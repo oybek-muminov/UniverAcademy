@@ -1,0 +1,738 @@
+{
+  "status": "SYNTHETIC_REVIEW_ONLY_CANDIDATE_FIXTURES_NOT_OWNER_ACCEPTANCE",
+  "contract_sha256": "280503a6a306c62e60dacea8a067137b37bcde151e6c2101d0beb4cbe09a25eb",
+  "context": {
+    "assignmentId": "00000000-0000-4000-8000-000000000001",
+    "attemptId": "00000000-0000-4000-8000-000000000002",
+    "successorId": "00000000-0000-4000-8000-000000000003",
+    "title": "Sun’iy fizika testi"
+  },
+  "cases": {
+    "profileIncomplete": {
+      "schema": "Profile",
+      "data": {
+        "person_id": "00000000-0000-4000-8000-000000000008",
+        "first_name": "Namuna",
+        "last_name": "O‘quvchi",
+        "roles": [
+          "student"
+        ],
+        "registration_complete": false,
+        "active_group_id": null,
+        "qadam_id": "0000000001"
+      }
+    },
+    "profileRegistered": {
+      "schema": "Profile",
+      "data": {
+        "person_id": "00000000-0000-4000-8000-000000000008",
+        "first_name": "Namuna",
+        "last_name": "O‘quvchi",
+        "roles": [
+          "student"
+        ],
+        "registration_complete": true,
+        "active_group_id": "00000000-0000-4000-8000-000000000007",
+        "qadam_id": "0000000001"
+      }
+    },
+    "examOpen": {
+      "schema": "Meta",
+      "data": {
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "version_id": "00000000-0000-4000-8000-000000000005",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "title": "Sun’iy fizika testi",
+        "instructions_blocks": [
+          {
+            "type": "text",
+            "markdown": "Faqat mapping sinovi."
+          }
+        ],
+        "question_count": 1,
+        "duration_seconds": 720,
+        "opens_at": "2026-11-05T10:00:00Z",
+        "closes_at": "2026-11-05T11:01:00Z",
+        "admission_status": "open",
+        "server_now": "2026-11-05T11:00:00Z",
+        "series": {
+          "series_id": null,
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": null,
+          "generation": 0,
+          "state_revision": 0,
+          "current_status": null,
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": null,
+          "normal_attempt_used": false
+        },
+        "review_gate": {
+          "id": "00000000-0000-4000-8000-000000000040",
+          "status": "blocked",
+          "revision": 0,
+          "barrier_revision": 0,
+          "barrier_complete": false,
+          "eligible_unresolved_count": 1,
+          "active_count": 0,
+          "recovery_ready_count": 0,
+          "timezone": "Asia/Tashkent",
+          "first_opened_at": null,
+          "opens_at": null,
+          "closes_at": null,
+          "server_now": "2026-11-05T11:00:00Z"
+        }
+      }
+    },
+    "examClosed": {
+      "schema": "Meta",
+      "data": {
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "version_id": "00000000-0000-4000-8000-000000000005",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "title": "Sun’iy fizika testi",
+        "instructions_blocks": [
+          {
+            "type": "text",
+            "markdown": "Faqat mapping sinovi."
+          }
+        ],
+        "question_count": 1,
+        "duration_seconds": 720,
+        "opens_at": "2026-11-05T10:00:00Z",
+        "closes_at": "2026-11-05T11:01:00Z",
+        "admission_status": "closed",
+        "server_now": "2026-11-05T11:00:00Z",
+        "series": {
+          "series_id": null,
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": null,
+          "generation": 0,
+          "state_revision": 0,
+          "current_status": null,
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": null,
+          "normal_attempt_used": false
+        },
+        "review_gate": {
+          "id": "00000000-0000-4000-8000-000000000040",
+          "status": "blocked",
+          "revision": 0,
+          "barrier_revision": 0,
+          "barrier_complete": false,
+          "eligible_unresolved_count": 1,
+          "active_count": 0,
+          "recovery_ready_count": 0,
+          "timezone": "Asia/Tashkent",
+          "first_opened_at": null,
+          "opens_at": null,
+          "closes_at": null,
+          "server_now": "2026-11-05T11:00:00Z"
+        }
+      }
+    },
+    "ready": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 2,
+        "status": "ready",
+        "state_revision": 2,
+        "started_at": null,
+        "deadline_at": null,
+        "completed_at": null,
+        "cancelled_at": null,
+        "completion_reason": null,
+        "server_now": "2026-11-05T11:05:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000003",
+          "generation": 2,
+          "state_revision": 2,
+          "current_status": "ready",
+          "recovery_state": "ready",
+          "recovery": {
+            "opens_at": "2026-11-05T11:05:00Z",
+            "closes_at": "2026-11-05T12:00:00Z",
+            "duration_seconds": 720
+          },
+          "official_result_attempt_id": null,
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "in_progress": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 1,
+        "status": "in_progress",
+        "state_revision": 1,
+        "started_at": "2026-11-05T11:00:00Z",
+        "deadline_at": "2026-11-05T11:12:00Z",
+        "completed_at": null,
+        "cancelled_at": null,
+        "completion_reason": null,
+        "server_now": "2026-11-05T11:00:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "generation": 1,
+          "state_revision": 1,
+          "current_status": "in_progress",
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": null,
+          "normal_attempt_used": true
+        },
+        "questions": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "display_position": 1,
+            "prompt_blocks": [
+              {
+                "type": "text",
+                "markdown": "Sun’iy savol: yo‘l va vaqt orasidagi bog‘lanish."
+              },
+              {
+                "type": "formula",
+                "latex": "s = v t",
+                "display": "block"
+              },
+              {
+                "type": "image",
+                "asset": {
+                  "asset_id": "00000000-0000-4000-8000-000000000030",
+                  "url": "https://media.invalid/synthetic-diagram.png",
+                  "expires_at": "2026-11-05T12:00:00Z",
+                  "content_type": "image/png"
+                },
+                "alt": "Sun’iy harakat diagrammasi",
+                "caption": "Fixture, haqiqiy test materiali emas"
+              }
+            ],
+            "options": [
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "display_position": 1,
+                "blocks": [
+                  {
+                    "type": "text",
+                    "markdown": "Namuna A"
+                  }
+                ]
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000021",
+                "display_position": 2,
+                "blocks": [
+                  {
+                    "type": "text",
+                    "markdown": "Namuna B"
+                  }
+                ]
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000022",
+                "display_position": 3,
+                "blocks": [
+                  {
+                    "type": "text",
+                    "markdown": "Namuna C"
+                  }
+                ]
+              },
+              {
+                "id": "00000000-0000-4000-8000-000000000023",
+                "display_position": 4,
+                "blocks": [
+                  {
+                    "type": "text",
+                    "markdown": "Namuna D"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "answers": [
+          {
+            "question_id": "00000000-0000-4000-8000-000000000006",
+            "selected_option_id": "00000000-0000-4000-8000-000000000021",
+            "revision": 1,
+            "saved_at": "2026-11-05T11:00:00Z",
+            "series_state_revision": 1
+          }
+        ]
+      }
+    },
+    "submitted": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 1,
+        "status": "submitted",
+        "state_revision": 1,
+        "started_at": "2026-11-05T11:00:00Z",
+        "deadline_at": "2026-11-05T11:12:00Z",
+        "completed_at": "2026-11-05T11:05:00Z",
+        "cancelled_at": null,
+        "completion_reason": "submitted",
+        "server_now": "2026-11-05T11:05:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "generation": 1,
+          "state_revision": 1,
+          "current_status": "submitted",
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "expired": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 1,
+        "status": "expired",
+        "state_revision": 1,
+        "started_at": "2026-11-05T11:00:00Z",
+        "deadline_at": "2026-11-05T11:12:00Z",
+        "completed_at": "2026-11-05T11:12:00Z",
+        "cancelled_at": null,
+        "completion_reason": "deadline_expired",
+        "server_now": "2026-11-05T11:12:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "generation": 1,
+          "state_revision": 1,
+          "current_status": "expired",
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "forced": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 1,
+        "status": "forced",
+        "state_revision": 1,
+        "started_at": "2026-11-05T11:00:00Z",
+        "deadline_at": "2026-11-05T11:12:00Z",
+        "completed_at": "2026-11-05T11:05:00Z",
+        "cancelled_at": null,
+        "completion_reason": "admin_forced",
+        "server_now": "2026-11-05T11:05:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "generation": 1,
+          "state_revision": 1,
+          "current_status": "forced",
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "cancelled": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 1,
+        "status": "cancelled",
+        "state_revision": 1,
+        "started_at": "2026-11-05T11:00:00Z",
+        "deadline_at": "2026-11-05T11:12:00Z",
+        "completed_at": null,
+        "cancelled_at": "2026-11-05T11:05:00Z",
+        "completion_reason": "technical_failure",
+        "server_now": "2026-11-05T11:05:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "generation": 1,
+          "state_revision": 1,
+          "current_status": "cancelled",
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": null,
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "recovery_lapsed": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 2,
+        "status": "recovery_lapsed",
+        "state_revision": 2,
+        "started_at": null,
+        "deadline_at": null,
+        "completed_at": "2026-11-05T12:00:00Z",
+        "cancelled_at": null,
+        "completion_reason": "recovery_window_elapsed",
+        "server_now": "2026-11-05T12:00:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000003",
+          "generation": 2,
+          "state_revision": 2,
+          "current_status": "recovery_lapsed",
+          "recovery_state": "lapsed",
+          "recovery": {
+            "opens_at": "2026-11-05T11:00:00Z",
+            "closes_at": "2026-11-05T12:00:00Z",
+            "duration_seconds": 720
+          },
+          "official_result_attempt_id": null,
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "cancelledWithSuccessor": {
+      "schema": "Attempt",
+      "data": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "demo_id": "00000000-0000-4000-8000-000000000004",
+        "assignment_id": "00000000-0000-4000-8000-000000000001",
+        "generation": 1,
+        "status": "cancelled",
+        "state_revision": 1,
+        "started_at": "2026-11-05T11:00:00Z",
+        "deadline_at": "2026-11-05T11:12:00Z",
+        "completed_at": "2026-11-05T11:05:00Z",
+        "cancelled_at": "2026-11-05T18:05:00Z",
+        "completion_reason": "technical_failure",
+        "server_now": "2026-11-05T18:05:00Z",
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000003",
+          "generation": 2,
+          "state_revision": 2,
+          "current_status": "ready",
+          "recovery_state": "ready",
+          "recovery": {
+            "opens_at": "2026-11-05T18:05:00Z",
+            "closes_at": "2026-11-05T19:00:00Z",
+            "duration_seconds": 720
+          },
+          "official_result_attempt_id": null,
+          "normal_attempt_used": true
+        },
+        "questions": [],
+        "answers": []
+      }
+    },
+    "savedAnswer": {
+      "schema": "Answer",
+      "data": {
+        "question_id": "00000000-0000-4000-8000-000000000006",
+        "selected_option_id": "00000000-0000-4000-8000-000000000021",
+        "revision": 1,
+        "saved_at": "2026-11-05T11:00:00Z",
+        "series_state_revision": 1
+      }
+    },
+    "clearedAnswer": {
+      "schema": "Answer",
+      "data": {
+        "question_id": "00000000-0000-4000-8000-000000000006",
+        "selected_option_id": null,
+        "revision": 2,
+        "saved_at": "2026-11-05T11:00:00Z",
+        "series_state_revision": 1
+      }
+    },
+    "pendingResult": {
+      "schema": "StudentAttemptGradingResult",
+      "data": {
+        "attempt_id": "00000000-0000-4000-8000-000000000002",
+        "ordinary": null,
+        "statistical_bonus": null
+      }
+    },
+    "ordinaryResult": {
+      "schema": "StudentCompletedGradingResult",
+      "data": {
+        "attempt_id": "00000000-0000-4000-8000-000000000002",
+        "ordinary": {
+          "earned_points": 1.5,
+          "max_points": 2,
+          "percentage": 75,
+          "calculated_at": "2026-11-05T11:05:00Z",
+          "display": {
+            "earned_points": "1.5",
+            "max_points": "2.0",
+            "percentage": "75.00"
+          }
+        },
+        "statistical_bonus": null
+      }
+    },
+    "bonusResult": {
+      "schema": "StudentCompletedGradingResult",
+      "data": {
+        "attempt_id": "00000000-0000-4000-8000-000000000002",
+        "ordinary": {
+          "earned_points": 1.5,
+          "max_points": 2,
+          "percentage": 75,
+          "calculated_at": "2026-11-05T11:05:00Z",
+          "display": {
+            "earned_points": "1.5",
+            "max_points": "2.0",
+            "percentage": "75.00"
+          }
+        },
+        "statistical_bonus": {
+          "calculation_id": "00000000-0000-4000-8000-000000000041",
+          "earned_points": 2.25,
+          "calculated_at": "2026-11-05T18:00:00Z",
+          "display": {
+            "earned_points": "2.3"
+          }
+        }
+      }
+    },
+    "successorResult": {
+      "schema": "StudentCompletedGradingResult",
+      "data": {
+        "attempt_id": "00000000-0000-4000-8000-000000000003",
+        "ordinary": {
+          "earned_points": 1.5,
+          "max_points": 2,
+          "percentage": 75,
+          "calculated_at": "2026-11-05T11:05:00Z",
+          "display": {
+            "earned_points": "1.5",
+            "max_points": "2.0",
+            "percentage": "75.00"
+          }
+        },
+        "statistical_bonus": null
+      }
+    },
+    "historyRecovery": {
+      "schema": "History",
+      "data": {
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000003",
+          "generation": 2,
+          "state_revision": 2,
+          "current_status": "ready",
+          "recovery_state": "ready",
+          "recovery": {
+            "opens_at": "2026-11-05T18:05:00Z",
+            "closes_at": "2026-11-05T19:00:00Z",
+            "duration_seconds": 720
+          },
+          "official_result_attempt_id": null,
+          "normal_attempt_used": true
+        },
+        "attempts": [
+          {
+            "lifecycle_status": "cancelled",
+            "score": {
+              "attempt_id": "00000000-0000-4000-8000-000000000002",
+              "ordinary": {
+                "earned_points": 1.5,
+                "max_points": 2,
+                "percentage": 75,
+                "calculated_at": "2026-11-05T11:05:00Z",
+                "display": {
+                  "earned_points": "1.5",
+                  "max_points": "2.0",
+                  "percentage": "75.00"
+                }
+              },
+              "statistical_bonus": {
+                "calculation_id": "00000000-0000-4000-8000-000000000041",
+                "earned_points": 2.25,
+                "calculated_at": "2026-11-05T18:00:00Z",
+                "display": {
+                  "earned_points": "2.3"
+                }
+              }
+            },
+            "started_at": "2026-11-05T11:00:00Z",
+            "deadline_at": "2026-11-05T11:12:00Z",
+            "completed_at": "2026-11-05T11:05:00Z",
+            "cancellation": {
+              "cancelled_at": "2026-11-05T18:05:00Z",
+              "prior_status": "submitted",
+              "reason_code": "technical_failure"
+            }
+          },
+          {
+            "lifecycle_status": "ready",
+            "score": null,
+            "started_at": null,
+            "deadline_at": null,
+            "completed_at": null,
+            "cancellation": null
+          }
+        ]
+      }
+    },
+    "historyCompleted": {
+      "schema": "History",
+      "data": {
+        "series": {
+          "series_id": "00000000-0000-4000-8000-000000000010",
+          "demo_id": "00000000-0000-4000-8000-000000000004",
+          "current_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "generation": 1,
+          "state_revision": 1,
+          "current_status": "submitted",
+          "recovery_state": "none",
+          "recovery": null,
+          "official_result_attempt_id": "00000000-0000-4000-8000-000000000002",
+          "normal_attempt_used": true
+        },
+        "attempts": [
+          {
+            "lifecycle_status": "submitted",
+            "score": {
+              "attempt_id": "00000000-0000-4000-8000-000000000002",
+              "ordinary": {
+                "earned_points": 1.5,
+                "max_points": 2,
+                "percentage": 75,
+                "calculated_at": "2026-11-05T11:05:00Z",
+                "display": {
+                  "earned_points": "1.5",
+                  "max_points": "2.0",
+                  "percentage": "75.00"
+                }
+              },
+              "statistical_bonus": null
+            },
+            "started_at": "2026-11-05T11:00:00Z",
+            "deadline_at": "2026-11-05T11:12:00Z",
+            "completed_at": "2026-11-05T11:05:00Z",
+            "cancellation": null
+          }
+        ]
+      }
+    },
+    "error_APP_SESSION_EXPIRED": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "APP_SESSION_EXPIRED",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    },
+    "error_FORBIDDEN": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "FORBIDDEN",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    },
+    "error_NOT_FOUND": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "NOT_FOUND",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    },
+    "error_REVISION_CONFLICT": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "REVISION_CONFLICT",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    },
+    "error_INVALID_OPTION": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "INVALID_OPTION",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    },
+    "error_RATE_LIMITED": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "RATE_LIMITED",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    },
+    "error_SERVICE_UNAVAILABLE": {
+      "schema": "Error",
+      "data": {
+        "error": {
+          "code": "SERVICE_UNAVAILABLE",
+          "message": "Sun’iy xato fixture",
+          "request_id": "00000000-0000-4000-8000-000000000050"
+        }
+      }
+    }
+  },
+  "schema_validation_status": "NOT_RUN_FULL_OWNER_SCHEMA_BYTES_NOT_INCLUDED_IN_MINIMAL_HANDOFF"
+}

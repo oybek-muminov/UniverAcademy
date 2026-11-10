@@ -1,0 +1,7 @@
+dist-demo/
+dist/
+test-results/
+node_modules
+.vite/
+__pycache__/
+*.pyc

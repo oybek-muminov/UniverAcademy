@@ -1,0 +1,1364 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UniverAcademy API — ordinary scoring and optional statistical bonus",
+    "version": "0.2.9-admin-assignment-policy-a-candidate.1",
+    "description": "PROVISIONAL, NOT ACCEPTED. New user decision freezes Rasch for a later phase and restores statistical bonus instead of the optional Rasch action. Exactly two active scoring mechanisms: ordinary and optional group statistical bonus. Unanswered counts as incorrect by explicit new user reply. Teacher own-group/subject optional action, Owner existing authority; no Admin activation. Question default45/editable, positive fractional points, initial individual off, ordinary display2, protected Asia/Tashkent admission, current-self-submitted population and frozen one-shot/recovery attribution retained from latest mechanics. API wire and numerical/storage proposals require Backend review; no implementation, migration or deployment performed. Local decision delta: transfer blocked only by a started current active attempt; revoke unstarted recovery eligibility on successful transfer and retain history. User selected policy A: Admin assignment requires existing manage_content and current group/subject scope; manage_roster is independent for roster mutations. No inherited acceptance."
+  },
+  "servers": [
+    {
+      "url": "https://api.invalid/api/v1",
+      "description": "Nonfunctional placeholder; origin not yet approved."
+    }
+  ],
+  "paths": {
+    "/admin/students/{student_id}/transfer": {
+      "post": {
+        "operationId": "transferStudent",
+        "summary": "transferStudent",
+        "description": "O-01. Only Owner or delegated Admin with manage_roster and current source/target group scope. Atomic transfer from current group or retained affinity when inactive. Same target as affinity is not a transfer (409 MEMBERSHIP_STATE_CONFLICT); use member route to re-add. Check current membership CAS after auth/privacy; only a started current in_progress attempt with locked now < deadline blocks transfer. At/after deadline materialize completion first. Unstarted approved ready recovery, including a future opens_at, never blocks transfer and is revoked atomically on successful transfer, retaining its historical window and existing attempts/answers. Commit changes affinity+membership epoch, revokes ALL old unstarted grants, keeps result/attempt history and global normal-demo usage; re-add cannot restore old access. Fresh grants require explicit authorization bound to new epoch. See x-membership-rules. No previous affinity is initial placement, not transfer:409 MEMBERSHIP_STATE_CONFLICT; use member route. The latest user decision confirms the transfer active-only guard and cancellation of unstarted recovery eligibility; exact delegation/storage/concurrency mechanics remain local review design. Removal policy is separate.",
+        "security": [
+          {
+            "StaffJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessTransferResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferWrite"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/versions/{version_id}": {
+      "patch": {
+        "operationId": "updateDraftVersion",
+        "summary": "Replace editable draft version metadata",
+        "description": "Replace draft duration/instructions/ordinary grading under existing version CAS; published immutable. Default question target45 is Teacher-editable and not a fixed array limit. No question content/ID changes from metadata edit.",
+        "security": [
+          {
+            "StaffJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessVersion"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionPatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/groups/{group_id}/members": {
+      "put": {
+        "operationId": "groupMembership",
+        "summary": "groupMembership",
+        "description": "O-01. Teacher with current own-group grant and manage_roster may initially add a never-placed registered pupil, remove own active member, or re-add an inactive pupil whose server-owned placement affinity is this group. A transfer changes affinity even if the pupil is later removed; owning both groups never permits cross-group re-add. Different-affinity active writes by any actor must use privileged transfer. Removal revokes old unstarted grants by membership epoch, cancels unsent notices and recalculates barriers; history and normal-demo usage remain. Re-add never resurrects old grants. Removal retains its separately reviewed active/ready guard. Transfer follows the latest user decision: only a started active attempt blocks; unstarted ready recovery is revoked on successful transfer. Auth/scope/privacy before state and replay; group+membership CAS, transaction and K as x-membership-rules. Returns immutable command receipt. The product authority is confirmed in Master Context 1.0; exact capability/scope, affinity and concurrency mechanics here are review design and do not constitute new historical approvals.",
+        "security": [
+          {
+            "StaffJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMembershipMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberWrite"
+              }
+            }
+          }
+        },
+        "x-membership-authority": {
+          "teacher": {
+            "allowed_statuses": [
+              "active",
+              "removed"
+            ],
+            "requires_current_own_group_grant": true,
+            "requires_manage_roster": true,
+            "initial": "no previous membership",
+            "readd": "inactive and affinity_group_id equals target",
+            "removal": "own current active member",
+            "other_affinity_denial": "404 NOT_FOUND; unauthorized candidate existence is hidden"
+          },
+          "transfer": {
+            "executing_roles": [
+              "owner",
+              "admin"
+            ],
+            "admin_requires_current_capability_and_source_target_scope": true,
+            "direct_member_write_cannot_transfer": true
+          },
+          "concurrency": {
+            "group_revision_precondition": true,
+            "membership_revision_precondition": true,
+            "person_membership_anchor_lock": true,
+            "competing_placement": "one commits; second rechecks privacy: now-foreign affinity404 NOT_FOUND; still-visible stale membership409 STATE_REVISION_CONFLICT, or active409 ACTIVE_GROUP_EXISTS if submitted with current revision",
+            "increments": [
+              "Group.revision",
+              "person.membership_revision"
+            ]
+          }
+        }
+      }
+    },
+    "/admin/assignments": {
+      "post": {
+        "operationId": "createAssignment",
+        "summary": "createAssignment",
+        "description": "Explicit group roster, pinned stable demo/version, required IANA timezone and review policy. Admission times do not cap active deadlines. UNIQUE(group,demo) pilot, student global demo usage still enforced. Review timezone confirmed Asia/Tashkent; never assume UTC calendar. Assigned subject/group Teacher may configure reminder_lead_seconds per group test, within approved safe server bounds; never a global fixed lead override. Current content/group grants required. Null disables pre-opening reminder, opening category remains separately consent-controlled. U-GR-15: for already-rostered late pupils, classroom session ending early cannot shorten the protected end-of-day start right. Correct actual assignment UTC close from explicitly configured local day/timezone; Asia/Tashkent is confirmed, actual local exam day still configured explicitly. Latest user decision: Admin initially performs membership and assignment duties; later Teacher delegation must not remove Admin authority. User-confirmed policy A: a current enabled approved Admin may create assignments with existing manage_content and current target-group/version-subject mutation scope. manage_roster is not required for assignment and remains separately required for roster mutations. A test-management-only Admin may assign an already-rostered pupil; a roster-only/read-only Admin cannot create assignments. The endpoint does not create or reactivate membership. Owner existing authority remains; Teacher assignment implementation remains pending. Reauthorize current authority and scope on receipt replay.",
+        "security": [
+          {
+            "StaffJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAssignment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/versions/{version_id}/questions/{question_id}": {
+      "put": {
+        "operationId": "writeQuestion",
+        "summary": "writeQuestion",
+        "description": "Full draft content upsert with optional individual_points. Existing four-option, path-ID, shared version revision, approved-subject/asset and published freeze rules remain. Required per-question values are checked at publish, conditional on GradingConfig.",
+        "security": [
+          {
+            "StaffJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionWrite"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/versions/{version_id}/publish": {
+      "post": {
+        "operationId": "publishVersion",
+        "summary": "publishVersion",
+        "description": "Existing subject, content/key/options and validated asset checks plus snapshot of effective question base points: every question 1 when individual_enabled=false; individual inputs for every question when true. Missing individual values invalid. Every effective point must be positive, at least1 question and max>0; display2 decimals, no rounded intermediate score. Tie rounding/storage limits technical review. Published content and grading snapshot immutable.",
+        "security": [
+          {
+            "StaffJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Publish"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "ErrorResponse": {
+        "description": "Structured safe error. See canonical document/code catalog; no credentials/keys/foreign PII.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "const": "no-store"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Assignment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "demo_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opens_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "timezone": {
+            "$ref": "#/components/schemas/IanaTimezone"
+          },
+          "review_policy": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "teacher_approval"
+            ]
+          },
+          "reminder_lead_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "admission_status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "open",
+              "closed",
+              "cancelled"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "demo_id",
+          "version_id",
+          "group_id",
+          "opens_at",
+          "closes_at",
+          "timezone",
+          "review_policy",
+          "reminder_lead_seconds",
+          "admission_status",
+          "revision"
+        ]
+      },
+      "AssignmentCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "demo_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opens_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "timezone": {
+            "$ref": "#/components/schemas/IanaTimezone"
+          },
+          "review_policy": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "teacher_approval"
+            ]
+          },
+          "student_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "reminder_lead_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "demo_id",
+          "version_id",
+          "group_id",
+          "opens_at",
+          "closes_at",
+          "timezone",
+          "review_policy",
+          "student_ids",
+          "reminder_lead_seconds"
+        ],
+        "description": "Group roster/pinned version and explicit UTC admission schedule/IANA timezone, subject/group authorization. Classroom session end must not revoke already-rostered late pupils' start right until EOD (U-GR-15). Asia/Tashkent and protected next-local-midnight close confirmed; actual demo day still configured; do not select early admission close as a classroom finish. Existing reminders and review policy preserved."
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "request_id"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "INIT_DATA_INVALID",
+                  "INIT_DATA_EXPIRED",
+                  "INIT_DATA_REPLAY",
+                  "REFRESH_INVALID",
+                  "REFRESH_EXPIRED",
+                  "REFRESH_REUSED",
+                  "SESSION_REVOKED",
+                  "ACCOUNT_DISABLED",
+                  "APP_SESSION_EXPIRED",
+                  "ACCESS_SUPERSEDED",
+                  "STAFF_NOT_APPROVED",
+                  "STAFF_TOKEN_INVALID",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "MALFORMED_REQUEST",
+                  "INVALID_CURSOR",
+                  "VALIDATION_ERROR",
+                  "INVALID_TIMEZONE",
+                  "RATE_LIMITED",
+                  "INTERNAL_ERROR",
+                  "SERVICE_UNAVAILABLE",
+                  "IDEMPOTENCY_CONFLICT",
+                  "REVISION_CONFLICT",
+                  "RESOURCE_REVISION_CONFLICT",
+                  "STATE_REVISION_CONFLICT",
+                  "REQUEST_TARGET_CHANGED",
+                  "REQUEST_PRECONDITION_MISMATCH",
+                  "REQUEST_TERMINAL",
+                  "ALREADY_APPROVED_TEACHER",
+                  "ADMISSION_CLOSED",
+                  "RECOVERY_ADMISSION_CLOSED",
+                  "NORMAL_ATTEMPT_USED",
+                  "ACTIVE_EXAM_OR_RECOVERY",
+                  "PROFILE_INCOMPLETE",
+                  "ATTEMPT_NOT_COMPLETED",
+                  "ATTEMPT_TERMINAL",
+                  "ATTEMPT_EXPIRED",
+                  "ATTEMPT_SUPERSEDED",
+                  "EXAM_ACCESS_REVOKED",
+                  "INVALID_OPTION",
+                  "VERSION_FROZEN",
+                  "ASSET_NOT_VALIDATED",
+                  "ASSET_PURPOSE_MISMATCH",
+                  "UPLOAD_REJECTED",
+                  "REVIEW_BARRIER_INCOMPLETE",
+                  "REVIEW_NOT_OPEN",
+                  "REVIEW_CLOSED",
+                  "REVIEW_EXPOSURE_OWNER_ACK_REQUIRED",
+                  "CAPABILITY_REQUIRED",
+                  "SUBJECT_NOT_APPROVED",
+                  "LOGOUT_PROOF_REQUIRED",
+                  "LOGOUT_PROOF_MISMATCH",
+                  "MALFORMED_JSON",
+                  "UPLOAD_EXPIRED",
+                  "UPLOAD_NOT_READY",
+                  "UPLOAD_HASH_MISMATCH",
+                  "ASSET_SCOPE_INVALID",
+                  "IDENTIFIER_MISMATCH",
+                  "INVALID_TIME_WINDOW",
+                  "INVALID_REVIEW_WINDOW",
+                  "RESPONSE_INVARIANT_FAILED",
+                  "ADMIN_TRANSFER_REQUIRED",
+                  "ACTIVE_GROUP_EXISTS",
+                  "MEMBERSHIP_STATE_CONFLICT",
+                  "MEMBERSHIP_CHANGED",
+                  "GRADING_POLICY_UNRESOLVED",
+                  "INVALID_GRADING_CONFIG",
+                  "STATISTICAL_BONUS_NOT_READY",
+                  "BONUS_EMPTY_COHORT"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "FormulaBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "formula"
+          },
+          "latex": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "block"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "latex",
+          "display"
+        ]
+      },
+      "GradingConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "individual_enabled": {
+            "type": "boolean",
+            "description": "Explicit Teacher choice. Direct review.3 user confirmation: a new test initially uses false, every question worth1. Teacher can enable individual mode and set positive fractional points. Clients must still send this required boolean explicitly; no server default or omitted-field permission is implied. Existing test values are not reset."
+          }
+        },
+        "required": [
+          "individual_enabled"
+        ],
+        "description": "Teacher individual grading initially off on new test; required boolean explicitly sent. Off effective base1 per question; on positive fractional points. Existing test values retained. Optional statistical bonus is a separate one-time group calculation."
+      },
+      "IanaTimezone": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Confirmed project examination timezone: Asia/Tashkent (Uzbekistan). Persist IANA name; derive midnight with timezone calendar, never truncate started duration.",
+        "const": "Asia/Tashkent"
+      },
+      "ImageInputBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "image"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "alt": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "type",
+          "asset_id",
+          "alt"
+        ]
+      },
+      "IndividualQuestionPointsString": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6,
+        "pattern": "^(?:(?:0|[1-9]|[12][0-9])(?:\\.[0-9]{1,3})?|30(?:\\.0{1,3})?)(?![\\s\\S])",
+        "not": {
+          "pattern": "^0(?:\\.0{1,3})?(?![\\s\\S])"
+        },
+        "description": "Approved individual QUESTION base: exact plain decimal string,0<value<=30, at most3 fractional digits including trailing zeros. Reject excess digits/range; never round, trim excess zeros or clip to pass validation. No exponent/sign/comma/whitespace/leading zeros. Missing/null draft behavior unchanged. This limit is not a total/percentage/bonus cap."
+      },
+      "InputBlock": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TextBlock"
+          },
+          {
+            "$ref": "#/components/schemas/FormulaBlock"
+          },
+          {
+            "$ref": "#/components/schemas/ImageInputBlock"
+          }
+        ]
+      },
+      "MemberWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "removed"
+            ]
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_membership_revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "student_id",
+          "status",
+          "expected_revision",
+          "expected_membership_revision"
+        ],
+        "description": "O-01: group revision AND membership revision CAS. Teacher initial placement, own-group removal, or same-affinity re-add only; different-affinity placement requires privileged transfer. Removal guard is separate; transfer blocks only a started active attempt and revokes unstarted recovery eligibility. UUID selected through authorized directory/candidate; Qadam ID itself grants nothing."
+      },
+      "MembershipMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "removed"
+            ]
+          },
+          "group_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "membership_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revoked_unstarted_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "student_id",
+          "group_id",
+          "status",
+          "group_revision",
+          "membership_revision",
+          "revoked_unstarted_count"
+        ],
+        "description": "Immutable command receipt at application time, not a current membership snapshot. Same K replay never reapplies effects; fetch current scoped state separately."
+      },
+      "OptionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputBlock"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "blocks"
+        ]
+      },
+      "Publish": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "reason",
+          "expected_revision"
+        ]
+      },
+      "QuestionWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "prompt_blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputBlock"
+            },
+            "minItems": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionInput"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "correct_option_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "explanation_blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputBlock"
+            },
+            "minItems": 0
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "individual_points": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndividualQuestionPointsString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When present/non-null: exact individual QUESTION points string,0<value<=30, at most3 fractional digits; reject excess digits or range without rounding/clipping. Existing missing/null/requiredness unchanged; publish with individual_enabled=true requires each value. individual_enabled=false effective base remains1. No total/percentage/bonus cap."
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "prompt_blocks",
+          "options",
+          "correct_option_id",
+          "explanation_blocks",
+          "expected_revision"
+        ],
+        "description": "Full draft content upsert with optional individual_points. Existing four-option, path-ID, shared version revision, approved-subject/asset and published freeze rules remain. Required per-question values are checked at publish, conditional on GradingConfig."
+      },
+      "SuccessAssignment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Assignment"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessMembershipMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MembershipMutation"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessTransferResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TransferResult"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "TextBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "text"
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "type",
+          "markdown"
+        ]
+      },
+      "TransferResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previous_group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "membership_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revoked_unstarted_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "student_id",
+          "previous_group_id",
+          "active_group_id",
+          "membership_revision",
+          "revoked_unstarted_count"
+        ]
+      },
+      "TransferWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "to_group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          },
+          "expected_membership_revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "to_group_id",
+          "reason",
+          "expected_membership_revision"
+        ]
+      },
+      "Version": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "demo_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "instructions_blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputBlock"
+            },
+            "minItems": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "grading_config": {
+            "$ref": "#/components/schemas/GradingConfig"
+          }
+        },
+        "required": [
+          "id",
+          "demo_id",
+          "version_no",
+          "duration_seconds",
+          "instructions_blocks",
+          "status",
+          "revision",
+          "grading_config"
+        ],
+        "description": "Draft or published test duration/instructions and explicit ordinary grading configuration. Shared revision/published immutability remain. Proposed wire addition; individual points must be positive, fractional allowed; full precision, display2 decimals."
+      },
+      "VersionPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "instructions_blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputBlock"
+            },
+            "minItems": 1
+          },
+          "grading_config": {
+            "$ref": "#/components/schemas/GradingConfig"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "duration_seconds",
+          "instructions_blocks",
+          "grading_config"
+        ],
+        "description": "Replace draft duration/instructions/ordinary grading under existing version CAS; published immutable. Default question target45 is Teacher-editable and not a fixed array limit. No question content/ID changes from metadata edit."
+      }
+    },
+    "securitySchemes": {
+      "StaffJWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Only enabled approved staff: project Auth issuer/aud authenticated, JWKS exp/nbf/sub/session_id, ledger/current DB roles/grants. Admin all-group read, Teacher own-group student data plus approved-subject content-wide management. No client role trust."
+      }
+    }
+  },
+  "x-source-sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4",
+  "x-status": "LOCAL_STAFF_HANDLER_CANDIDATE_NOT_PRODUCTION_ACCEPTANCE"
+}

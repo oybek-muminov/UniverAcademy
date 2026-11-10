@@ -1,0 +1,209 @@
+{
+  "status": "LOCAL_PROPOSAL_NOT_APPLIED_NOT_ACCEPTED",
+  "base_commit": "9a9dd43cd0f565bac8f8b333b044f54650919531",
+  "base_openapi_sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4",
+  "proposal_version": "0.3.0-clerk-auth-proposal.1",
+  "json_patch": [
+    {
+      "op": "replace",
+      "path": "/info/version",
+      "value": "0.3.0-clerk-auth-proposal.1"
+    },
+    {
+      "op": "add",
+      "path": "/components/securitySchemes/ClerkSessionBearer",
+      "value": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Clerk session JWT v2; RS256; sub=user_… sid=sess_…; no cookie fallback"
+      }
+    },
+    {
+      "op": "add",
+      "path": "/components/schemas/ClerkExchangeRequest",
+      "value": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "op": "add",
+      "path": "/paths/~1auth~1clerk",
+      "value": {
+        "post": {
+          "operationId": "exchangeClerkSession",
+          "summary": "Exchange verified Clerk session for a student opaque application session",
+          "description": "LOCAL CANDIDATE / NOT ACCEPTED. Explicit Clerk v2 RS256 bearer profile, case-sensitive user_/sess_ IDs, authorized party and current provider liveness plus server identity mapping. Existing account is reused; absent mapping creates only an incomplete ungrouped student. Same email/name never links identities. New successful student login supersedes old app family; retired provider sessions cannot reclaim it. No staff entitlement or device policy is inferred.",
+          "security": [
+            {
+              "ClerkSessionBearer": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClerkExchangeRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "headers": {
+                "Cache-Control": {
+                  "schema": {
+                    "const": "no-store",
+                    "type": "string"
+                  }
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SuccessSession"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "401": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "403": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "404": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "409": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "422": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "429": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "500": {
+              "$ref": "#/components/responses/ErrorResponse"
+            },
+            "503": {
+              "$ref": "#/components/responses/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "replace",
+      "path": "/paths/~1admin~1versions~1{version_id}~1questions~1{question_id}/put/security",
+      "value": [
+        {
+          "ClerkSessionBearer": []
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "path": "/paths/~1admin~1versions~1{version_id}/patch/security",
+      "value": [
+        {
+          "ClerkSessionBearer": []
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "path": "/paths/~1admin~1versions~1{version_id}~1publish/post/security",
+      "value": [
+        {
+          "ClerkSessionBearer": []
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "path": "/paths/~1admin~1groups~1{group_id}~1members/put/security",
+      "value": [
+        {
+          "ClerkSessionBearer": []
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "path": "/paths/~1admin~1assignments/post/security",
+      "value": [
+        {
+          "ClerkSessionBearer": []
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "path": "/paths/~1admin~1students~1{student_id}~1transfer/post/security",
+      "value": [
+        {
+          "ClerkSessionBearer": []
+        }
+      ]
+    }
+  ],
+  "provider_profile": {
+    "issuer": "exact configured HTTPS Frontend API origin",
+    "algorithm": "RS256 only; trusted backend key resolver",
+    "required_claims": [
+      "iss",
+      "sub",
+      "sid",
+      "iat",
+      "nbf",
+      "exp",
+      "azp",
+      "jti",
+      "v"
+    ],
+    "v": 2,
+    "azp": "required exact configured HTTPS authorized party",
+    "audience": "explicit required(value) OR clerk_default_no_audience requiring absent aud; no silent fallback or ignored unexpected audience",
+    "pending_or_impersonated": "rejected",
+    "external_identifiers": "case-sensitive base62 suffix; no guessed fixed length; UUID staff verifier unchanged",
+    "liveness": "fresh normalized issuer/user/session binding, active status, enabled account, provider session expiry"
+  },
+  "staff_auth_proposal": {
+    "implemented_existing_operations": [
+      "PUT /admin/versions/{version}/questions/{question}",
+      "PATCH /admin/versions/{version}",
+      "POST /admin/versions/{version}/publish",
+      "PUT /admin/groups/{group}/members",
+      "POST /admin/assignments",
+      "POST /admin/students/{student}/transfer"
+    ],
+    "bearer": "Candidate security diff included for the six implemented operations only; default device-policy gate stays503 pending product decision",
+    "authority": "current mapped internal person roles plus approved server capabilities/group/subject scope; JWT/organization claims ignored",
+    "device_policy": "UNRESOLVED; absent reviewed server gate returns503 STAFF_DEVICE_POLICY_UNRESOLVED; fixture gate is not a product policy"
+  },
+  "blocked_not_added_to_openapi": {
+    "POST /auth/telegram/link": "409 IDENTITY_LINK_POLICY_UNRESOLVED after valid Clerk proof/current mapping/liveness; no link/merge/transfer mutation"
+  },
+  "storage_review_required": [
+    "canonical internal UUID remains unchanged; external issuer+user ID unique/case-sensitive",
+    "new Clerk account may have null Telegram ID; existing SQL readers/schema have not been adapted",
+    "atomic identity/Qadam/membership creation, one active family, immutable provider family binding",
+    "retired student provider sessions, exchange proof digests and retention must persist transactionally",
+    "all identity/person/session locks and fresh time/provider checks before commit; no raw proofs at rest"
+  ],
+  "pending_decisions": [
+    "Telegram two-proof linking/reassignment/unlink protocol, UX and expiry; no inferred email/phone/name merge",
+    "staff device policy and enforcement protocol",
+    "retired student device interactive re-entry UX; no silent reinstatement",
+    "real Clerk claim/authorized-party/audience profile and provider liveness integration review"
+  ],
+  "current_contract_client_types_modified": false
+}
