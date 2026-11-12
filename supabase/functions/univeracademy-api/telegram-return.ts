@@ -11,7 +11,7 @@ export type TelegramSession={access_token:string;refresh_token:string;expires_at
 export type TelegramReturnPort={link(proof:ClerkProof,raw:string):Promise<{ok:true}>;resume(raw:string):Promise<TelegramSession>};
 export type TelegramLaunch=Readonly<{telegramUserId:number;authDate:number;replayDigest:string}>;
 const verifiedLaunches=new WeakSet<object>();
-const unavailable=():never=>fail("SERVICE_UNAVAILABLE",503);
+function unavailable():never{return fail("SERVICE_UNAVAILABLE",503);}
 const plain=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==="object"&&[null,Object.prototype].includes(Object.getPrototypeOf(value));
 const ownValue=(value:Record<string,unknown>,key:string)=>{
   const d=Object.getOwnPropertyDescriptor(value,key);if(!d||!Object.hasOwn(d,"value"))fail("VALIDATION_ERROR",422);return d.value;
