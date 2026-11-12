@@ -4,6 +4,7 @@ import { readFileSync, openSync, writeFileSync, fsyncSync, closeSync, renameSync
 import { dirname } from "node:path";
 import assert from "node:assert/strict";
 const resetSql="SELECT set_config('ua.phase',$1,true),set_config('ua.person_id',$2,true),set_config('ua.person_ids',$3,true),set_config('ua.clerk_issuer',$4,true),set_config('ua.clerk_subject',$5,true),set_config('ua.telegram_id',$6,true)";
+const staffLocatorSql="SELECT person_id::text FROM ua_private.staff_identities WHERE issuer=$1 AND provider_subject=$2 AND revoked_at_ms IS NULL";
 const contextKeys=["phase","person_id","person_ids","clerk_issuer","clerk_subject","telegram_id"];
 const controls={ua_begin:["ua_commit","ua_rollback"],ua_clerk_begin:["ua_clerk_commit","ua_clerk_rollback"],ua_locator_begin:[null,"ua_locator_rollback"],ua_clerk_locator_begin:[null,"ua_clerk_locator_rollback"]};
 const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\s\S])/.test(v);
@@ -45,6 +46,16 @@ export class DiskExecutor {
     const ack = () => result([{}]);
     const execute=async ({ name, text, values: v }) => {
         this.events.push(name);
+        // StaffAccessRows.locate uses a separate, read-only checkout before BEGIN.
+        // Admit only its exact bound hint query; no other extension runs here.
+        if(name==="ua_staff_identity_locate"){
+          assert.equal(active,false,"STAFF_LOCATOR_BEFORE_BEGIN");assert.equal(text,staffLocatorSql,"STAFF_LOCATOR_SQL");values(v,2);
+          assert.ok(typeof v[0]==="string"&&v[0].startsWith("https://")&&uuid(v[1]),"STAFF_LOCATOR_ARGUMENTS");
+          if(this.failStatement===name){this.failStatement=null;throw Error("SYNTHETIC_WRITE_FAILURE");}
+          assert.equal(typeof this.extension,"function","STAFF_LOCATOR_HANDLER_REQUIRED");
+          const snapshot=this.read(),before=structuredClone(snapshot),answer=await this.extension({name,text,values:v},snapshot);
+          assert.deepEqual(snapshot,before,"STAFF_LOCATOR_READ_ONLY");assert.notEqual(answer,undefined,"STAFF_LOCATOR_HANDLER_REQUIRED");return answer;
+        }
         if(Object.hasOwn(controls,name)){
           assert.equal(active,false,"TRANSACTION_ALREADY_ACTIVE");assert.equal(text,"BEGIN","TRANSACTION_SQL");values(v,0);
           if(this.failStatement===name){this.failStatement=null;throw Error("SYNTHETIC_WRITE_FAILURE");}

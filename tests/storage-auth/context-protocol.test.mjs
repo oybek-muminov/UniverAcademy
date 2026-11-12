@@ -1,10 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {DiskExecutor,durableWrite} from './disk-executor.mjs';
 import {PostgresTransactions} from '../../supabase/functions/univeracademy-api/storage/postgres-transaction.ts';
+import {StaffAccessRows} from '../../supabase/functions/univeracademy-api/storage/staff-access-rows.ts';
+import {firstTestExecutor} from '../first-test/executor.mjs';
 import {resetTrustedServerContext,setTrustedPhase,setTrustedPeople,setTrustedClerk,setTrustedTelegram,closeTrustedServerContext} from '../../supabase/functions/univeracademy-api/storage/trusted-server-context.ts';
 
 const P='00000000-0000-4000-8000-000000000001',Q='00000000-0000-4000-8000-000000000002';
@@ -87,4 +89,78 @@ for(const failure of ['before','after'])test('runner preserves commit_unknown an
 test('rollback/discard clears transaction state after reset failure and never ACKs active release',async t=>{
  const pool=await setup(t);pool.failStatement='ua_context_reset';await assert.rejects(new PostgresTransactions(pool).run([P],async()=>assert.fail('UNREACHABLE')),/SYNTHETIC_WRITE_FAILURE/);assert.equal(pool.events.filter(x=>x==='ua_rollback').length,1);assert.equal(pool.releasedDiscard,false);
  const c=await pool.connect();await query(c,'ua_begin','BEGIN');assert.throws(()=>c.release(),/ACTIVE_TRANSACTION_RELEASE/);
+});
+
+// Inert verified-proof inputs exercise the actual row adapter, not JWT verification.
+const staffIssuer='https://synthetic.invalid/auth/v1',staffSubject='10000000-0000-4000-8000-00000000000a',otherStaffSubject='10000000-0000-4000-8000-00000000000b';
+const staffLocatorSql='SELECT person_id::text FROM ua_private.staff_identities WHERE issuer=$1 AND provider_subject=$2 AND revoked_at_ms IS NULL';
+const staffLocator=(values=[staffIssuer,staffSubject],text=staffLocatorSql)=>({name:'ua_staff_identity_locate',text,values});
+const staffProof={kind:'staff_verified',issuer:staffIssuer,subject:staffSubject,providerSessionId:P,notBefore:0,expiresAt:20000};
+async function staffPool(t){
+ const base=await setup(t),d=base.read();
+ d.staffIdentities={[staffIssuer+'|'+staffSubject]:{person_id:P,revoked_at_ms:null},[staffIssuer+'|'+otherStaffSubject]:{person_id:Q,revoked_at_ms:null}};
+ durableWrite(base.path,d);return firstTestExecutor(base.path);
+}
+for(const stale of [false,true])test('staff locator actual adapter reads one bound hint before BEGIN without changing rows/context; stale='+stale,async t=>{
+ const pool=await staffPool(t);if(stale)pool.sessionContext={phase:'domain',person_id:Q,person_ids:JSON.stringify([Q]),clerk_issuer:'https://old.invalid',clerk_subject:'user_Old',telegram_id:'123'};
+ const before=readFileSync(pool.path,'utf8'),context=structuredClone(pool.sessionContext),previous=pool.extension;let calls=0;
+ pool.extension=async(statement,d)=>{calls++;assert.deepEqual(statement,staffLocator());return previous(statement,d);};
+ assert.equal(await new StaffAccessRows().locate(pool,staffProof),P);assert.equal(calls,1);
+ assert.deepEqual(pool.events,['ua_staff_identity_locate','release']);assert.equal(pool.releasedDiscard,false);assert.equal(readFileSync(pool.path,'utf8'),before);
+ assert.deepEqual(pool.contextEvents,[{name:'ua_staff_identity_locate',before:context,after:context,active:false}]);
+});
+test('staff locator returns only the exact issuer/subject mapping; disabled person is a hint, never authorization',async t=>{
+ const pool=await staffPool(t),d=pool.read();d.people[P]={enabled:false,roles:['student'],profile:{private:'unreturned'}};durableWrite(pool.path,d);
+ const c=await pool.connect();t.after(()=>c.release(true));
+ assert.deepEqual(await c.query(staffLocator()),{rows:[{person_id:P}],rowCount:1});
+ assert.deepEqual(await c.query(staffLocator([staffIssuer,otherStaffSubject])),{rows:[{person_id:Q}],rowCount:1});
+ assert.deepEqual(await c.query(staffLocator(['https://other.invalid/auth/v1',staffSubject])),{rows:[],rowCount:0});
+});
+for(const reason of ['absent','wrong-issuer','revoked'])test('staff locator actual adapter rejects '+reason+' identity without writes and releases once',async t=>{
+ const pool=await staffPool(t),d=pool.read();if(reason==='absent')delete d.staffIdentities[staffIssuer+'|'+staffSubject];if(reason==='revoked')d.staffIdentities[staffIssuer+'|'+staffSubject].revoked_at_ms=1;durableWrite(pool.path,d);
+ const before=readFileSync(pool.path,'utf8');await assert.rejects(new StaffAccessRows().locate(pool,{...staffProof,...(reason==='wrong-issuer'?{issuer:'https://other.invalid/auth/v1'}:{})}),e=>e.code==='STAFF_TOKEN_INVALID'&&e.status===401);
+ assert.equal(readFileSync(pool.path,'utf8'),before);assert.deepEqual(pool.events,['ua_staff_identity_locate','release']);assert.equal(pool.releasedDiscard,false);
+});
+const invalidStaffValues=[
+ ['empty-issuer',['',staffSubject]],['http-issuer',['http://synthetic.invalid/auth/v1',staffSubject]],['null-issuer',[null,staffSubject]],['numeric-issuer',[42,staffSubject]],
+ ['empty-subject',[staffIssuer,'']],['non-uuid-subject',[staffIssuer,'user_Staff']],['uppercase-subject',[staffIssuer,staffSubject.toUpperCase()]],['trailing-subject',[staffIssuer,staffSubject+'\n']],['null-subject',[staffIssuer,null]],['numeric-subject',[staffIssuer,42]],
+ ['missing-value',[staffIssuer]],['extra-value',[staffIssuer,staffSubject,'extra']],['sparse-value',Array(2)],['extra-property',Object.assign([staffIssuer,staffSubject],{extra:true})]
+];
+for(const [label,values]of invalidStaffValues)test('staff locator rejects invalid arguments before the handler: '+label,async t=>{
+ const pool=await staffPool(t),before=readFileSync(pool.path,'utf8'),c=await pool.connect();t.after(()=>c.release(true));let calls=0;pool.extension=()=>{calls++;assert.fail('UNEXPECTED_HANDLER');};
+ await assert.rejects(c.query(staffLocator(values)),/STAFF_LOCATOR_ARGUMENTS|CONTEXT_VALUES_SHAPE/);assert.equal(calls,0);assert.equal(readFileSync(pool.path,'utf8'),before);assert.deepEqual(c.context,{});
+});
+for(const [label,text]of [['projection',staffLocatorSql.replace('person_id::text','*')],['revocation-filter',staffLocatorSql.replace(' AND revoked_at_ms IS NULL','')],['write','UPDATE ua_private.staff_identities SET person_id=$1 WHERE provider_subject=$2'],['swapped-binds',staffLocatorSql.replace('issuer=$1 AND provider_subject=$2','issuer=$2 AND provider_subject=$1')]])test('staff locator rejects altered SQL before the handler: '+label,async t=>{
+ const pool=await staffPool(t),c=await pool.connect();t.after(()=>c.release(true));let calls=0;pool.extension=()=>{calls++;assert.fail('UNEXPECTED_HANDLER');};await assert.rejects(c.query(staffLocator(undefined,text)),/STAFF_LOCATOR_SQL/);assert.equal(calls,0);
+});
+test('staff locator rejects statement/value getters without invoking them',async t=>{
+ const pool=await staffPool(t),c=await pool.connect();t.after(()=>c.release(true));let gets=0,calls=0;pool.extension=()=>{calls++;assert.fail('UNEXPECTED_HANDLER');};
+ const values=[staffIssuer,staffSubject];Object.defineProperty(values,'1',{get(){gets++;throw Error('unread');}});await assert.rejects(c.query(staffLocator(values)),/CONTEXT_VALUES_SHAPE/);
+ const statement={text:staffLocatorSql,values:[staffIssuer,staffSubject]};Object.defineProperty(statement,'name',{enumerable:true,get(){gets++;throw Error('unread');}});await assert.rejects(c.query(statement),/STATEMENT_SHAPE/);
+ await assert.rejects(c.query({...staffLocator(),extra:true}),/STATEMENT_SHAPE/);assert.equal(gets,0);assert.equal(calls,0);
+});
+for(const stage of ['uninitialized','deny','auth','domain','exchange'])test('staff locator is pretransaction-only; active '+stage+' rejects, rolls back and can reuse the checkout',async t=>{
+ const pool=await staffPool(t),c=await pool.connect();t.after(()=>c.release(true));let calls=0;const previous=pool.extension;pool.extension=(...args)=>{calls++;return previous(...args);};
+ await query(c,'ua_begin','BEGIN');if(stage!=='uninitialized')await resetTrustedServerContext(c);if(['auth','domain','exchange'].includes(stage))await setTrustedPhase(c,'auth');
+ if(['domain','exchange'].includes(stage)){await setTrustedPeople(c,[P]);if(stage==='exchange')await setTrustedClerk(c,'https://issuer.invalid','user_Staff');await setTrustedPhase(c,stage);}
+ await assert.rejects(c.query(staffLocator()),/STAFF_LOCATOR_BEFORE_BEGIN/);assert.equal(calls,0);await assert.rejects(query(c,'ua_clock','SELECT now'),/TRANSACTION_ABORTED/);await rollback(c);
+ assert.deepEqual((await c.query(staffLocator())).rows,[{person_id:P}]);assert.equal(calls,1);
+});
+test('staff locator does not initialize or bypass the next transaction reset',async t=>{
+ const pool=await staffPool(t),c=await pool.connect();t.after(()=>c.release(true));await c.query(staffLocator());await query(c,'ua_begin','BEGIN');await assert.rejects(query(c,'ua_clock','SELECT now'),/CONTEXT_RESET_REQUIRED/);await rollback(c);
+ await query(c,'ua_begin','BEGIN');await resetTrustedServerContext(c);await setTrustedPhase(c,'auth');assert.deepEqual((await query(c,'ua_clock','SELECT now')).rows,[{now_ms:'10000'}]);await rollback(c);
+});
+for(const name of ['ua_staff_identity_locate_extra','ua_staff_access_current','ua_first_questions','ua_unknown'])test('staff locator exception does not admit unrelated pretransaction statement '+name,async t=>{
+ const pool=await staffPool(t),c=await pool.connect();t.after(()=>c.release(true));let calls=0;pool.extension=()=>{calls++;assert.fail('UNEXPECTED_HANDLER');};await assert.rejects(c.query({...staffLocator(),name}),/TRANSACTION_REQUIRED/);assert.equal(calls,0);
+});
+test('staff locator requires its exact handler and rejects mutation of the read snapshot',async t=>{
+ const pool=await setup(t),before=readFileSync(pool.path,'utf8'),c=await pool.connect();t.after(()=>c.release(true));await assert.rejects(c.query(staffLocator()),/STAFF_LOCATOR_HANDLER_REQUIRED/);
+ pool.extension=()=>undefined;await assert.rejects(c.query(staffLocator()),/STAFF_LOCATOR_HANDLER_REQUIRED/);
+ pool.extension=(_statement,d)=>{d.writes++;return{rows:[],rowCount:0};};await assert.rejects(c.query(staffLocator()),/STAFF_LOCATOR_READ_ONLY/);assert.equal(readFileSync(pool.path,'utf8'),before);
+});
+test('staff locator failure releases once without retry, then a fresh acquisition can read',async t=>{
+ const pool=await staffPool(t),before=readFileSync(pool.path,'utf8');pool.failStatement='ua_staff_identity_locate';
+ await assert.rejects(new StaffAccessRows().locate(pool,staffProof),/SYNTHETIC_WRITE_FAILURE/);assert.deepEqual(pool.events,['ua_staff_identity_locate','release']);assert.equal(readFileSync(pool.path,'utf8'),before);
+ assert.equal(await new StaffAccessRows().locate(pool,staffProof),P);assert.deepEqual(pool.events,['ua_staff_identity_locate','release','ua_staff_identity_locate','release']);
+ const c=await pool.connect();c.release();await assert.rejects(c.query(staffLocator()),/CLIENT_ALREADY_RELEASED/);
 });
