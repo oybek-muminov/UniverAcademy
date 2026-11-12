@@ -24,6 +24,16 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/telegram/link": {
+        parameters: { query?: never; header?: never; path?: never; cookie?: never };
+        get?: never; put?: never; post: operations["linkTelegramIdentity"];
+        delete?: never; options?: never; head?: never; patch?: never; trace?: never;
+    };
+    "/auth/telegram/resume": {
+        parameters: { query?: never; header?: never; path?: never; cookie?: never };
+        get?: never; put?: never; post: operations["resumeTelegramSession"];
+        delete?: never; options?: never; head?: never; patch?: never; trace?: never;
+    };
     "/auth/telegram": {
         parameters: {
             query?: never;
@@ -333,12 +343,14 @@ export interface components {
             answers: components["schemas"]["Answer"][];
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
         ClerkExchangeRequest: Record<string, never>;
+        TelegramLinkRequest: { init_data: string };
+        TelegramResumeRequest: { init_data: string };
         /** @description Server final two-decimal nonnegative display from authoritative exact source; HALF_UP candidate requires approval. 0.00 can represent a positive source such as0.004, never input rejection or source rounding. */
         DecimalDisplay2: string;
         Error: {
             error: {
                 /** @enum {string} */
-                code: "INIT_DATA_INVALID" | "INIT_DATA_EXPIRED" | "INIT_DATA_REPLAY" | "REFRESH_INVALID" | "REFRESH_EXPIRED" | "REFRESH_REUSED" | "SESSION_REVOKED" | "ACCOUNT_DISABLED" | "APP_SESSION_EXPIRED" | "ACCESS_SUPERSEDED" | "STAFF_NOT_APPROVED" | "STAFF_TOKEN_INVALID" | "FORBIDDEN" | "NOT_FOUND" | "MALFORMED_REQUEST" | "INVALID_CURSOR" | "VALIDATION_ERROR" | "INVALID_TIMEZONE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_CONFLICT" | "REVISION_CONFLICT" | "RESOURCE_REVISION_CONFLICT" | "STATE_REVISION_CONFLICT" | "REQUEST_TARGET_CHANGED" | "REQUEST_PRECONDITION_MISMATCH" | "REQUEST_TERMINAL" | "ALREADY_APPROVED_TEACHER" | "ADMISSION_CLOSED" | "RECOVERY_ADMISSION_CLOSED" | "NORMAL_ATTEMPT_USED" | "ACTIVE_EXAM_OR_RECOVERY" | "PROFILE_INCOMPLETE" | "ATTEMPT_NOT_COMPLETED" | "ATTEMPT_TERMINAL" | "ATTEMPT_EXPIRED" | "ATTEMPT_SUPERSEDED" | "EXAM_ACCESS_REVOKED" | "INVALID_OPTION" | "VERSION_FROZEN" | "ASSET_NOT_VALIDATED" | "ASSET_PURPOSE_MISMATCH" | "UPLOAD_REJECTED" | "REVIEW_BARRIER_INCOMPLETE" | "REVIEW_NOT_OPEN" | "REVIEW_CLOSED" | "REVIEW_EXPOSURE_OWNER_ACK_REQUIRED" | "CAPABILITY_REQUIRED" | "SUBJECT_NOT_APPROVED" | "LOGOUT_PROOF_REQUIRED" | "LOGOUT_PROOF_MISMATCH" | "MALFORMED_JSON" | "UPLOAD_EXPIRED" | "UPLOAD_NOT_READY" | "UPLOAD_HASH_MISMATCH" | "ASSET_SCOPE_INVALID" | "IDENTIFIER_MISMATCH" | "INVALID_TIME_WINDOW" | "INVALID_REVIEW_WINDOW" | "RESPONSE_INVARIANT_FAILED" | "ADMIN_TRANSFER_REQUIRED" | "ACTIVE_GROUP_EXISTS" | "MEMBERSHIP_STATE_CONFLICT" | "MEMBERSHIP_CHANGED" | "GRADING_POLICY_UNRESOLVED" | "INVALID_GRADING_CONFIG" | "STATISTICAL_BONUS_NOT_READY" | "BONUS_EMPTY_COHORT" | "CLERK_TOKEN_INVALID" | "CLERK_SESSION_REVOKED" | "CLERK_IDENTITY_REVOKED" | "CLERK_SESSION_SUPERSEDED" | "CLERK_TOKEN_REPLAY";
+                code: "IDENTITY_LINK_CONFLICT" | "TELEGRAM_LINK_REQUIRED" | "INIT_DATA_INVALID" | "INIT_DATA_EXPIRED" | "INIT_DATA_REPLAY" | "REFRESH_INVALID" | "REFRESH_EXPIRED" | "REFRESH_REUSED" | "SESSION_REVOKED" | "ACCOUNT_DISABLED" | "APP_SESSION_EXPIRED" | "ACCESS_SUPERSEDED" | "STAFF_NOT_APPROVED" | "STAFF_TOKEN_INVALID" | "FORBIDDEN" | "NOT_FOUND" | "MALFORMED_REQUEST" | "INVALID_CURSOR" | "VALIDATION_ERROR" | "INVALID_TIMEZONE" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_CONFLICT" | "REVISION_CONFLICT" | "RESOURCE_REVISION_CONFLICT" | "STATE_REVISION_CONFLICT" | "REQUEST_TARGET_CHANGED" | "REQUEST_PRECONDITION_MISMATCH" | "REQUEST_TERMINAL" | "ALREADY_APPROVED_TEACHER" | "ADMISSION_CLOSED" | "RECOVERY_ADMISSION_CLOSED" | "NORMAL_ATTEMPT_USED" | "ACTIVE_EXAM_OR_RECOVERY" | "PROFILE_INCOMPLETE" | "ATTEMPT_NOT_COMPLETED" | "ATTEMPT_TERMINAL" | "ATTEMPT_EXPIRED" | "ATTEMPT_SUPERSEDED" | "EXAM_ACCESS_REVOKED" | "INVALID_OPTION" | "VERSION_FROZEN" | "ASSET_NOT_VALIDATED" | "ASSET_PURPOSE_MISMATCH" | "UPLOAD_REJECTED" | "REVIEW_BARRIER_INCOMPLETE" | "REVIEW_NOT_OPEN" | "REVIEW_CLOSED" | "REVIEW_EXPOSURE_OWNER_ACK_REQUIRED" | "CAPABILITY_REQUIRED" | "SUBJECT_NOT_APPROVED" | "LOGOUT_PROOF_REQUIRED" | "LOGOUT_PROOF_MISMATCH" | "MALFORMED_JSON" | "UPLOAD_EXPIRED" | "UPLOAD_NOT_READY" | "UPLOAD_HASH_MISMATCH" | "ASSET_SCOPE_INVALID" | "IDENTIFIER_MISMATCH" | "INVALID_TIME_WINDOW" | "INVALID_REVIEW_WINDOW" | "RESPONSE_INVARIANT_FAILED" | "ADMIN_TRANSFER_REQUIRED" | "ACTIVE_GROUP_EXISTS" | "MEMBERSHIP_STATE_CONFLICT" | "MEMBERSHIP_CHANGED" | "GRADING_POLICY_UNRESOLVED" | "INVALID_GRADING_CONFIG" | "STATISTICAL_BONUS_NOT_READY" | "BONUS_EMPTY_COHORT" | "CLERK_TOKEN_INVALID" | "CLERK_SESSION_REVOKED" | "CLERK_IDENTITY_REVOKED" | "CLERK_SESSION_SUPERSEDED" | "CLERK_TOKEN_REPLAY";
                 message: string;
                 /** Format: uuid */
                 request_id: string;
@@ -607,6 +619,74 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ClerkExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessSession"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            422: components["responses"]["ErrorResponse"];
+            429: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+            503: components["responses"]["ErrorResponse"];
+        };
+    };
+    linkTelegramIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessAck"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            422: components["responses"]["ErrorResponse"];
+            429: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+            503: components["responses"]["ErrorResponse"];
+        };
+    };
+    resumeTelegramSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramResumeRequest"];
             };
         };
         responses: {

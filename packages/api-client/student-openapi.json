@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "UniverAcademy student Clerk exchange review — NOT ACCEPTED",
-    "version": "0.3.0-clerk-exchange-review.1",
-    "description": "PROVISIONAL / NOT ACCEPTED. Exchange-only derived review view. Other behavior retains the exact baseline; no inherited acceptance."
+    "version": "0.3.1-telegram-return-review.1",
+    "description": "PROVISIONAL / NOT ACCEPTED. Telegram link/resume derived review; prior endpoints retained byte-equivalent as JSON values. No runtime or deployment acceptance."
   },
   "paths": {
     "/auth/clerk": {
@@ -1007,6 +1007,142 @@
           }
         }
       }
+    },
+    "/auth/telegram/link": {
+      "post": {
+        "operationId": "linkTelegramIdentity",
+        "summary": "Link verified Telegram identity to current mapped Clerk person",
+        "description": "Fresh Clerk JWT bearer and fresh signed Telegram init_data. Server verifies both identities/current authority; same pair ACKs without tokens, merge or rebinding. Conflicting side returns409 IDENTITY_LINK_CONFLICT. Clerk JTI exchange ledger does not deny this authenticated link. No client person/role/email identity. No automatic retry after uncertain outcome.",
+        "security": [
+          {
+            "ClerkSessionBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/auth/telegram/resume": {
+      "post": {
+        "operationId": "resumeTelegramSession",
+        "summary": "Resume linked existing Clerk-bound student family with fresh Telegram proof",
+        "description": "Authorization MUST be absent. Fresh signed init_data selects only the persisted link and unique current eligible Clerk-bound family. Current provider liveness and expiry are required. Rotate proofs preserving family ID/absolute expiry; never create a person/family or invent SID. Missing link409 TELEGRAM_LINK_REQUIRED consumes nothing; revoked/expired401 CLERK_SESSION_REVOKED; replay409 INIT_DATA_REPLAY; ambiguous or provider/commit uncertainty503 without retry.",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramResumeRequest"
+              }
+            }
+          }
+        },
+        "x-authorization-header": "MUST_BE_ABSENT"
+      }
     }
   },
   "components": {
@@ -1682,7 +1818,9 @@
                   "CLERK_SESSION_REVOKED",
                   "CLERK_IDENTITY_REVOKED",
                   "CLERK_SESSION_SUPERSEDED",
-                  "CLERK_TOKEN_REPLAY"
+                  "CLERK_TOKEN_REPLAY",
+                  "IDENTITY_LINK_CONFLICT",
+                  "TELEGRAM_LINK_REQUIRED"
                 ]
               },
               "message": {
@@ -2874,6 +3012,34 @@
           "type",
           "markdown"
         ]
+      },
+      "TelegramLinkRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          }
+        },
+        "required": [
+          "init_data"
+        ]
+      },
+      "TelegramResumeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          }
+        },
+        "required": [
+          "init_data"
+        ]
       }
     },
     "securitySchemes": {
@@ -2890,8 +3056,10 @@
     }
   },
   "x-source": {
-    "full_openapi_sha256": "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28",
+    "full_openapi_sha256": "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c",
     "base_openapi_sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4",
-    "status": "PROVISIONAL / NOT ACCEPTED"
+    "status": "PROVISIONAL / NOT ACCEPTED",
+    "full_openapi_path": "contracts/telegram-return.openapi.json",
+    "previous_full_openapi_sha256": "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28"
   }
 }

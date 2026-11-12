@@ -2,8 +2,8 @@ import type { components } from "./student-types.d.ts";
 
 type Schema = components["schemas"];
 export type StudentSchema = Schema;
-export const STUDENT_CONTRACT_SHA256 = "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28";
-export const STUDENT_CONTRACT_VERSION = "0.3.0-clerk-exchange-review.1";
+export const STUDENT_CONTRACT_SHA256 = "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c";
+export const STUDENT_CONTRACT_VERSION = "0.3.1-telegram-return-review.1";
 export const STUDENT_CONTRACT_REVIEW_STATUS = "PROVISIONAL / NOT ACCEPTED";
 
 export class StudentClientProtocolError extends Error {
@@ -105,6 +105,18 @@ function buildStudentClient(root: string, transport: (request: Request) => Promi
     // response suite separately validates pinned schemas; do not infer API acceptance.
     return value as T;
   }
+  // New proof operations accept only their exact own data field; never read
+  // caller identity extras or getters, cache a Clerk JWT, or retry a launch.
+  function telegramInput(input: unknown): { init_data: string } {
+    if (!input || typeof input !== "object" || ![Object.prototype, null].includes(Object.getPrototypeOf(input)) ||
+        Reflect.ownKeys(input).length !== 1 || !Object.hasOwn(input, "init_data"))
+      throw new StudentClientProtocolError("INVALID_TELEGRAM_REQUEST");
+    const field = Object.getOwnPropertyDescriptor(input, "init_data");
+    if (!field || !Object.hasOwn(field, "value") || typeof field.value !== "string" ||
+        field.value.length === 0 || field.value.length > 16384)
+      throw new StudentClientProtocolError("INVALID_TELEGRAM_REQUEST");
+    return { init_data: field.value };
+  }
   const part = encodeURIComponent;
   const pendingRefresh = new Map<string, Promise<Schema["SuccessSession"]>>();
   const attemptedRefresh = new Set<string>();
@@ -113,6 +125,17 @@ function buildStudentClient(root: string, transport: (request: Request) => Promi
     // used for me/exams/refresh. Never persist this JWT or put it in a URL.
     exchangeClerkSession: (clerkSessionToken: string, input: Schema["ClerkExchangeRequest"] = {}) =>
       send<Schema["SuccessSession"]>("POST", "/auth/clerk", { accessToken: clerkSessionToken, body: input }),
+    async linkTelegramIdentity(clerkJwt: string, input: Schema["TelegramLinkRequest"]): Promise<Schema["SuccessAck"]> {
+      const body = telegramInput(input);
+      // Lexical JWT shape prevents accidental opaque-project-token transport.
+      // Authentication, freshness and claim validation remain server-owned.
+      if (typeof clerkJwt !== "string" || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(clerkJwt))
+        throw new StudentClientProtocolError("INVALID_CLERK_TOKEN");
+      return send<Schema["SuccessAck"]>("POST", "/auth/telegram/link", { accessToken: clerkJwt, body });
+    },
+    async resumeTelegramSession(input: Schema["TelegramResumeRequest"]): Promise<Schema["SuccessSession"]> {
+      return send<Schema["SuccessSession"]>("POST", "/auth/telegram/resume", { body: telegramInput(input) });
+    },
     telegramLogin: (input: Schema["TelegramLogin"]) =>
       send<Schema["SuccessSession"]>("POST", "/auth/telegram", { body: input }),
     refresh(input: Schema["Refresh"]): Promise<Schema["SuccessSession"]> {
