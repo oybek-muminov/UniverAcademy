@@ -1,0 +1,6 @@
+{
+  "name": "univeracademy-bot",
+  "main": "src/returning-worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "keep_vars": true
+}
