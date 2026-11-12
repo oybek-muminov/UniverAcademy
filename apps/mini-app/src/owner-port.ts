@@ -8,17 +8,24 @@ import type { StudentPort } from './flow.ts';
 // Shared UI adapter. Backend owns all operations, DTOs and constructor guards.
 // No server implementation, fixture identity or signing key is imported here.
 type Client = StudentClient;
+// Canonical operation signatures and DTOs remain Backend-owned.
+// Keep the runtime capability boundary fail-closed for stale JavaScript copies.
+function returnClient(client: Client): Client {
+  if (typeof client.linkTelegramIdentity !== 'function' || typeof client.resumeTelegramSession !== 'function')
+    throw new StudentFailure('protocol', 'TELEGRAM_RETURN_CLIENT_REQUIRED');
+  return client;
+}
 type View = { title: string; groupLabel: string; startAllowed: boolean };
 export type OwnerPortOptions = {
   mode: 'local_fixture' | 'production'; contractSha256: string; baseUrl: string;
-  loginMethod?: 'telegram' | 'clerk'; loginSignal?: AbortSignal;
+  loginMethod?: 'telegram' | 'clerk' | 'telegram_resume'; loginSignal?: AbortSignal;
   fetcher(request: Request): Promise<Response>; view(assignmentId: string, metadata?: StudentSchema['Meta']): View; assetUrl(value: string): string;
   now?: () => number;
   logoutReceiptPolicy?: { retentionMs: number; monotonicNow?: () => number };
 };
 export function createOwnerPort(options: OwnerPortOptions) {
   if (!['local_fixture', 'production'].includes(options.mode) || options.contractSha256 !== STUDENT_CONTRACT_SHA256) throw new Error('CONTRACT_HASH_MISMATCH');
-  if (options.loginMethod !== undefined && !['telegram', 'clerk'].includes(options.loginMethod)) throw new Error('LOGIN_METHOD_INVALID');
+  if (options.loginMethod !== undefined && !['telegram', 'clerk', 'telegram_resume'].includes(options.loginMethod)) throw new Error('LOGIN_METHOD_INVALID');
   // Native browser fetch must not receive the options object as its receiver.
   const fetcher = options.fetcher;
   const mapper = createWireMap({ assetUrl: options.assetUrl });
@@ -60,9 +67,12 @@ export function createOwnerPort(options: OwnerPortOptions) {
     origin: options.mode === 'production' ? options.baseUrl : 'https://local.invalid/api/v1', now: options.now,
     fetcher: async () => { throw new Error('Use Backend-owned client operations'); },
     logoutReceiptPolicy: options.logoutReceiptPolicy,
+    loginFailurePolicy: options.loginMethod === 'telegram_resume' ? 'telegram_return' : undefined,
     sessions: {
       login: async raw => projectSession((await call(client => options.loginMethod === 'clerk'
-        ? client.exchangeClerkSession(raw) : client.telegramLogin({ init_data: raw }), options.loginSignal)).data),
+        ? client.exchangeClerkSession(raw) : options.loginMethod === 'telegram_resume'
+          ? returnClient(client).resumeTelegramSession({ init_data: raw })
+          : client.telegramLogin({ init_data: raw }), options.loginSignal)).data),
       rotate: async refresh => projectSession((await call(client => client.refresh({ refresh_token: refresh }))).data),
       logout: async (refresh, signal) => {
         const ack = (await call(client => client.logoutByRefresh({ refresh_token: refresh }), signal)).data;
@@ -108,6 +118,14 @@ export function createOwnerPort(options: OwnerPortOptions) {
       mapper.history((await call(client => client.history(access, assignmentId))).data, context(assignmentId))),
   };
   return { port, auth: { login: transport.login, logout: transport.logout, person: transport.person,
+    requireTelegramReturn: () => call(async client => { returnClient(client); }, options.loginSignal),
+    async linkTelegramIdentity(clerkJwt: string, raw: string, person: string) {
+      if (!person || transport.person() !== person) throw new StudentFailure('auth', 'ACCESS_SUPERSEDED');
+      const result = await call(client => returnClient(client).linkTelegramIdentity(clerkJwt, { init_data: raw }), options.loginSignal);
+      if (transport.person() !== person) throw new StudentFailure('auth', 'ACCESS_SUPERSEDED', null, true);
+      if (!result?.data || result.data.ok !== true || Object.keys(result.data).length !== 1)
+        throw new StudentFailure('protocol', 'RESPONSE_INVARIANT_FAILED', null, true);
+    },
     clear: transport.clear,
     logoutReceipt: transport.logoutReceipt, retryLogoutReceipt: transport.retryLogoutReceipt, cancelLogoutReceipt: transport.cancelLogoutReceipt } };
 }

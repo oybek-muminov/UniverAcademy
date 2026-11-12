@@ -75,11 +75,11 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
       <small>{flow.signInMethod === 'clerk' ? 'Qayta kirishda Google yoki email usulini tanlang.' : 'Haqiqiy kirish nuqtasi: @univeracademybot'}</small>
     </section>}
 
-    {s.screen === 'profile' && <form className="card" onSubmit={event => {
+    {s.screen === 'profile' && <form key={s.student?.person} className="card" onSubmit={event => {
       event.preventDefault(); void flow.register(firstName.current!.value, lastName.current!.value);
     }}><h2>Ism va familiyangiz</h2><p>{mode === 'telegram' ? 'Ism va familiyangizni kiriting.' : 'Namuna uchun to‘qima ism ishlatishingiz mumkin.'}</p>
-      <label htmlFor="first-name">Ism</label><input id="first-name" ref={firstName} required maxLength={100} autoComplete="given-name" placeholder="Masalan, Aziz" />
-      <label htmlFor="last-name">Familiya</label><input id="last-name" ref={lastName} required maxLength={100} autoComplete="family-name" placeholder="Masalan, Karimov" />
+      <label htmlFor="first-name">Ism</label><input id="first-name" ref={firstName} defaultValue={s.student?.firstName ?? ''} required maxLength={100} autoComplete="given-name" placeholder="Masalan, Aziz" />
+      <label htmlFor="last-name">Familiya</label><input id="last-name" ref={lastName} defaultValue={s.student?.lastName ?? ''} required maxLength={100} autoComplete="family-name" placeholder="Masalan, Karimov" />
       <button className="primary" disabled={s.busy}>Davom etish →</button>
     </form>}
 

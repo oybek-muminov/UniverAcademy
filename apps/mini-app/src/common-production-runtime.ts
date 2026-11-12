@@ -5,6 +5,8 @@ import { createClerkAppSession } from './clerk-app-session.ts';
 import { createClerkSdkAdapter } from './clerk-sdk-adapter.ts';
 import type { ClerkSdkBindings } from './clerk-sdk-adapter.ts';
 import { StudentFailure } from './transport.ts';
+import { EntryFailure } from './sign-in-controller.ts';
+import type { TelegramReturnLaunch } from './telegram-return-launch.ts';
 
 export function readCommonEntryConfig(env: Readonly<Record<string, unknown>>, pageOrigin: string) {
   const config = readProductionConfig(env, pageOrigin);
@@ -27,11 +29,53 @@ export type CommonEntryConfig = ReturnType<typeof readCommonEntryConfig>;
 // Injectable SDK/HTTP seams for local tests. The real entry supplies public Clerk
 // hooks and fetch; no window slot, synthetic provider or local-client fallback.
 export function createCommonProductionRuntime(config: CommonEntryConfig, sdk: ClerkSdkBindings,
-  context: 'browser' | 'telegram_webview', fetcher: typeof fetch = fetch) {
+  context: 'browser' | 'telegram_webview', fetcher: typeof fetch = fetch,
+  options: { launch?: TelegramReturnLaunch } = {}) {
   if (sdk.callbackUrl !== config.callbackUrl) throw new StudentFailure('protocol', 'CALLBACK_CONFIG_MISMATCH');
   const provider = createClerkSdkAdapter(sdk);
-  const app = createClerkAppSession(signal => createProductionOwnerConnection({ mode: 'production',
+  const app = createClerkAppSession((signal, method = 'clerk') => createProductionOwnerConnection({ mode: 'production',
     baseUrl: config.apiBaseUrl, contractSha256: config.contractSha256 }, fetcher,
-  { loginMethod: 'clerk', loginSignal: signal }));
-  return createSignInController({ context, provider, ...app });
+  { loginMethod: method, loginSignal: signal }));
+  const launch = options.launch;
+  const runtime = createSignInController({ context, provider, retire: app.retire,
+    identityContext: () => { const session = sdk.session(); return session?.status === 'active' && !session.currentTask ? session.id : null; },
+    beforeAuthorize: () => {
+      try { launch?.beforeAuthorize(); } catch (error) { launch?.fail(); throw error; }
+    },
+    authorize: async evidence => {
+      try {
+        const authorization = await app.authorize(evidence, !!launch);
+        return { ...authorization, assertCurrent() { authorization.assertCurrent(); launch?.assertCurrent(); } };
+      }
+      catch (error) { launch?.fail(); throw error; }
+    },
+    afterAuthorize: launch ? async (authorization, check) => {
+      try {
+        const raw = launch.beginLink(); check();
+        // Ask SDK for another fresh default JWT; never forward stored exchange
+        // evidence or substitute the project's opaque access bearer.
+        const fresh = await provider.current!(); check(); launch.assertCurrent();
+        await app.link(authorization, fresh.proof, raw); check(); launch.linked();
+      } catch (error) { launch.fail(); throw error; }
+    } : undefined,
+    resume: launch ? async () => {
+      try {
+        const raw = launch.beginResume(), authorization = await app.resumeTelegram(raw);
+        launch.resumed();
+        return { ...authorization, assertCurrent() { authorization.assertCurrent(); launch.assertCurrent(); } };
+      } catch (error) {
+        if (error instanceof StudentFailure && ((error.kind === 'conflict' && error.code === 'TELEGRAM_LINK_REQUIRED')
+            || (error.kind === 'auth' && error.code === 'CLERK_SESSION_REVOKED'))) {
+          try { launch.requireClerk(); } catch (changed) { launch.fail(); throw changed; }
+          throw new EntryFailure(error.code);
+        }
+        launch.fail(); throw error;
+      }
+    } : undefined,
+  });
+  return { ...runtime, telegramOutcome: () => launch?.phase() ?? null,
+    reset() { launch?.fail(); return runtime.reset(); },
+    logout() { launch?.fail(); return runtime.logout(); },
+    dispose() { launch?.dispose(); runtime.dispose(); },
+  };
 }

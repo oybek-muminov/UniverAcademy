@@ -14,7 +14,7 @@ import {canonicalPersonId,resetTrustedServerContext,setTrustedPhase,setTrustedPe
 
 type Options={pool:PgPool;botToken?:string;sessionPolicy:SessionPolicy;now:()=>number;verifier?:ClerkVerifierConfiguration;liveness:ClerkLiveness;signal?:AbortSignal};
 type Hint={personId:string;enabled:boolean;identity:Pick<ClerkIdentity,"issuer"|"userId">|null;identityEnabled:boolean|null};
-const unavailable=():never=>{throw new StorageUnavailable("not_committed");};
+function unavailable():never{throw new StorageUnavailable("not_committed");}
 const validSubject=(v:unknown):v is string=>typeof v==="string"&&/^user_[A-Za-z0-9]+(?![\s\S])/.test(v);
 const validSid=(v:unknown):v is string=>typeof v==="string"&&/^sess_[A-Za-z0-9]+(?![\s\S])/.test(v);
 function origin(v:unknown):v is string{try{return typeof v==="string"&&v.startsWith("https://")&&new URL(v).origin===v;}catch{return false;}}

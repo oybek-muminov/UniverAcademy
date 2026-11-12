@@ -9,13 +9,17 @@ import { spawnSync } from 'node:child_process';
 
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
-const current = 'apps/mini-app/tests/fixtures/backend-d54d19c-clean-manifest.json';
+const current = 'apps/mini-app/tests/fixtures/backend-telegram-return-assembly-manifest.json';
+const previousClean = 'apps/mini-app/tests/fixtures/backend-d54d19c-clean-manifest.json';
 const lab208 = 'apps/mini-app/tests/fixtures/backend-d54d19c-manifest.json';
 const historicalAttempts = 'apps/mini-app/tests/fixtures/attempts-8a750ee.ts.txt';
 const copies = ['student-client.ts', 'student-types.d.ts'].map(name => 'apps/mini-app/src/owner-client/' + name);
 const attempts = 'supabase/functions/univeracademy-api/attempts.ts';
 const sha = value => createHash('sha256').update(value).digest('hex');
 const manifest = JSON.parse(readFileSync(join(source, current), 'utf8'));
+const previousCleanRaw = readFileSync(join(source, previousClean));
+assert.equal(previousCleanRaw.length, 19964);
+assert.equal(sha(previousCleanRaw), 'e3a6e0c368b957cd243fe9b2dedc7786d34d451d76737cd8542fbb6b198d0fd4');
 const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
@@ -23,11 +27,12 @@ assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c46
 const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts]]);
 let pristinePassed = false;
 
-function check(mutate, expected) {
+function check(mutate, expected, { rebindDigest = false } = {}) {
+  assert(!rebindDigest || expected, "TEST_DIGEST_REBIND_REQUIRES_NEGATIVE");
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, current, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, current, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -35,24 +40,30 @@ function check(mutate, expected) {
       before.set(name, sha(bytes)); writeFileSync(path, bytes);
     }
     mutate?.(root);
+    if (rebindDigest) {
+      const original = readFileSync(join(root, guard), 'utf8'), literal = /const ACTIVE_MANIFEST_SHA256 = '[a-f0-9]{64}';/g;
+      assert.equal([...original.matchAll(literal)].length, 1, 'ONE_TEST_COPY_DIGEST_LITERAL_REQUIRED');
+      writeFileSync(join(root, guard), original.replace(literal, "const ACTIVE_MANIFEST_SHA256 = '" + sha(readFileSync(join(root, current))) + "';"));
+    }
     const changed = inputs.filter(name => !existsSync(join(root, name)) || lstatSync(join(root, name)).isSymbolicLink() ||
       sha(readFileSync(join(root, name))) !== before.get(name));
-    assert.equal(changed.length, expected ? 1 : 0, 'CONTROL_MUST_CHANGE_ONLY_ITS_DELIBERATE_TARGET');
+    assert.equal(changed.length, rebindDigest ? 2 : expected ? 1 : 0, 'CONTROL_MUST_CHANGE_ONLY_ITS_DELIBERATE_TARGET');
     const result = spawnSync(process.execPath, [guard], { cwd: root, encoding: 'utf8' });
     assert.equal(result.status, expected ? 1 : 0, result.stderr);
     if (expected) {
       assert(result.stderr.includes(expected), result.stderr);
       const suffix = expected.split(': ')[1];
-      const target = expected === 'ENOENT' ? changed[0] :
+      const target = rebindDigest ? current : expected === 'ENOENT' ? changed[0] :
         expected.startsWith('OWNER_CLIENT_') ? 'apps/mini-app/src/owner-client/' + suffix :
         expected.startsWith('BACKEND_TARGET_') ? suffix : manifestErrors.get(expected);
-      assert.equal(changed[0], target, 'DIAGNOSTIC_MUST_IDENTIFY_THE_DELIBERATE_TARGET');
+      assert.deepEqual(changed.slice().sort(), rebindDigest ? [guard, target].sort() : [target], 'DIAGNOSTIC_MUST_IDENTIFY_THE_DELIBERATE_TARGET');
+      if (rebindDigest) assert(!result.stderr.includes('AssertionError [ERR_ASSERTION]: RUNTIME_MANIFEST_MISMATCH'), 'METADATA_PROBE_MUST_REACH_VALIDATION');
       if (expected === 'ENOENT') assert(result.stderr.includes(target), result.stderr);
     } else pristinePassed = true;
     if (process.env.UA_MINI_PIN_GUARD_TRACE_PATH) appendFileSync(process.env.UA_MINI_PIN_GUARD_TRACE_PATH,
       JSON.stringify({ control: expected ? 'negative' : 'pristine_positive', target: changed[0] ?? null,
         expected: expected ?? null, status: result.status, deliberate_target_verified: true,
-        stderr_sha256: sha(Buffer.from(result.stderr)) }) + '\n');
+        test_only_digest_rebound: rebindDigest, metadata_validation_reached: rebindDigest, stderr_sha256: sha(Buffer.from(result.stderr)) }) + '\n');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -74,7 +85,7 @@ function oldAttempts(root) {
   return old; // Exact historical bytes; never executed or written over owner source.
 }
 
-test('current guard accepts all 111 clean exact d54 Backend files and both browser owner copies', () => check());
+test('current guard accepts exact corrected types base plus two Backend corrections and both owner copies', () => check());
 test('stale source claim for historical 194-target checkpoint is rejected', () => check(root => {
   mutateCurrentManifest(root, value => { value.source_commit = '8a750ee01eed794bda1942bc1bd0e89829c3a704'; });
 }, 'RUNTIME_MANIFEST_MISMATCH'));
@@ -328,3 +339,55 @@ for (const [label, mutate] of [
   test('manifest digest rejects ' + label, () => check(root => mutateCurrentManifest(root, mutate),
     'RUNTIME_MANIFEST_MISMATCH'));
 }
+
+test('exact previous clean111 inventory is historical, never an active fallback', () => check(root => {
+  writeFileSync(join(root, current), previousCleanRaw);
+}, 'RUNTIME_MANIFEST_MISMATCH'));
+// Every selected input has its own isolated deliberate target diagnostics.
+for (const { path: target } of manifest.files) {
+  test('selected target missing: ' + target, () => check(root => rmSync(join(root, target)), 'ENOENT'));
+  test('selected target wrong size: ' + target, () => check(root => {
+    const path = join(root, target); writeFileSync(path, Buffer.concat([readFileSync(path), Buffer.from('\n')]));
+  }, 'BACKEND_TARGET_SIZE_MISMATCH: ' + target));
+  test('selected target same-size corruption: ' + target, () => check(root => {
+    const path = join(root, target), b = readFileSync(path); b[0] ^= 1; writeFileSync(path, b);
+  }, 'BACKEND_TARGET_HASH_MISMATCH: ' + target));
+}
+const metadataCases = [];
+function metadataCase(label, mutate, diagnostic) { metadataCases.push([label, mutate, diagnostic]); }
+for (const key of ['format_version','source_repository','source_commit','source_tree','layout','selection_policy','target_count','target_bytes'])
+  metadataCase('wrong ' + key, value => { value[key] = typeof value[key] === 'number' ? value[key] - 1 : 'wrong'; }, 'ASSEMBLY_METADATA_MISMATCH: ' + key);
+for (const key of ['repository','commit','tree','parent'])
+  metadataCase('wrong corrected type base ' + key, value => { value.application_base[key] = 'wrong'; }, 'ASSEMBLY_METADATA_MISMATCH: application_base');
+metadataCase('missing correction layer', value => { value.backend_overlays.pop(); }, 'ASSEMBLY_METADATA_MISMATCH: backend_overlays');
+metadataCase('extra correction layer', value => { value.backend_overlays.push(structuredClone(value.backend_overlays[0])); }, 'ASSEMBLY_METADATA_MISMATCH: backend_overlays');
+for (const key of ['repository','commit','tree','parent','prefix'])
+  metadataCase('wrong correction ' + key, value => { value.backend_overlays[0][key] = 'wrong'; }, 'ASSEMBLY_METADATA_MISMATCH: backend_overlays[0].' + key);
+for (const [label, mutate, code] of [
+  ['omitted correction', l => l.files.pop(), 'ASSEMBLY_MAPPING_COUNT_MISMATCH'],
+  ['extra correction', l => l.files.push(structuredClone(l.files[0])), 'ASSEMBLY_MAPPING_COUNT_MISMATCH'],
+  ['duplicate correction', l => { l.files[1] = structuredClone(l.files[0]); }, 'ASSEMBLY_MAPPING_DUPLICATE'],
+  ['wrong source prefix', l => { l.files[0].source_path = 'wrong/source.ts'; }, 'ASSEMBLY_MAPPING_PATH_MISMATCH'],
+  ['path escape', l => { l.files[0].source_path = l.files[0].application_path = '../escape.ts'; }, 'ASSEMBLY_MAPPING_PATH_MISMATCH'],
+  ['unsupported mode', l => { l.files[0].mode = '100755'; }, 'ASSEMBLY_MAPPING_MODE_MISMATCH'],
+  ['unexpected collision', l => { l.files[0].source_path = l.files[0].application_path = 'package.json'; }, 'ASSEMBLY_UNEXPECTED_COLLISION'],
+  ['wrong preimage', l => { l.files[0].preimage.sha256 = '0'.repeat(64); }, 'ASSEMBLY_PREIMAGE_MISMATCH'],
+  ['missing preimage', l => { l.files[0].preimage = null; }, 'ASSEMBLY_PREIMAGE_MISMATCH'],
+  ['wrong final correction hash', l => { l.files[0].sha256 = '0'.repeat(64); }, 'ASSEMBLY_MAPPING_MISMATCH'],
+  ['reordered corrections', l => { l.files.reverse(); }, 'ASSEMBLY_MAPPING_MISMATCH'],
+]) metadataCase(label, value => mutate(value.backend_overlays[0]), code + ': backend_overlays[0]');
+for (const [label, mutate, diagnostic] of metadataCases)
+  test('test-only rebound metadata validator: ' + label, () => check(root => mutateCurrentManifest(root, mutate), diagnostic, { rebindDigest: true }));
+for (const [label, mutate, diagnostic] of [
+  ['absolute path', v => { v.files[0].path = '/outside'; }, 'RUNTIME_TARGET_PATH_MISMATCH'],
+  ['traversal', v => { v.files[0].path = '../outside'; }, 'RUNTIME_TARGET_PATH_MISMATCH'],
+  ['URL', v => { v.files[0].path = 'https://outside.test/file'; }, 'RUNTIME_TARGET_PATH_MISMATCH'],
+  ['duplicate', v => { v.files[1] = { ...v.files[0] }; }, 'RUNTIME_TARGET_DUPLICATE'],
+  ['omitted input', v => { v.files.pop(); }, 'RUNTIME_TARGET_COUNT_MISMATCH'],
+  ['extra input', v => { v.files.push({ ...v.files[0] }); }, 'RUNTIME_TARGET_COUNT_MISMATCH'],
+  ['substitution', v => { v.files[0].path = 'api/unknown.mjs'; }, 'RUNTIME_TARGET_SET_MISMATCH'],
+  ['fractional bytes', v => { v.files[0].bytes += 0.5; }, 'RUNTIME_TARGET_SIZE_SHAPE_MISMATCH'],
+  ['upper hash', v => { v.files[0].sha256 = v.files[0].sha256.toUpperCase(); }, 'RUNTIME_TARGET_HASH_SHAPE_MISMATCH'],
+  ['row order', v => { v.files.reverse(); }, 'RUNTIME_TARGET_ORDER_MISMATCH'],
+  ['total bytes', v => { v.files[0].bytes++; }, 'RUNTIME_TARGET_BYTES_MISMATCH'],
+]) test('test-only rebound target validator: ' + label, () => check(root => mutateCurrentManifest(root, mutate), diagnostic, { rebindDigest: true }));

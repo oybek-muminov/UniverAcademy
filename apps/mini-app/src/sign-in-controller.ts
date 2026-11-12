@@ -3,6 +3,7 @@ import type { StudentPort } from './flow.ts';
 
 // Provider evidence is distinct from the Backend-owned opaque app session.
 export type SignInEvidence = { proof: string };
+export type AppAuthorization = { person: string; port: StudentPort; assertCurrent?(): void };
 export type SignInProvider = {
   google(): Promise<SignInEvidence>;
   current?(): Promise<SignInEvidence>;
@@ -14,6 +15,11 @@ export type SignInProvider = {
 export class EntryFailure extends Error {
   code: string;
   constructor(code: string) { super(code); this.code = code; }
+}
+function registrationName(value: string): string | null {
+  // Match the existing profile limit in Unicode code points, not UTF-16 units.
+  if (typeof value !== 'string' || Array.from(value).length > 100) return null;
+  return value.trim() || null;
 }
 type Step = 'choose' | 'sending' | 'code' | 'verifying' | 'authorizing' | 'ready' | 'browser_required';
 export type SignInSnapshot = Readonly<{ step: Step; busy: boolean; maskedEmail: string; notice: string; flow: StudentFlow | null }>;
@@ -30,24 +36,36 @@ const messages: Record<string, string> = {
   FRESH_PROOF_REQUIRED: 'Kirishni yangidan tasdiqlang. Oldingi tasdiq takror yuborilmadi.',
   APP_DENIED: 'Kabinetga kirish huquqi tasdiqlanmadi. Ma’lumotlar ochilmadi.',
   PROFILE_MISMATCH: 'Hisob mosligi tasdiqlanmadi. Yangidan kirib ko‘ring.',
+  FRESH_LAUNCH_REQUIRED: 'Kirishni yangidan tasdiqlang. Oldingi tasdiq takror yuborilmadi.',
+  TELEGRAM_LINK_REQUIRED: 'Qo‘shimcha tasdiqlash kerak. Kirish usulini qayta tanlang.',
+  CLERK_SESSION_REVOKED: 'Qo‘shimcha tasdiqlash kerak. Kirish usulini qayta tanlang.',
 };
 export function createSignInController(options: {
   context: 'browser' | 'telegram_webview'; provider: SignInProvider;
   validateEmail?(email: string): boolean; invalidEmailMessage?: string;
-  authorize(evidence: SignInEvidence): Promise<{ person: string; port: StudentPort }>;
+  authorize(evidence: SignInEvidence): Promise<AppAuthorization>;
+  beforeAuthorize?(): void;
+  afterAuthorize?(authorization: AppAuthorization, check: () => void): Promise<void>;
+  resume?(): Promise<AppAuthorization>;
+  identityContext?(): string | null;
   retire?(): Promise<'confirmed' | 'unconfirmed' | 'none'>;
 }) {
   let state: SignInSnapshot = Object.freeze({ step: 'choose', busy: false, maskedEmail: '', notice: '', flow: null });
   const listeners = new Set<() => void>();
   let epoch = 0, disposed = false, challenge: string | null = null, email = '';
   let pending: Promise<void> | null = null;
+  let identityAnchor: { generation: number; key: string | null } | null = null;
   function update(value: Partial<SignInSnapshot>) {
     if (disposed) return;
     state = Object.freeze({ ...state, ...value }); listeners.forEach(notify => notify());
   }
-  function check(generation: number) { if (disposed || generation !== epoch) throw new EntryFailure('SUPERSEDED'); }
+  function check(generation: number) {
+    if (disposed || generation !== epoch) throw new EntryFailure('SUPERSEDED');
+    if (identityAnchor?.generation === generation && options.identityContext?.() !== identityAnchor.key)
+      throw new EntryFailure('PROFILE_MISMATCH');
+  }
   function clearLocal() {
-    epoch++; pending = null; challenge = null; email = '';
+    epoch++; pending = null; challenge = null; email = ''; identityAnchor = null;
     update({ step: 'choose', busy: false, maskedEmail: '', notice: '', flow: null });
   }
   function retire() {
@@ -78,10 +96,11 @@ export function createSignInController(options: {
         : 'Sessiya lokal yopildi. Server tasdig‘i kelmadi; yangidan kiring.' }); throw error;
     }
   }
-  function run(step: Step, failureStep: Step, action: (generation: number) => Promise<void>): Promise<void> {
+  function run(step: Step, failureStep: Step, action: (generation: number) => Promise<void>, bindIdentity = false): Promise<void> {
     if (disposed) return Promise.resolve();
     if (pending) return pending;
     const generation = ++epoch;
+    identityAnchor = bindIdentity && options.identityContext ? { generation, key: options.identityContext() } : null;
     update({ step, busy: true, notice: '', flow: null });
     const task = (async () => { await action(generation); })().catch(error => {
       if (disposed || generation !== epoch) return;
@@ -103,10 +122,29 @@ export function createSignInController(options: {
     challenge = null; email = '';
     update({ step: 'authorizing', maskedEmail: '' });
     // A provider success alone cannot open the existing student UI.
+    options.beforeAuthorize?.(); check(generation);
     const authorization = await options.authorize(evidence); check(generation);
-    const student = await authorization.port.profile(); check(generation);
+    const checked = () => { check(generation); authorization.assertCurrent?.(); };
+    checked();
+    if (options.afterAuthorize) { await options.afterAuthorize(authorization, checked); checked(); }
+    await admit(authorization, generation);
+  }
+  async function admit(authorization: AppAuthorization, generation: number) {
+    const checked = () => { check(generation); authorization.assertCurrent?.(); };
+    checked();
+    let student = await authorization.port.profile(); checked();
     if (!student || student.person !== authorization.person) throw new EntryFailure('PROFILE_MISMATCH');
-    const exams = student.registrationComplete ? await authorization.port.exams() : []; check(generation);
+    // Names come only from the authorized server profile, never SDK/user metadata.
+    // Existing completed profiles are not written again or replaced on login.
+    if (!student.registrationComplete) {
+      const first = registrationName(student.firstName), last = registrationName(student.lastName);
+      if (first && last) {
+        student = await authorization.port.register(first, last); checked();
+        if (!student || student.person !== authorization.person) throw new EntryFailure('PROFILE_MISMATCH');
+        if (!student.registrationComplete) throw new EntryFailure('APP_DENIED');
+      }
+    }
+    const exams = student.registrationComplete ? await authorization.port.exams() : []; checked();
     const flow = new StudentFlow(authorization.port, undefined, undefined, 'clerk');
     flow.patch({ student, exams, screen: student.registrationComplete ? 'exams' : 'profile' });
     challenge = null; email = '';
@@ -127,6 +165,12 @@ export function createSignInController(options: {
     if (disposed || state.step === 'ready' || !options.provider.current) return Promise.resolve();
     return run('verifying', 'choose', async generation => {
       const evidence = await options.provider.current!(); check(generation); await finish(evidence, generation);
+    }, true);
+  }
+  function resumeSession(): Promise<void> {
+    if (disposed || state.step === 'ready' || !options.resume) return Promise.resolve();
+    return run('authorizing', 'choose', async generation => {
+      const authorization = await options.resume!(); check(generation); await admit(authorization, generation);
     });
   }
   function sendCode(value: string): Promise<void> {
@@ -156,7 +200,7 @@ export function createSignInController(options: {
   }
   return {
     snapshot: () => state, subscribe(notify: () => void) { listeners.add(notify); return () => { listeners.delete(notify); }; },
-    google, continueSession, sendCode, verifyCode, resend: () => email ? sendCode(email) : Promise.resolve(), reset, logout,
+    google, continueSession, resumeSession, sendCode, verifyCode, resend: () => email ? sendCode(email) : Promise.resolve(), reset, logout,
     // Disposal retires captured contexts; it cannot claim an unknown server ACK.
     dispose() { reset(); disposed = true; listeners.clear(); },
   };

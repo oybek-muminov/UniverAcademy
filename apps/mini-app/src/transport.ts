@@ -53,6 +53,7 @@ type LogoutReceipt = {
 
 export function createStudentTransport(options: {
   origin: string; fetcher: typeof fetch; sessions: SessionHooks; now?: () => number;
+  loginFailurePolicy?: 'telegram_return';
   // Explicit local candidate policy only. Omitted => no retained-proof retry.
   logoutReceiptPolicy?: { retentionMs: number; monotonicNow?: () => number };
 }) {
@@ -218,7 +219,12 @@ export function createStudentTransport(options: {
         const next = validProof(await options.sessions.login(rawInitData));
         if (epoch !== authEpoch) throw new Error('Session changed');
         proof = next; return next.person;
-      } catch { throw new StudentFailure('auth', 'FRESH_LAUNCH_REQUIRED', null, true); }
+      } catch (error) {
+        // Return endpoints have reviewed distinct outcomes. Do not collapse an
+        // unknown-link or revoked-authority response into a retry/new account.
+        if (options.loginFailurePolicy === 'telegram_return' && error instanceof StudentFailure) throw error;
+        throw new StudentFailure('auth', 'FRESH_LAUNCH_REQUIRED', null, true);
+      }
     },
     async logout() {
       if (!proof) {
