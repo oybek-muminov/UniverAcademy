@@ -106,7 +106,7 @@ test("TCP exchange creates a fresh ungrouped student, keeps linking blocked and 
   wire("SuccessProfile", await client.updateProfile(session.access_token, { first_name: "Synthetic", last_name: "New" }));
   assert.deepEqual((await client.exams(session.access_token)).data, []);
   const link = await fetch(local.baseUrl + "/auth/telegram/link", { method: "POST", headers: { authorization: "Bearer " + await lab.sign(lab.actors.fresh) }, body: "{}" });
-  assert.equal(link.status, 409); assert.equal((await link.json()).error.code, "IDENTITY_LINK_POLICY_UNRESOLVED");
+  assert.equal(link.status, 422); assert.equal((await link.json()).error.code, "VALIDATION_ERROR");
   lab.activate(lab.users.admin, lab.sids.admin);
   const staff = await fetch(local.baseUrl + `/admin/versions/${staffIds.draft}`, { method: "PATCH", headers: { authorization: "Bearer " + await lab.sign({ userId: lab.users.admin, sessionId: lab.sids.admin }), "content-type": "application/json", "idempotency-key": "review-staff-default-deny" }, body: JSON.stringify(versionBody()) });
   assert.equal(staff.status, 200);

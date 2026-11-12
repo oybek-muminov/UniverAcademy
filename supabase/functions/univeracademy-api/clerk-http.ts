@@ -1,6 +1,6 @@
 import {ApiFault,fail} from "./fault.ts";
-import {createClerkVerifier,checkClerkProof,requireLiveClerk,clerkIdentityKey,clerkSessionKey} from "./clerk-auth.ts";
-import type {ClerkIdentity,ClerkProof,ClerkVerifierConfiguration,ClerkLiveness} from "./clerk-auth.ts";
+import {createClerkVerifier,checkClerkProof,requireLiveClerk,requireLiveClerkProfile,clerkDisplayNames,clerkIdentityKey,clerkSessionKey} from "./clerk-auth.ts";
+import type {ClerkIdentity,ClerkProof,ClerkVerifierConfiguration,ClerkLiveness,ClerkDisplayNames} from "./clerk-auth.ts";
 import {createStudentHttpHandler} from "./student-http.ts";
 import {createStaffHttpHandler} from "./staff-http.ts";
 import {currentStaff,STAFF_CONTRACT_SHA} from "./staff-state.ts";
@@ -8,6 +8,8 @@ import type {StaffAccessRecord,StaffState,VerifiedStaffProof} from "./staff-stat
 import {reconcileMembershipEffects} from "./membership-effects.ts";
 import {checkSessionPolicy,issueProofs,newQadamId,proofHash,revokeFamily} from "./student-state.ts";
 import type {SessionPolicy,NumericPresentation,Person} from "./student-state.ts";
+import {telegramRequestBody} from "./telegram-return.ts";
+import type {TelegramReturnPort} from "./telegram-return.ts";
 import {profileWire,utc} from "./student-wire.ts";
 
 export type ClerkCandidateState={
@@ -17,9 +19,12 @@ export type ClerkCandidateState={
   studentSessions:Record<string,{personId:string;retiredAt:number|null}>;
   consumedTokens:Record<string,true>;
 };
-export type ClerkTransaction={state:ClerkCandidateState;now:()=>number;newPersonId?:()=>string};
+export type ClerkTransaction={state:ClerkCandidateState;now:()=>number;newPersonId?:()=>string;
+  // Server transaction hook: each validated authority check may only shorten
+  // this request's commit lease. It never grants identity or extends authority.
+  restrictProviderExpiry?:(expiresAt:number)=>void};
 export type ClerkTransactionIntent={kind:"exchange"|"staff"|"link";proof:ClerkProof};
-export type ClerkTransactions={transaction<T>(work:(tx:ClerkTransaction)=>Promise<T>,intent?:ClerkTransactionIntent):Promise<T>};
+export type ClerkTransactions={telegramReturn?:TelegramReturnPort;transaction<T>(work:(tx:ClerkTransaction)=>Promise<T>,intent?:ClerkTransactionIntent):Promise<T>};
 export type ClerkCandidateDependencies={mode:"local_candidate";transactions:ClerkTransactions;
   verifier:ClerkVerifierConfiguration;liveness:ClerkLiveness;sessionPolicy:SessionPolicy;numericPresentation:NumericPresentation;
   legacyTelegram?:{botToken:string};staff?:{validate:(schema:string,value:unknown)=>boolean;newAssignmentId:()=>string}};
@@ -49,22 +54,25 @@ function currentStudentSession(state:ClerkCandidateState,id:ClerkIdentity,person
   const record=state.studentSessions[clerkSessionKey(id)];
   if(record&&(record.personId!==personId||record.retiredAt!==null))fail("CLERK_SESSION_SUPERSEDED",401);
 }
-function ensureStudent(state:ClerkCandidateState,id:ClerkIdentity,policy:SessionPolicy,newPersonId:()=>string=()=>crypto.randomUUID()):Person{
+// Server-domain creation rule; authenticated exchange is its caller. Display
+// names never choose a person, link an account, or supply platform roles.
+function ensureClerkStudent(state:ClerkCandidateState,id:ClerkIdentity,policy:SessionPolicy,newPersonId:()=>string=()=>crypto.randomUUID(),names:ClerkDisplayNames={firstName:null,lastName:null}):Person{
   const key=clerkIdentityKey(id);
   if(Object.hasOwn(state.identities,key)){
     const person=mapped(state,id);if(!person.profile.roles.includes("student"))fail("FORBIDDEN",403);return person;
   }
+  const initialNames=clerkDisplayNames(names);
   for(let n=0;n<policy.identityCollisionAttempts;n++){
     const personId=newPersonId(),qadam=newQadamId();
     if(state.domain.student.people[personId]||Object.values(state.domain.student.people).some(p=>p.profile.qadam_id===qadam))continue;
-    const person:Person={telegramId:null,enabled:true,profile:{person_id:personId,first_name:"",last_name:"",roles:["student"],
+    const person:Person={telegramId:null,enabled:true,profile:{person_id:personId,first_name:initialNames.firstName??"",last_name:initialNames.lastName??"",roles:["student"],
       registration_complete:false,active_group_id:null,qadam_id:qadam}};
     state.domain.student.people[personId]=person;state.domain.memberships[personId]={affinityGroupId:null,active:false,revision:0,epoch:0};
     state.identities[key]={personId,enabled:true};return person;
   }
   fail("SERVICE_UNAVAILABLE",503);
 }
-function serverTime(tx:ClerkTransaction,deps:ClerkCandidateDependencies&{signal?:AbortSignal},floor=0):number{
+function serverTime(tx:ClerkTransaction,deps:Pick<ClerkCandidateDependencies,"verifier">&{signal?:AbortSignal},floor=0):number{
   if(deps.signal?.aborted)fail("SERVICE_UNAVAILABLE",503);
   const lockedAt=tx.now(),now=deps.verifier.now();
   if(!Number.isSafeInteger(lockedAt)||lockedAt<0||!Number.isSafeInteger(now)||now<lockedAt||now<floor)
@@ -76,19 +84,28 @@ function checkCurrentTime(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandida
   if(now>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
   return now;
 }
-async function verifyCurrentClerk(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies){
+async function verifyCurrentClerk(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies,creating=false){
   const before=serverTime(tx,deps);checkClerkProof(proof,before);
-  const providerExpires=await requireLiveClerk(identity(proof),before,deps.liveness);
+  let providerExpires:number,names:ClerkDisplayNames|undefined;
+  if(creating){
+    const live=await requireLiveClerkProfile(identity(proof),before,deps.liveness);
+    providerExpires=live.expiresAt;names={firstName:live.firstName,lastName:live.lastName};
+  }else providerExpires=await requireLiveClerk(identity(proof),before,deps.liveness);
   const now=checkCurrentTime(tx,proof,deps,providerExpires,before);
-  return {now,providerExpires};
+  return {now,providerExpires,names};
 }
-async function exchange(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies){
-  const {state}=tx,policy=checkSessionPolicy(deps.sessionPolicy);
-  const checked=await verifyCurrentClerk(tx,proof,deps),{providerExpires}=checked,id=identity(proof);
+// Internal post-verification transaction operation, not an HTTP/auth bypass.
+// The public handler still obtains proof only from createClerkVerifier.
+export async function exchangeClerkSession(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies){
+  const {state}=tx,policy=checkSessionPolicy(deps.sessionPolicy),id=identity(proof);
+  // identities is the locked, authoritative platform projection. Disabled
+  // mappings remain existing mappings and can never enter provisioning.
+  const creating=!Object.hasOwn(state.identities,clerkIdentityKey(id));
+  const checked=await verifyCurrentClerk(tx,proof,deps,creating),{providerExpires}=checked;
   const digest=await proofHash(JSON.stringify([proof.issuer,proof.userId,proof.sessionId,proof.tokenId]));
   // All provider/clock/digest awaits precede account creation and supersession.
   const now=checkCurrentTime(tx,proof,deps,providerExpires,checked.now);
-  const person=ensureStudent(state,id,policy,tx.newPersonId),personId=person.profile.person_id,key=clerkSessionKey(id);
+  const person=ensureClerkStudent(state,id,policy,tx.newPersonId,checked.names),personId=person.profile.person_id,key=clerkSessionKey(id);
   currentStudentSession(state,id,personId);
   if(state.consumedTokens[digest])fail("CLERK_TOKEN_REPLAY",409);
   const expiresAt=Math.min(now+policy.familyTtlMs,providerExpires);utc(expiresAt);
@@ -123,7 +140,11 @@ async function familyHint(state:ClerkCandidateState,request:Request,raw:string):
   if(request.method!=="POST"||!/\/auth\/logout\/?$/.test(path))return undefined;
   return bodyFamily(); // Logout's bearer-first/no-fallback branch remains above.
 }
-async function guardBoundFamily(tx:ClerkTransaction,request:Request,raw:string,deps:ClerkCandidateDependencies):Promise<number>{
+export async function guardBoundFamily(tx:ClerkTransaction,request:Request,raw:string,deps:Pick<ClerkCandidateDependencies,"verifier"|"liveness"|"legacyTelegram">&{signal?:AbortSignal}):Promise<number>{
+  // Intentional revocation-only behavior: opaque logout is authorized locally
+  // by its proof and locked persisted family, never by provider availability.
+  // The core retains bearer-first, mismatch, expiry and tombstone semantics.
+  if(request.method==="POST"&&/\/auth\/logout\/?$/.test(new URL(request.url).pathname))return serverTime(tx,deps);
   const id=await familyHint(tx.state,request,raw),now=serverTime(tx,deps);if(!id)return now;
   const family=tx.state.domain.student.families[id],binding=tx.state.familyBindings[id];
   // Core handler retains its expired/revoked proof and logout tombstone branches.
@@ -142,7 +163,7 @@ async function guardBoundFamily(tx:ClerkTransaction,request:Request,raw:string,d
   if(!tx.state.studentSessions[clerkSessionKey(binding)])fail("RESPONSE_INVARIANT_FAILED",500);
   const providerExpires=await requireLiveClerk(binding,now,deps.liveness),checkedAt=serverTime(tx,deps,now);
   if(checkedAt>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
-  return checkedAt;
+  tx.restrictProviderExpiry?.(providerExpires);return checkedAt;
 }
 function staffRecord(state:ClerkCandidateState,proof:ClerkProof,now:number):StaffAccessRecord{
   const person=mapped(state,proof),record=state.domain.staff[proof.userId];
@@ -164,16 +185,20 @@ export function createClerkCandidateHandler(configuration:ClerkCandidateDependen
         const token=bearer(request),proof=await createClerkVerifier(deps.verifier)(token),raw=await request.text();
         let parsed;try{parsed=JSON.parse(raw);}catch{fail("MALFORMED_JSON",400);}
         if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)||Object.keys(parsed).length)fail("VALIDATION_ERROR",422);
-        const result=await deps.transactions.transaction(tx=>exchange(tx,proof,deps),{kind:"exchange",proof});
+        const result=await deps.transactions.transaction(tx=>exchangeClerkSession(tx,proof,deps),{kind:"exchange",proof});
         return new Response(JSON.stringify({data:result}),{status:200,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
       }
       if(path==="/api/v1/auth/telegram/link"&&request.method==="POST"){
-        const proof=await createClerkVerifier(deps.verifier)(bearer(request));
-        await deps.transactions.transaction(async tx=>{
-          await verifyCurrentClerk(tx,proof,deps);mapped(tx.state,proof);
-          fail("IDENTITY_LINK_POLICY_UNRESOLVED",409); // No auto merge/email match/link mutation.
-        },{kind:"link",proof});
-        fail("RESPONSE_INVARIANT_FAILED",500);
+        const raw=await telegramRequestBody(request),proof=await createClerkVerifier(deps.verifier)(bearer(request));
+        const operation=deps.transactions.telegramReturn;if(!operation)fail("SERVICE_UNAVAILABLE",503);
+        const result=await operation.link(proof,raw);
+        return new Response(JSON.stringify({data:result}),{status:200,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+      }
+      if(path==="/api/v1/auth/telegram/resume"&&request.method==="POST"){
+        if(request.headers.has("authorization"))fail("VALIDATION_ERROR",422);
+        const raw=await telegramRequestBody(request),operation=deps.transactions.telegramReturn;if(!operation)fail("SERVICE_UNAVAILABLE",503);
+        const result=await operation.resume(raw);
+        return new Response(JSON.stringify({data:result}),{status:200,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
       }
       if(path.startsWith("/api/v1/admin/")){
         const token=bearer(request),proof=await createClerkVerifier(deps.verifier)(token),p=deps.staff;

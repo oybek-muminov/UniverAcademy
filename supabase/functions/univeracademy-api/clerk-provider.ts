@@ -142,7 +142,9 @@ export function createClerkProviderAdapter(input: ClerkProviderSettings, binding
       if (user.id !== identity.userId) return denied();
       const expiresAt = Math.min(session.expireAt, session.abandonAt);
       if (now >= expiresAt) return denied();
-      return { ...identity, status: "active", accountEnabled: !user.banned && !user.locked && !user.deprovisioned, expiresAt };
+      const accountEnabled=!user.banned&&!user.locked&&!user.deprovisioned;
+      const names=accountEnabled?{firstName:user.firstName,lastName:user.lastName}:{firstName:null,lastName:null};
+      return { ...identity, status: "active", accountEnabled, expiresAt, ...names };
     } catch (error) {
       // requireLiveClerk owns the final401 denial; it maps thrown read faults503.
       if (error instanceof ApiFault && error.status === 401) return denied();

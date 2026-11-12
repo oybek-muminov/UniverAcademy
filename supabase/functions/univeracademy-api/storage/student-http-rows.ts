@@ -10,7 +10,7 @@ export class StudentHttpRows {
   private readonly attempts = new AttemptRows();
   private readonly options:{boundClerk?:boolean;externalAuthWriter?:boolean};
   constructor(options:{boundClerk?:boolean;externalAuthWriter?:boolean}={}){this.options=options;}
-  async load(tx: LockedTransaction, personId: string): Promise<StudentState> {
+  async loadAuthentication(tx: LockedTransaction, personId: string): Promise<StudentState> {
     own(tx, personId);
     const p = (await query(tx, "ua_http_person", "SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1", [personId])).rows[0];
     if (!p) fail("NOT_FOUND", 404);
@@ -21,12 +21,22 @@ export class StudentHttpRows {
     const families = await query(tx, "ua_http_families", "SELECT id::text,person_id::text,expires_at_ms::text,revoked_at_ms::text,logout_retain_until_ms::text,auth_provider FROM ua_private.student_families WHERE person_id=$1", [personId]);
     for (const f of families.rows) s.families[f.id as string] = { personId: f.person_id as string, expiresAt: integer(f.expires_at_ms),
       revokedAt: f.revoked_at_ms === null ? null : integer(f.revoked_at_ms), logoutRetainUntil: f.logout_retain_until_ms === null ? null : integer(f.logout_retain_until_ms),...(f.auth_provider===null?{}:{authProvider:f.auth_provider as "clerk"|"telegram"}) };
+    if(Object.values(s.families).some(f=>f.personId!==personId))fail("RESPONSE_INVARIANT_FAILED",500);
     if(!this.options.boundClerk&&Object.values(s.families).some(f=>f.revokedAt===null&&tx.now<f.expiresAt&&f.authProvider!=="telegram"))fail("SERVICE_UNAVAILABLE",503);
     for (const a of (await query(tx, "ua_http_access", "SELECT a.digest,a.family_id::text,a.expires_at_ms::text,a.superseded FROM ua_private.student_access a JOIN ua_private.student_families f ON f.id=a.family_id WHERE f.person_id=$1", [personId])).rows)
       s.access[a.digest as string] = { familyId: a.family_id as string, expiresAt: integer(a.expires_at_ms), superseded: a.superseded as boolean };
     for (const r of (await query(tx, "ua_http_refresh", "SELECT r.digest,r.family_id::text,r.consumed FROM ua_private.student_refresh r JOIN ua_private.student_families f ON f.id=r.family_id WHERE f.person_id=$1", [personId])).rows)
       s.refresh[r.digest as string] = { familyId: r.family_id as string, consumed: r.consumed as boolean };
     for (const r of (await query(tx, "ua_http_replays", "SELECT digest FROM ua_private.init_data_replays WHERE person_id=$1", [personId])).rows) s.consumedInitData[r.digest as string] = true;
+    return s;
+  }
+  async load(tx: LockedTransaction, personId: string): Promise<StudentState> {
+    return this.loadDomain(tx,personId,await this.loadAuthentication(tx,personId));
+  }
+  async loadDomain(tx: LockedTransaction, personId: string, s: StudentState): Promise<StudentState> {
+    own(tx,personId);
+    if(!same(Object.keys(s.people),[personId])||s.people[personId].profile.person_id!==personId||
+      Object.values(s.families).some(f=>f.personId!==personId)) fail("RESPONSE_INVARIANT_FAILED",500);
     for (const g of (await query(tx, "ua_http_grants", "SELECT g.assignment_id::text,(g.rostered AND m.active) AS rostered,m.epoch::text AS membership_epoch,g.grant_epoch::text FROM ua_private.grants g JOIN ua_private.memberships m ON m.person_id=g.person_id WHERE g.person_id=$1", [personId])).rows)
       s.grants[personId][g.assignment_id as string] = { rostered: g.rostered as boolean,membershipEpoch: integer(g.membership_epoch),grantEpoch: integer(g.grant_epoch) };
     const assignments = await query(tx, "ua_http_assignments", `SELECT a.record FROM ua_private.assignments a WHERE EXISTS(SELECT 1 FROM ua_private.grants g WHERE g.assignment_id=a.id AND g.person_id=$1) OR EXISTS(SELECT 1 FROM ua_private.attempts t WHERE t.assignment_id=a.id AND t.person_id=$1)`, [personId]);

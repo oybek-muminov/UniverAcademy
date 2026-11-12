@@ -9,7 +9,7 @@ test("transaction pool port strips every Statement.name, preserves parameterizat
   const driver={connect:async()=>{
     connections++;return{query:async q=>{
       assert.deepEqual(Object.keys(q).sort(),["text","values"]);calls.push(q);
-      if(q.text.includes("ORDER BY id FOR UPDATE"))return{rows:[{id:person}],rowCount:1};
+      if(q.text==="SELECT id::text AS id FROM ua_private.lock_people($1::uuid[]) ORDER BY id")return{rows:[{id:person}],rowCount:1};
       if(q.text.includes("clock_timestamp()"))return{rows:[{now_ms:"10000"}],rowCount:1};
       return{rows:[],rowCount:0};
     },release:discard=>releases.push(discard)};
@@ -29,7 +29,7 @@ test("pool bridge forwards transaction advisory locks and unknown COMMIT discard
       assert.ok(!Object.hasOwn(q,"name"));texts.push(q.text);
       if(q.text==="COMMIT"){commits++;throw Error("synthetic outcome unknown");}
       if(q.text.includes("clock_timestamp()"))return{rows:[{now_ms:"10000"}],rowCount:1};
-      if(q.text.includes("ORDER BY id FOR UPDATE"))return{rows:[{id:person}],rowCount:1};
+      if(q.text==="SELECT id::text AS id FROM ua_private.lock_people($1::uuid[]) ORDER BY id")return{rows:[{id:person}],rowCount:1};
       return{rows:[],rowCount:0};
     },release:discard=>releases.push(discard),
   };}};
@@ -42,7 +42,7 @@ test("pool bridge forwards transaction advisory locks and unknown COMMIT discard
 
 test("pool bridge retains callback exception identity and rollback/release, and rejects a malformed driver without fallback",async()=>{
   const calls=[],releases=[],fault=Error("synthetic callback failure");
-  const driver={connect:async()=>({query:async q=>{calls.push(q.text);return q.text.includes("FOR UPDATE")?{rows:[{id:person}],rowCount:1}:q.text.includes("clock_timestamp")?{rows:[{now_ms:"10000"}],rowCount:1}:{rows:[],rowCount:0};},release:d=>releases.push(d)})};
+  const driver={connect:async()=>({query:async q=>{calls.push(q.text);return q.text==="SELECT id::text AS id FROM ua_private.lock_people($1::uuid[]) ORDER BY id"?{rows:[{id:person}],rowCount:1}:q.text.includes("clock_timestamp")?{rows:[{now_ms:"10000"}],rowCount:1}:{rows:[],rowCount:0};},release:d=>releases.push(d)})};
   await assert.rejects(new PostgresTransactions(transactionPoolPort(driver)).run([person],async()=>{throw fault;}),e=>e===fault);
   assert.equal(calls.at(-1),"ROLLBACK");assert.ok(!calls.includes("COMMIT"));assert.deepEqual(releases,[false]);
   assert.throws(()=>transactionPoolPort({}),e=>e.status===503);

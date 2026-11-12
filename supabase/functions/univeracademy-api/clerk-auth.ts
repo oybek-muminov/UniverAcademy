@@ -1,15 +1,29 @@
-import {jwtVerify,errors} from "jose";
 import type {JWTVerifyGetKey} from "jose";
 import {fail} from "./fault.ts";
 
 export type ClerkIdentity={issuer:string;userId:string;sessionId:string};
+export type ClerkDisplayNames=Readonly<{firstName:string|null;lastName:string|null}>;
 export type ClerkProof=Readonly<ClerkIdentity&{kind:"clerk_verified";notBefore:number;expiresAt:number;authorizedParty:string;tokenId:string}>;
 export type ClerkVerifierConfiguration={issuer:string;authorizedParties:readonly string[];
   audience:{kind:"required";value:string}|{kind:"clerk_default_no_audience"};
   trustedKeys:JWTVerifyGetKey;now:()=>number};
 export type ClerkLiveness=(identity:ClerkIdentity,now:number,options?:{signal?:AbortSignal})=>Promise<{
   issuer:string;userId:string;sessionId:string;status:string;accountEnabled:boolean;expiresAt:number;
+  // Raw server-fetched display fields, not authentication inputs. Validate only
+  // after the locked platform mapping selects new-person creation.
+  firstName?:unknown;lastName?:unknown;
 }>;
+// Display data only, never identity/role authority. Match the existing API's
+// Unicode code-point maximum; absent/blank names stay missing, not invented.
+export function clerkDisplayNames(value:{firstName?:unknown;lastName?:unknown}):ClerkDisplayNames{
+  const name=(v:unknown):string|null=>{
+    if(v===undefined||v===null)return null;
+    if(typeof v!=="string"||Array.from(v).length>100||v.includes("\u0000"))fail("SERVICE_UNAVAILABLE",503);
+    for(const c of v)if(c.length===1&&c.charCodeAt(0)>=0xd800&&c.charCodeAt(0)<=0xdfff)fail("SERVICE_UNAVAILABLE",503);
+    return v.trim()?v:null;
+  };
+  return Object.freeze({firstName:name(value.firstName),lastName:name(value.lastName)});
+}
 const user=(v:unknown):v is string=>typeof v==="string"&&/^user_[A-Za-z0-9]+(?![\s\S])/.test(v);
 const session=(v:unknown):v is string=>typeof v==="string"&&/^sess_[A-Za-z0-9]+(?![\s\S])/.test(v);
 const seconds=(v:unknown):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0&&Number.isSafeInteger(v*1000);
@@ -30,6 +44,9 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
       !config.audience||!(config.audience.kind==="clerk_default_no_audience"||
       (config.audience.kind==="required"&&typeof config.audience.value==="string"&&config.audience.value.length)))fail("SERVICE_UNAVAILABLE",503);
   return async(token:string):Promise<ClerkProof>=>{
+    let jose;
+    try{jose=await import("jose");}catch{fail("SERVICE_UNAVAILABLE",503);}
+    const {jwtVerify,errors}=jose;
     const now=config.now();if(!Number.isSafeInteger(now)||now<0)fail("SERVICE_UNAVAILABLE",503);
     let verified;
     try{
@@ -53,7 +70,8 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
       notBefore:Math.max(p.iat,p.nbf)*1000,expiresAt:p.exp*1000,authorizedParty:p.azp,tokenId:p.jti});
   };
 }
-export async function requireLiveClerk(identity:ClerkIdentity,now:number,read:ClerkLiveness):Promise<number>{
+async function readLiveClerk<T>(identity:ClerkIdentity,now:number,read:ClerkLiveness,
+  project:(live:Awaited<ReturnType<ClerkLiveness>>)=>T):Promise<T>{
   if(!origin(identity.issuer)||!user(identity.userId)||!session(identity.sessionId))fail("CLERK_TOKEN_INVALID",401);
   if(!Number.isSafeInteger(now)||now<0)fail("SERVICE_UNAVAILABLE",503);
   if(typeof read!=="function")fail("SERVICE_UNAVAILABLE",503);
@@ -61,5 +79,15 @@ export async function requireLiveClerk(identity:ClerkIdentity,now:number,read:Cl
   if(!live||live.issuer!==identity.issuer||live.userId!==identity.userId||live.sessionId!==identity.sessionId||
       live.status!=="active"||live.accountEnabled!==true||!Number.isSafeInteger(live.expiresAt)||live.expiresAt<=now)
     fail("CLERK_SESSION_REVOKED",401);
-  return live.expiresAt;
+  // Copy the requested projection in this checked frame, without another await
+  // over a mutable provider model. Common authority never reads display fields.
+  return project(live);
+}
+// Creation-only projection. Common login/session/profile authority must not
+// depend on optional provider display data for an existing platform mapping.
+export async function requireLiveClerkProfile(identity:ClerkIdentity,now:number,read:ClerkLiveness):Promise<ClerkDisplayNames&{expiresAt:number}>{
+  return readLiveClerk(identity,now,read,live=>Object.freeze({...clerkDisplayNames(live),expiresAt:live.expiresAt}));
+}
+export async function requireLiveClerk(identity:ClerkIdentity,now:number,read:ClerkLiveness):Promise<number>{
+  return readLiveClerk(identity,now,read,live=>live.expiresAt);
 }

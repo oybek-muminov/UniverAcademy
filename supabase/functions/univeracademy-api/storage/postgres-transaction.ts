@@ -1,4 +1,5 @@
 import { ApiFault, fail } from "../fault.ts";
+import {resetTrustedServerContext,setTrustedPhase,setTrustedPeople,setTrustedTelegram,closeTrustedServerContext} from "./trusted-server-context.ts";
 
 // Driver boundary only. No URL, credential, pool construction or network fallback.
 export type Statement = { name: string; text: string; values: readonly unknown[] };
@@ -103,7 +104,7 @@ export class PostgresTransactions {
       // Negative bigint keys are reserved for verified Telegram identities.
       // This lock exists before the first people row; no global identity lock.
       await client.query({ name: "ua_telegram_identity_lock", text: "SELECT pg_advisory_xact_lock($1::bigint)", values: [(-BigInt(telegramId)).toString()] });
-      await client.query({name:"ua_telegram_identity_context",text:"SELECT set_config('ua.telegram_id',$1,true)",values:[String(telegramId)]});
+      await setTrustedTelegram(client,telegramId);
       const personId = await ensure({client,personIds:[],now:await this.clock(client),telegramId});
       if (!uuid.test(personId)) fail("RESPONSE_INVARIANT_FAILED", 500);
       return this.lockPeople(client, [personId]);
@@ -118,9 +119,9 @@ export class PostgresTransactions {
     return now;
   }
   private async lockPeople(client: PgClient, ids: readonly string[]): Promise<LockedTransaction> {
-    await client.query({name:"ua_people_context",text:"SELECT set_config('ua.person_ids',$1,true)",values:[JSON.stringify(ids)]});
+    await setTrustedPeople(client,ids);
     const locked = await client.query({ name: "ua_people_lock", text:
-      "SELECT id::text AS id FROM ua_private.people WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE", values: [ids] });
+      "SELECT id::text AS id FROM ua_private.lock_people($1::uuid[]) ORDER BY id", values: [ids] });
     if (locked.rows.length !== ids.length || locked.rows.some((r, i) => r.id !== ids[i])) fail("NOT_FOUND", 404);
     return {client,personIds:ids,now:await this.clock(client)};
   }
@@ -142,6 +143,8 @@ export class PostgresTransactions {
     let began = false, committing = false, discard = false;
     try {
       await client.query({ name: "ua_begin", text: "BEGIN", values: [] }); began = true;
+      await resetTrustedServerContext(client);
+      await setTrustedPhase(client,"auth");
       const value = await work(await prepare(client));
       // Returned business-error outcomes commit maintenance transitions, including
       // deadline expiry. Throwing aborts. Never render an ACK inside this callback.
@@ -174,6 +177,7 @@ export class PostgresTransactions {
       } else discard = true;
       throw error;
     } finally {
+      closeTrustedServerContext(client);
       if (hooks) cleanupPrepared(client, discard, hooks);
       else client.release(discard);
     }

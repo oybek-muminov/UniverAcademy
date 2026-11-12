@@ -87,11 +87,11 @@ test("unknown exchange COMMIT is not ACKed; a fresh JWT for the still-current se
   }
 });
 
-test("Telegram link remains authenticated but blocked; optional existing Telegram association never auto-links or lets old Clerk session reclaim",async()=>{
+test("Missing trusted link port fails closed; optional legacy association never auto-links or lets old Clerk session reclaim",async()=>{
   const f=await clerkFixture({legacyTelegram:true});f.activate(users.student,sids.first);const token=await f.sign();
   const a=await f.exchange(token);assert.equal(a.status,200);const before=f.snapshot();
   const blocked=await f.call("POST","/auth/telegram/link",{init_data:"synthetic-unconsumed-proof"},await f.sign());
-  assert.equal(blocked.status,409);assert.equal(blocked.json.error.code,"IDENTITY_LINK_POLICY_UNRESOLVED");assert.deepEqual(f.store.state,before);
+  assert.equal(blocked.status,503);assert.equal(blocked.json.error.code,"SERVICE_UNAVAILABLE");assert.deepEqual(f.store.state,before);
   assert.equal((await f.exchange(await f.sign(),{person_id:ids.person})).status,422);assert.deepEqual(f.store.state,before);
   const person=f.store.state.domain.student.people[ids.person],raw=signedInitData(person.telegramId,crypto.randomUUID(),f.store.time);
   const telegram=(await f.client.telegramLogin({init_data:raw})).data;assert.equal(telegram.profile.person_id,ids.person);

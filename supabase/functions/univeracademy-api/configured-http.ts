@@ -1,7 +1,6 @@
 import { ApiFault,fail } from "./fault.ts";
 import { createStudentHttpHandler } from "./student-http.ts";
 import { createStaffHttpHandler } from "./staff-http.ts";
-import { createStaffJwtVerifier,requireLiveStaff } from "./staff-jwt.ts";
 import { checkSessionPolicy } from "./student-state.ts";
 import type { NumericPresentation,SessionPolicy } from "./student-state.ts";
 import type { StaffState } from "./staff-state.ts";
@@ -15,13 +14,12 @@ import { StaffFirstTestRows } from "./storage/staff-first-test-rows.ts";
 import { reconcileMembershipEffects } from "./membership-effects.ts";
 import { STAFF_CONTRACT_SHA } from "./staff-state.ts";
 import type { StaffJwtProof } from "./staff-jwt.ts";
-import {createClerkCandidateHandler} from "./clerk-http.ts";
 import type {ClerkCandidateDependencies} from "./clerk-http.ts";
-import {ClerkDomainTransactions} from "./storage/clerk-domain.ts";
+import {PreparedStudentTransactions,isFirstStudentRequest,isLegacyStudentRequest} from "./storage/prepared-student.ts";
 
-type StaffPorts={jwt:Parameters<typeof createStaffJwtVerifier>[0];
+type StaffPorts={jwt:Parameters<typeof import("./staff-jwt.ts").createStaffJwtVerifier>[0];
   resolvePersons?:(request:Request,proof:StaffJwtProof)=>Promise<readonly string[]>;
-  liveness:Parameters<typeof requireLiveStaff>[3];
+  liveness:Parameters<typeof import("./staff-jwt.ts").requireLiveStaff>[3];
   validate:(schema:string,value:unknown)=>boolean;newAssignmentId:()=>string} &
   ({domain:"first_test_relational";load?:never;flush?:never} |
    {domain?:undefined;load:(tx:LockedTransaction,proof:StaffJwtProof)=>Promise<StaffState>;
@@ -58,15 +56,17 @@ export function createConfiguredHttpHandler(config:HttpConfiguration){
       ready(config);
       if(!new URL(request.url).pathname.startsWith("/api/v1/"))fail("NOT_FOUND",404);
       if(config.clerk){
+        const [{createClerkCandidateHandler},{ClerkDomainTransactions}]=await Promise.all([import("./clerk-http.ts"),import("./storage/clerk-domain.ts")]);
         if(typeof config.clerk.liveness!=="function"||!config.clerk.verifier)fail("SERVICE_UNAVAILABLE",503);
         return await createClerkCandidateHandler({mode:"local_candidate",...config.clerk,
           sessionPolicy:config.sessionPolicy,numericPresentation:config.numericPresentation,
           ...(config.botToken?{legacyTelegram:{botToken:config.botToken}}:{}),
           transactions:new ClerkDomainTransactions({pool:config.storage.pool,request,botToken:config.botToken,
-            sessionPolicy:config.sessionPolicy,now:config.now,liveness:config.clerk.liveness,staff:config.clerk.staff})})(request);
+            sessionPolicy:config.sessionPolicy,now:config.now,liveness:config.clerk.liveness,verifier:config.clerk.verifier,staff:config.clerk.staff})})(request);
       }
       const runner=new PostgresTransactions(config.storage.pool);
       if(new URL(request.url).pathname.startsWith("/api/v1/admin/")){
+        const {createStaffJwtVerifier,requireLiveStaff}=await import("./staff-jwt.ts");
         const p=config.staff;
         if(!p||(p.resolvePersons!==undefined&&typeof p.resolvePersons!=="function")||
           !(p.domain==="first_test_relational"||(p.domain===undefined&&typeof p.load==="function"&&typeof p.flush==="function"))||
@@ -99,6 +99,13 @@ export function createConfiguredHttpHandler(config:HttpConfiguration){
           })}});
         return await handler(request);
       }
+      if(isFirstStudentRequest(request)){
+        const captured=request.clone();
+        return await createStudentHttpHandler({botToken:config.botToken,sessionPolicy:config.sessionPolicy,
+          numericPresentation:config.numericPresentation,
+          transactions:new PreparedStudentTransactions(config.storage.pool,captured)})(captured);
+      }
+      if(!isLegacyStudentRequest(request))fail("NOT_FOUND",404);
       const legacy={...config,botToken:config.botToken!};
       const scope=await locateStudent(config.storage.pool,request.clone(),legacy);
       const rows=new StudentHttpRows();

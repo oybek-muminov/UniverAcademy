@@ -1,4 +1,3 @@
-import { jwtVerify, errors } from "jose";
 import type { JWTVerifyGetKey } from "jose";
 import { fail } from "./fault.ts";
 import { currentStaff } from "./staff-state.ts";
@@ -13,6 +12,9 @@ export function createStaffJwtVerifier(config: { issuer: string; audience: strin
       config.algorithms.some((a) => a !== "RS256" && a !== "ES256") ||
       typeof config.trustedKeys !== "function" || typeof config.now !== "function") fail("SERVICE_UNAVAILABLE", 503);
   return async (token: string): Promise<StaffJwtProof> => {
+    let jose;
+    try { jose=await import("jose"); } catch { fail("SERVICE_UNAVAILABLE",503); }
+    const {jwtVerify,errors}=jose;
     const now = config.now();
     if (!Number.isSafeInteger(now) || now < 0) fail("SERVICE_UNAVAILABLE", 503);
     let claims;

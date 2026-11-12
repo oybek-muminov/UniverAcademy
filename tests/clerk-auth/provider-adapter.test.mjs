@@ -228,14 +228,16 @@ test("timing: opaque refresh/access cannot use a pre-provider captured transacti
   }
 });
 
-test("timing: linking remains blocked409 before exp and denies401 at/after exp, with no login/link side effects", async () => {
+test("link route requires a trusted operation port; JWT expiry still denies before a missing port can act", async () => {
   for (const offset of [-1, 0, 1]) {
     const f = await fixture(); f.connect(); await f.f.exchange(await f.f.sign());
     const expires = f.f.store.time + 1000, token = await f.f.sign({ claims: { exp: expires / 1000 } });
-    const before = f.f.snapshot();
-    const reply = await holdUserReply(f, () => f.f.call("POST", "/auth/telegram/link", {}, token), expires + offset);
-    assert.equal(reply.status, offset < 0 ? 409 : 401); assert.equal(reply.json.data, undefined); assert.deepEqual(f.f.store.state, before);
+    const before = f.f.snapshot(); f.f.store.time=expires+offset;
+    const reply=await f.f.call("POST", "/auth/telegram/link", {init_data:"signed data is checked only by the absent trusted port"}, token);
+    assert.equal(reply.status, offset < 0 ? 503 : 401); assert.equal(reply.json.data, undefined); assert.deepEqual(f.f.store.state, before);
   }
+  // The actual provider-await linking expiry boundary is covered by the new
+  // TelegramReturnRows tests, rather than retaining the removed stub's409.
 });
 
 test("timing: staff JWT expiry after provider read denies before scope work; a live authorized parallel session succeeds", async () => {

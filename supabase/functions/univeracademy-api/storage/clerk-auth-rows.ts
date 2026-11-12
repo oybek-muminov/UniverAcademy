@@ -6,6 +6,7 @@ import type {Person,StudentState} from "../student-state.ts";
 import {proofHash} from "../student-state.ts";
 import {integer,StorageUnavailable} from "./postgres-transaction.ts";
 import type {PgPool,PgClient} from "./postgres-transaction.ts";
+import {resetTrustedServerContext,setTrustedPhase,setTrustedPeople,setTrustedClerk,closeTrustedServerContext} from "./trusted-server-context.ts";
 
 export type ClerkAuthSnapshot={person:Person|null;membership:{active:boolean;epoch:number;revision:number;affinityGroupId:string|null}|null;
   identities:ClerkCandidateState["identities"];familyBindings:ClerkCandidateState["familyBindings"];
@@ -29,14 +30,14 @@ function identity(value:ClerkIdentity){
   if(typeof value.issuer!=="string"||new URL(value.issuer).origin!==value.issuer||!value.issuer.startsWith("https://")||
     !/^user_[A-Za-z0-9]+(?![\s\S])/.test(value.userId)||!/^sess_[A-Za-z0-9]+(?![\s\S])/.test(value.sessionId))fail("RESPONSE_INVARIANT_FAILED",500);
 }
-function checkSnapshot(scope:Scope,s:ClerkAuthSnapshot){
+function checkSnapshot(scope:Scope,s:ClerkAuthSnapshot,revocationOnly=false){
   if(!s.person||s.person.profile.person_id!==scope.personId)fail("FORBIDDEN",403);
   const p=s.person.profile,m=s.membership;
   if(!Array.isArray(p.roles)||!p.roles.every(r=>["student","teacher","admin","owner"].includes(r))||typeof p.first_name!=="string"||typeof p.last_name!=="string"||
     typeof p.registration_complete!=="boolean"||!(p.active_group_id===null||uuid(p.active_group_id))||typeof p.qadam_id!=="string"||!/^\d{10}$/.test(p.qadam_id)||
     p.registration_complete&&(!p.first_name.trim()||!p.last_name.trim())||Object.keys(p).some(k=>!["person_id","first_name","last_name","roles","registration_complete","active_group_id","qadam_id"].includes(k)))fail("RESPONSE_INVARIANT_FAILED",500);
   if(!p.roles.includes("student"))fail("FORBIDDEN",403);
-  if(!bool(s.person.enabled))fail("ACCOUNT_DISABLED",403);
+  if(!bool(s.person.enabled)&&!revocationOnly)fail("ACCOUNT_DISABLED",403);
   if(!m||typeof m.active!=="boolean"||!Number.isSafeInteger(m.epoch)||m.epoch<0||!Number.isSafeInteger(m.revision)||m.revision<0||
     !(m.affinityGroupId===null||uuid(m.affinityGroupId))||m.active&&m.affinityGroupId===null||p.active_group_id!==(m.active?m.affinityGroupId:null))fail("RESPONSE_INVARIANT_FAILED",500);
   if(s.person.telegramId!==null&&(!Number.isSafeInteger(s.person.telegramId)||s.person.telegramId<=0))fail("RESPONSE_INVARIANT_FAILED",500);
@@ -52,7 +53,7 @@ function checkSnapshot(scope:Scope,s:ClerkAuthSnapshot){
     }else if(f.authProvider==="clerk"){
       const binding=s.familyBindings[key];
       if(!binding){if(f.revokedAt===null&&scope.now<f.expiresAt)fail("SERVICE_UNAVAILABLE",503);}
-      else{identity(binding);const fence=s.studentSessions[clerkSessionKey(binding)];if(f.revokedAt===null&&scope.now<f.expiresAt&&(!s.identities[clerkIdentityKey(binding)]?.enabled||!fence||fence.retiredAt!==null))fail("SERVICE_UNAVAILABLE",503);}
+      else{identity(binding);const fence=s.studentSessions[clerkSessionKey(binding)];if(!revocationOnly&&f.revokedAt===null&&scope.now<f.expiresAt&&(!s.identities[clerkIdentityKey(binding)]?.enabled||!fence||fence.retiredAt!==null))fail("SERVICE_UNAVAILABLE",503);}
     }else if(Object.hasOwn(s.familyBindings,key))fail("SERVICE_UNAVAILABLE",503);
   }
   if(live>1)fail("RESPONSE_INVARIANT_FAILED",500);
@@ -93,15 +94,18 @@ export class ClerkScopedAuthStore{
     try{
       if(this.signal?.aborted)throw new StorageUnavailable("not_committed");
       await query(client,"ua_clerk_begin","BEGIN");began=true;
+      await resetTrustedServerContext(client);await setTrustedPhase(client,"auth");
       checkClerkProof(proof,await clock(client));
       const who={issuer:proof.issuer,userId:proof.userId,sessionId:proof.sessionId};identity(who);
       await query(client,"ua_clerk_identity_gate","SELECT pg_advisory_xact_lock(1430348620,hashtext($1))",[clerkIdentityKey(who)]);
-      await query(client,"ua_clerk_identity_context","SELECT set_config('ua.clerk_issuer',$1,true),set_config('ua.clerk_subject',$2,true)",[who.issuer,who.userId]);
-      const mapped=await query(client,"ua_clerk_locate","SELECT person_id::text FROM ua_private.clerk_identities WHERE issuer=$1 AND subject=$2 FOR UPDATE",[who.issuer,who.userId]);
+      await setTrustedClerk(client,who.issuer,who.userId);
+      const mapped=await query(client,"ua_clerk_locate","SELECT person_id::text,enabled FROM ua_private.lock_clerk_identity($1::text,$2::text)",[who.issuer,who.userId]);
       if(mapped.rows.length>1)fail("RESPONSE_INVARIANT_FAILED",500);
+      if(mapped.rows.length&&(Object.keys(mapped.rows[0]).sort().join(",")!=="enabled,person_id"||!uuid(mapped.rows[0].person_id)||typeof mapped.rows[0].enabled!=="boolean"))fail("RESPONSE_INVARIANT_FAILED",500);
+      if(mapped.rows[0]?.enabled===false)fail("CLERK_IDENTITY_REVOKED",401);
       const personId=mapped.rows.length?mapped.rows[0].person_id:this.newPersonId();if(!uuid(personId))fail("RESPONSE_INVARIANT_FAILED",500);
-      await query(client,"ua_clerk_person_context","SELECT set_config('ua.person_id',$1,true)",[personId]);
-      if(mapped.rows.length){const locked=await query(client,"ua_clerk_person_lock","SELECT id::text FROM ua_private.people WHERE id=$1 FOR UPDATE",[personId]);if(locked.rows.length!==1||locked.rows[0].id!==personId)fail("CLERK_IDENTITY_REVOKED",401);}
+      await setTrustedPeople(client,[personId]);
+      if(mapped.rows.length){const locked=await query(client,"ua_clerk_person_lock","SELECT id::text FROM ua_private.lock_people($1::uuid[]) ORDER BY id",[[personId]]);if(locked.rows.length!==1||locked.rows[0].id!==personId)fail("CLERK_IDENTITY_REVOKED",401);}
       let now=await clock(client);checkClerkProof(proof,now);
       const providerExpires=await requireLiveClerk(who,now,this.liveness),afterRead=await clock(client);
       if(afterRead<now)throw new StorageUnavailable("not_committed");now=afterRead;checkClerkProof(proof,now);if(now>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
@@ -110,6 +114,7 @@ export class ClerkScopedAuthStore{
       const readyAt=await clock(client);if(readyAt<now)throw new StorageUnavailable("not_committed");now=readyAt;scope.now=now;
       checkClerkProof(proof,now);if(now>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
       if(state.consumedTokens[replay])fail("CLERK_TOKEN_REPLAY",409);if(consumeBeforeWork)state.consumedTokens[replay]=true;scope.exchangeDigest=replay;
+      await setTrustedPhase(client,"exchange");
       const value=await work({personId,state,now});scope.now=await clock(client);if(scope.now<now)throw new StorageUnavailable("not_committed");checkClerkProof(proof,scope.now);if(scope.now>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
       if(state.consumedTokens[replay]!==true)fail("RESPONSE_INVARIANT_FAILED",500);
       await rows.flush(scope,before,state);
@@ -122,16 +127,19 @@ export class ClerkScopedAuthStore{
       if(committing){discard=true;throw new StorageUnavailable("commit_unknown");}
       if(began){try{await query(client,"ua_clerk_rollback","ROLLBACK");}catch{discard=true;}}else discard=true;
       throw error;
-    }finally{client.release(discard);}
+    }finally{closeTrustedServerContext(client);client.release(discard);}
   }
 }
 
 // Shared person-scoped auth rows. No transaction, HTTP or provider defaults.
 export class ClerkAuthRows{
-  async load(s:Scope):Promise<ClerkAuthSnapshot>{
+  async load(s:Scope,session?:{familyId:string;revocationOnly:boolean}):Promise<ClerkAuthSnapshot>{
     const result:ClerkAuthSnapshot={person:null,membership:null,identities:{},families:{},access:{},refresh:{},familyBindings:{},studentSessions:{},consumedTokens:{}};
     if(!s.existing)return result;
-    const read=(name:string,text:string)=>query(s.client,name,text,[s.personId]);
+    const read=(name:string,text:string)=>{
+      const column:Record<string,string>={ua_clerk_families:"id",ua_clerk_bindings:"f.id",ua_clerk_access:"f.id",ua_clerk_refresh:"f.id"};
+      return session&&column[name]?query(s.client,name,text+" AND "+column[name]+"=$2",[s.personId,session.familyId]):query(s.client,name,text,[s.personId]);
+    };
     const p=(await read("ua_clerk_person","SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1")).rows;
     if(p.length!==1)fail("CLERK_IDENTITY_REVOKED",401);
     const profile=p[0].profile as Person["profile"];
@@ -154,14 +162,52 @@ export class ClerkAuthRows{
     for(const r of (await read("ua_clerk_fences","SELECT issuer,subject,sid,person_id::text,retired_at_ms::text FROM ua_private.clerk_student_sessions WHERE person_id=$1")).rows){
       if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.studentSessions[JSON.stringify([r.issuer,r.subject,r.sid])]={personId:s.personId,retiredAt:nullable(r.retired_at_ms)};
     }
-    for(const r of (await read("ua_clerk_replays","SELECT digest,person_id::text FROM ua_private.clerk_exchange_replays WHERE person_id=$1")).rows){if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.consumedTokens[r.digest as string]=true;}
+    for(const r of (session?[]:(await read("ua_clerk_replays","SELECT digest,person_id::text FROM ua_private.clerk_exchange_replays WHERE person_id=$1")).rows)){if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.consumedTokens[r.digest as string]=true;}
     for(const r of (await read("ua_clerk_access","SELECT a.digest,a.family_id::text,a.expires_at_ms::text,a.superseded FROM ua_private.student_access a JOIN ua_private.student_families f ON f.id=a.family_id WHERE f.person_id=$1")).rows)
       result.access[r.digest as string]={familyId:r.family_id as string,expiresAt:integer(r.expires_at_ms),superseded:bool(r.superseded)};
     for(const r of (await read("ua_clerk_refresh","SELECT r.digest,r.family_id::text,r.consumed FROM ua_private.student_refresh r JOIN ua_private.student_families f ON f.id=r.family_id WHERE f.person_id=$1")).rows)
       result.refresh[r.digest as string]={familyId:r.family_id as string,consumed:bool(r.consumed)};
-    checkSnapshot(s,result);
+    checkSnapshot(s,result,session?.revocationOnly);
     if(s.identity&&result.studentSessions[clerkSessionKey(s.identity)]?.retiredAt!==null&&result.studentSessions[clerkSessionKey(s.identity)]!==undefined)fail("CLERK_SESSION_SUPERSEDED",401);
     return result;
+  }
+  async loadSession(s:Scope,proof:{kind:"access"|"refresh";digest:string},revocationOnly:boolean):Promise<{familyId:string;state:ClerkAuthSnapshot}>{
+    if(revocationOnly&&proof.kind!=="refresh")fail("SERVICE_UNAVAILABLE",503);
+    const table=proof.kind==="access"?"student_access":"student_refresh";
+    const r=await query(s.client,"ua_clerk_session_family",`SELECT p.family_id::text FROM ua_private.${table} p JOIN ua_private.student_families f ON f.id=p.family_id WHERE p.digest=$1 AND f.person_id=$2`,[proof.digest,s.personId]);
+    if(!r.rows.length)fail(proof.kind==="access"?"SESSION_REVOKED":"REFRESH_INVALID",401);
+    if(r.rows.length!==1||Object.keys(r.rows[0]).join(",")!=="family_id"||!uuid(r.rows[0].family_id))fail("RESPONSE_INVARIANT_FAILED",500);
+    const familyId=r.rows[0].family_id,state=await this.load(s,{familyId,revocationOnly});
+    if(!state.families[familyId])fail("RESPONSE_INVARIANT_FAILED",500);
+    return {familyId,state};
+  }
+  async flushSession(s:Scope,before:ClerkAuthSnapshot,after:ClerkAuthSnapshot,familyId:string,kind:"refresh"|"logout"){
+    checkSnapshot(s,after,kind==="logout");
+    for(const key of ["person","membership","identities","familyBindings","studentSessions","consumedTokens"] as const)
+      if(!same(before[key],after[key]))fail("RESPONSE_INVARIANT_FAILED",500);
+    if(!same(Object.keys(before.families),[familyId])||!same(Object.keys(after.families),[familyId]))fail("RESPONSE_INVARIANT_FAILED",500);
+    if(kind==="logout"&&(!same(before.access,after.access)||!same(before.refresh,after.refresh)))fail("RESPONSE_INVARIANT_FAILED",500);
+    const write=async(name:string,text:string,values:readonly unknown[])=>{const r=await query(s.client,name,text,values);if(r.rowCount!==1)fail("RESPONSE_INVARIANT_FAILED",500);};
+    const old=before.families[familyId],v=after.families[familyId];
+    if(!same(old,v)){
+      if(old.revokedAt!==null||!same({...old,revokedAt:v.revokedAt,logoutRetainUntil:v.logoutRetainUntil},v)||v.revokedAt===null||v.revokedAt>s.now||v.logoutRetainUntil===null||v.logoutRetainUntil<v.revokedAt)fail("RESPONSE_INVARIANT_FAILED",500);
+      await write("ua_clerk_family_revoke","UPDATE ua_private.student_families SET revoked_at_ms=$1,logout_retain_until_ms=$2 WHERE id=$3 AND person_id=$4 AND revoked_at_ms IS NULL RETURNING id",[v.revokedAt,v.logoutRetainUntil,familyId,s.personId]);
+    }
+    for(const map of ["access","refresh"] as const){
+      if(Object.keys(before[map]).some(key=>!Object.hasOwn(after[map],key)))fail("RESPONSE_INVARIANT_FAILED",500);
+      if(Object.values(after[map]).some(p=>p.familyId!==familyId))fail("RESPONSE_INVARIANT_FAILED",500);
+    }
+    // No token issuance is permitted by a logout, or by reuse revocation.
+    if(kind==="logout"||v.revokedAt!==null){if(!same(before.access,after.access)||!same(before.refresh,after.refresh))fail("RESPONSE_INVARIANT_FAILED",500);return;}
+    for(const [key,v]of Object.entries(after.access))if(!same(before.access[key],v)){
+      const old=before.access[key];if(old&&(old.familyId!==v.familyId||old.expiresAt!==v.expiresAt||old.superseded&&!v.superseded))fail("RESPONSE_INVARIANT_FAILED",500);
+      if(!old&&(v.superseded||v.expiresAt<=s.now||v.expiresAt>after.families[familyId].expiresAt))fail("RESPONSE_INVARIANT_FAILED",500);
+      await write("ua_clerk_access_write","INSERT INTO ua_private.student_access(digest,family_id,expires_at_ms,superseded) VALUES($1,$2,$3,$4) ON CONFLICT(digest) DO UPDATE SET superseded=ua_private.student_access.superseded OR EXCLUDED.superseded WHERE ua_private.student_access.family_id=EXCLUDED.family_id AND ua_private.student_access.expires_at_ms=EXCLUDED.expires_at_ms RETURNING digest",[key,v.familyId,v.expiresAt,v.superseded]);
+    }
+    for(const [key,v]of Object.entries(after.refresh))if(!same(before.refresh[key],v)){
+      const old=before.refresh[key];if(old&&(old.familyId!==v.familyId||old.consumed&&!v.consumed)||!old&&v.consumed)fail("RESPONSE_INVARIANT_FAILED",500);
+      await write("ua_clerk_refresh_write","INSERT INTO ua_private.student_refresh(digest,family_id,consumed) VALUES($1,$2,$3) ON CONFLICT(digest) DO UPDATE SET consumed=ua_private.student_refresh.consumed OR EXCLUDED.consumed WHERE ua_private.student_refresh.family_id=EXCLUDED.family_id RETURNING digest",[key,v.familyId,v.consumed]);
+    }
   }
   async flush(s:Scope,before:ClerkAuthSnapshot,after:ClerkAuthSnapshot){
     checkSnapshot(s,after);

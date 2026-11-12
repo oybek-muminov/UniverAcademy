@@ -30,6 +30,8 @@
   },
   "dependencies": {
     "@clerk/backend": "3.27.0",
-    "jose": "6.2.15"
+    "jose": "6.2.15",
+    "pg": "8.16.3",
+    "pg-cloudflare": "1.2.7"
   }
 }

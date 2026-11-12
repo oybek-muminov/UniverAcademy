@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {ClerkScopedAuthStore} from "../../supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts";
 import {clerkIdentityKey,clerkSessionKey} from "../../supabase/functions/univeracademy-api/clerk-auth.ts";
 import {proofHash} from "../../supabase/functions/univeracademy-api/student-state.ts";
+import {exchangeClerkSession} from "../../supabase/functions/univeracademy-api/clerk-http.ts";
+import {testPolicy,testNumbers} from "../backend/http-fixture.ts";
 
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
 const at=Date.UTC(2026,10,7),who={issuer:"https://clerk.example.invalid",userId:"user_StoreA1",sessionId:"sess_StoreA1"};
@@ -24,11 +26,13 @@ class Pool{
       if(name==="ua_clerk_commit"){this.state=draft;if(this.fail==="commit_after")throw Error("unknown commit");return result([]);}
       if(name==="ua_clerk_rollback")return result([]);
       if(name==="ua_clerk_clock")return result([{now_ms:String(this.time)}]);
-      if(["ua_clerk_identity_gate","ua_clerk_identity_context","ua_clerk_person_context"].includes(name))return result([]);
+      if(name==="ua_context_reset"){assert.deepEqual(v,["deny","","[]","","",""]);assert.ok(text.endsWith("set_config('ua.telegram_id',$6,true)"));return result([]);}
+      if(name==="ua_context_phase"){assert.equal(text,"SELECT set_config('ua.phase',$1,true)");assert.ok(["deny","auth","domain","exchange"].includes(v[0]));return result([]);}
+      if(["ua_clerk_identity_gate","ua_clerk_identity_context","ua_people_context"].includes(name))return result([]);
       const owner=v[0],own=(map)=>Object.entries(map).filter(([,r])=>r.personId===owner);
       let rows;
-      if(name==="ua_clerk_locate"){const r=draft.identities[JSON.stringify(v)];rows=r?[{person_id:r.personId}]:[];}
-      else if(name==="ua_clerk_person_lock")rows=draft.people[owner]?[{id:owner}]:[];
+      if(name==="ua_clerk_locate"){assert.equal(text,"SELECT person_id::text,enabled FROM ua_private.lock_clerk_identity($1::text,$2::text)");const r=draft.identities[JSON.stringify(v)];rows=r?[{person_id:r.personId,enabled:r.enabled}]:[];}
+      else if(name==="ua_clerk_person_lock"){assert.equal(text,"SELECT id::text FROM ua_private.lock_people($1::uuid[]) ORDER BY id");assert.equal(v[0].length,1);rows=draft.people[v[0][0]]?[{id:v[0][0]}]:[];}
       else if(name==="ua_clerk_person"){const p=draft.people[owner];rows=p?[{telegram_id:p.telegramId===null?null:String(p.telegramId),enabled:p.enabled,roles:p.profile.roles,profile:p.profile}]:[];}
       else if(name==="ua_clerk_membership"){const m=draft.members[owner];rows=m?[{active:m.active,epoch:String(m.epoch),revision:String(m.revision),affinity_group_id:m.affinityGroupId}]:[];}
       else if(name==="ua_clerk_identities")rows=own(draft.identities).map(([k,r])=>{const [issuer,subject]=JSON.parse(k);return{issuer,subject,person_id:r.personId,enabled:r.enabled};});
@@ -153,4 +157,85 @@ test("expiry during scoped row loading denies before work; a regressing precommi
   assert.equal(worked,false);assert.deepEqual(f.pool.state,before);
   const g=fixture();g.pool.hook=(name,pool)=>{if(name==="ua_clerk_refresh_write")pool.time=at-1;};
   await assert.rejects(g.store.run(proof(),login()),e=>e.status===503);assert.deepEqual(g.pool.state,empty());
+});
+
+// Actual exchange/domain/auth-store code after the verifier boundary. Proofs and
+// provider responses are explicitly synthetic trusted-port inputs, not a JWT
+// verifier substitute. Real JOSE endpoint integration is a separate guarded test.
+function namesFixture(names={firstName:'Aziz',lastName:'Karimov'}){
+  const pool=new Pool();let serial=0;
+  const f={pool,names,enabled:true,status:'active',expires:at+60000,calls:0};
+  f.live=async identity=>{f.calls++;await f.readHook?.(identity);return{...identity,status:f.status,accountEnabled:f.enabled,expiresAt:f.expiry?.(f.calls)??f.expires,...f.names,...f.identityPatch};};
+  const store=new ClerkScopedAuthStore({pool,liveness:f.live,newPersonId:()=>id(++serial)});
+  const deps={mode:'local_candidate',verifier:{issuer:who.issuer,authorizedParties:['https://student.example.invalid'],audience:{kind:'clerk_default_no_audience'},trustedKeys:()=>{throw Error('No JWT verifier substitute');},now:()=>pool.time},
+    liveness:f.live,sessionPolicy:testPolicy,numericPresentation:testNumbers};
+  f.exchange=async(p=proof())=>store.runDomain(p,async input=>{
+    const s=input.state,student={people:s.person?{[input.personId]:s.person}:{},families:s.families,access:s.access,refresh:s.refresh,consumedInitData:{},grants:{},assignments:{},series:{},attempts:{},receipts:{},bonuses:{},cancellations:{}};
+    const state={domain:{student,memberships:s.membership?{[input.personId]:s.membership}:{}},identities:s.identities,familyBindings:s.familyBindings,studentSessions:s.studentSessions,consumedTokens:s.consumedTokens};
+    const value=await exchangeClerkSession({state,now:()=>pool.time,newPersonId:()=>input.personId},p,deps);
+    Object.assign(s,{person:student.people[input.personId],membership:state.domain.memberships[input.personId],identities:state.identities,
+      familyBindings:state.familyBindings,studentSessions:state.studentSessions,consumedTokens:state.consumedTokens,families:student.families,access:student.access,refresh:student.refresh});
+    return value;
+  });
+  return f;
+}
+test('new verified-provider names seed only a new UUID student and remain incomplete',async()=>{
+  const f=namesFixture(),result=await f.exchange({...proof(),first_name:'Forged',last_name:'Claims',roles:['owner'],email:'auto-link@invalid'});
+  assert.equal(result.profile.first_name,'Aziz');assert.equal(result.profile.last_name,'Karimov');assert.equal(result.profile.registration_complete,false);
+  assert.deepEqual(result.profile.roles,['student']);assert.equal(result.profile.active_group_id,null);assert.equal(result.profile.person_id,id(1));
+  assert.equal(f.pool.state.people[id(1)].telegramId,null);assert.match(result.profile.qadam_id,/^\d{10}$/);
+  assert.deepEqual(f.pool.state.members[id(1)],{active:false,epoch:0,revision:0,affinityGroupId:null});
+  assert.equal(f.pool.events.filter(e=>e.name==='ua_clerk_person_insert').length,1);
+});
+test('repeat login preserves edited platform names and all existing identity/role/qadam/group fields',async()=>{
+  const f=namesFixture();await f.exchange();const person=f.pool.state.people[id(1)];
+  Object.assign(person.profile,{first_name:'Edited',last_name:'Platform',registration_complete:true});const before=structuredClone(person);
+  f.names={firstName:'Changed provider',lastName:'Must not overwrite'};
+  const result=await f.exchange(proof({...who,sessionId:'sess_StoreNameSecond'}));
+  assert.deepEqual(f.pool.state.people[id(1)],before);assert.equal(result.profile.first_name,'Edited');assert.equal(result.profile.last_name,'Platform');
+  assert.equal(Object.keys(f.pool.state.people).length,1);assert.equal(f.pool.events.some(e=>e.name==='ua_clerk_profile_update'),false);
+});
+test('P2-NAMES-01 existing mapped login ignores malformed/overlong provider names without overwriting platform edits',async()=>{
+  for(const firstName of ['x'.repeat(101),'😀'.repeat(101),42,{},[],false,'\ud800','\udc00','bad\u0000name']){
+    const f=namesFixture();await f.exchange();const person=f.pool.state.people[id(1)];
+    Object.assign(person.profile,{first_name:'Edited',last_name:'Platform',registration_complete:true});const pinned=structuredClone(person);
+    f.names={firstName,lastName:{invalid:'must not become authority'}};
+    const result=await f.exchange(proof({...who,sessionId:'sess_StoreNamesLater'}));
+    assert.deepEqual(f.pool.state.people[id(1)],pinned);assert.equal(result.profile.first_name,'Edited');assert.equal(result.profile.last_name,'Platform');
+    assert.equal(Object.keys(f.pool.state.people).length,1);assert.equal(f.pool.events.some(e=>e.name==='ua_clerk_profile_update'),false);
+  }
+});
+for(const [label,names,expected]of [
+  ['null',{firstName:null,lastName:null},['','']],['missing',{},['','']],
+  ['partial',{firstName:'Aziz',lastName:null},['Aziz','']],['blank',{firstName:' ',lastName:''},['','']],
+  ['Unicode100',{firstName:'😀'.repeat(100),lastName:'O‘quvchi'},['😀'.repeat(100),'O‘quvchi']],
+])test('new-person '+label+' names are bounded display data without invented defaults',async()=>{
+  const f=namesFixture(names),r=await f.exchange();assert.deepEqual([r.profile.first_name,r.profile.last_name],expected);assert.equal(r.profile.registration_complete,false);
+});
+for(const value of [42,{},[],true,'x'.repeat(101),'😀'.repeat(101),'\ud800','\udc00','bad\u0000name'])
+test('malformed new-provider name rolls back without partial registration '+JSON.stringify(value).slice(0,20),async()=>{
+  const f=namesFixture({firstName:value,lastName:'Valid'}),before=structuredClone(f.pool.state);
+  await assert.rejects(f.exchange(),e=>e.status===503);assert.deepEqual(f.pool.state,before);assert.equal(f.pool.events.some(e=>e.name==='ua_clerk_person_insert'),false);
+});
+for(const change of [f=>{f.status='revoked';},f=>{f.enabled=false;},f=>{f.identityPatch={userId:'user_Foreign'};},f=>{f.identityPatch={issuer:'https://foreign.invalid'};},f=>{f.readHook=()=>{throw Error('synthetic provider outage');};}])
+test('provider failure/mismatch denies name provisioning with no partial graph',async()=>{
+  const f=namesFixture();change(f);const before=structuredClone(f.pool.state);await assert.rejects(f.exchange());assert.deepEqual(f.pool.state,before);
+});
+test('disabled mapping rejects before provider name read and cannot become a new person',async()=>{
+  const f=namesFixture();await f.exchange();f.pool.state.identities[clerkIdentityKey(who)].enabled=false;const before=structuredClone(f.pool.state),calls=f.calls;
+  await assert.rejects(f.exchange(),e=>e.code==='CLERK_IDENTITY_REVOKED');assert.deepEqual(f.pool.state,before);assert.equal(f.calls,calls);
+});
+test('name read and final flush expiry equality deny atomically; later expiry cannot extend the earlier lease',async()=>{
+  for(const phase of ['first read','exchange read','write','shortened exchange lease']){
+    const f=namesFixture(),before=structuredClone(f.pool.state);
+    if(phase==='first read')f.readHook=()=>{f.pool.time=at+60000;};
+    if(phase==='exchange read')f.readHook=()=>{if(f.calls===2)f.pool.time=at+60000;};
+    if(phase==='write')f.pool.hook=(name,pool)=>{if(name==='ua_clerk_person_insert')pool.time=at+60000;};
+    if(phase==='shortened exchange lease'){
+      f.expiry=n=>n===1?at+60000:at+100;
+      f.pool.hook=(name,pool)=>{if(name==='ua_clerk_refresh_write')pool.time=at+100;};
+    }
+    await assert.rejects(f.exchange(),e=>e.status===401,phase);assert.deepEqual(f.pool.state,before,phase);
+    assert.equal(f.pool.events.some(e=>e.name==='ua_clerk_commit'),false,phase);
+  }
 });
