@@ -11,9 +11,9 @@ Har ikkala repoga - UniverAcademy va lab_univeracademy - har bir yuklashdan oldi
 
 ## Manba va holat
 
-Avval [docs/source-status.md](docs/source-status.md) va [docs/api/README.md](docs/api/README.md) o‘qilsin. Master §0.7 va §22 joriy; eski Rasch/MAP overlaylari tarixiy.
+Avval [README.md](README.md) o‘qilsin. Joriy o‘quvchi kontrakti `contracts/telegram-return.openapi.json`; tarixiy kontraktlar test va generatsiya bog‘liqliklari uchun saqlanadi.
 
-API 0.2.7-statistical-bonus-review.1 hali PROVISIONAL / NOT ACCEPTED. Backend yagona API egasi. Iste’molchilar kontraktni o‘zicha o‘zgartirmaydi; konkret diff Backendga qaytariladi.
+Backend yagona API egasi. Iste’molchilar kontraktni o‘zicha o‘zgartirmaydi; konkret diff Backendga qaytariladi.
 
 Yangi loyiha nomzodida backend yo‘li `supabase/functions/univeracademy-api/`. Bu lokal tuzilma nomi; mavjud integratsiya, texnik identifikator yoki URL uchun avtomatik migratsiya emas. Amaldagi integratsiyalar faqat alohida aniq ruxsat va moslik rejasiga ko‘ra o‘zgartiriladi. Mavjud ish ustidan taxmin bilan yangi parallel backend yozilmaydi.
 
@@ -23,5 +23,9 @@ Modulli monolit: yagona API, PostgreSQL, xususiy media; frontendlar biznes qoida
 
 Birinchi fizika guruh testi ustuvor. Oddiy natija mustaqil; statistik bonus optional, Rasch keyingi bosqichda. 10 milliondan ortiq ro‘yxat va 10 minggacha bir vaqtdagi test — o‘sish maqsadi, isbotlangan sig‘im emas.
 
-Agent vazifalari va o‘zgarish chegaralari: [docs/ownership.md](docs/ownership.md).
+## Muvofiqlashtirish
+
+Boshqa mas’ul yo‘lidagi o‘zgarish avval muvofiqlashtiriladi. Backend va iste’molchilar bir xil kontrakt versiyasi/xeshini tekshiradi. Clientdagi rol ruxsat uchun authoritative emas. Hosting adapterlari biznes qoidalarini takrorlamaydi.
+
+Offline test yoki build natijasi production tayyorligi deb ko‘rsatilmaydi. Lokal tekshiruvlar [README.md](README.md)da.
 

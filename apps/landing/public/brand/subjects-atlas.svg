@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+<!-- Original Fanlar atlas: six hand-drawn subject studies, quiet central field. -->
+<g stroke-linecap="round" stroke-linejoin="round">
+<g id="mathematics" stroke="#8B2942" opacity=".27" stroke-width="2">
+<path d="M-35 255H215M46 365V78M-20 330Q65 320 93 248T195 127"/>
+<path d="M46 109A158 158 0 0 1 204 267M46 155A112 112 0 0 1 158 267M46 202A65 65 0 0 1 111 267"/>
+<path d="M46 267L180 180M46 267L142 330M86 260V274M126 260V274M166 260V274M39 227H53M39 187H53M39 147H53"/>
+<circle cx="94" cy="247" r="6" fill="#F8EAD3"/>
+</g>
+<g id="literature" transform="translate(1000 28) rotate(-8)" stroke="#8B2942" opacity=".28" stroke-width="2">
+<path d="M0 27Q65 5 124 37Q183 5 248 27V147Q181 126 124 158Q65 126 0 147Z M124 37V158 M-8 34V158Q63 139 124 169Q185 139 256 158V34"/>
+<path d="M18 49Q60 36 104 54M18 68Q60 55 104 73M18 87Q60 74 104 92M144 54Q185 36 229 49M144 73Q185 55 229 68M144 92Q185 74 229 87"/>
+<path d="M184 20Q210-18 244-9Q237 23 204 43L184 56M184 56L224 8" fill="#1A7979" fill-opacity=".15" stroke="#1A7979"/>
+</g>
+<g id="chemistry" transform="translate(1325 25)" stroke="#B28A32" opacity=".5" stroke-width="2.5">
+<path d="M24 60L79 28L134 60V124L79 156L24 124Z M34 67L79 41L124 67M124 118L79 144L34 118M134 60L186 30M134 124L188 155M24 60L-15 37M79 156V199"/>
+<circle cx="190" cy="27" r="12"/><circle cx="197" cy="163" r="12"/><circle cx="79" cy="213" r="12"/>
+</g>
+<g id="physics" stroke="#1A7979" opacity=".25" stroke-width="2.5">
+<path d="M1385 285H1640M1402 260V475M1360 369C1400 369 1400 299 1440 299S1480 439 1520 439S1560 299 1600 299S1640 439 1680 439"/>
+<path d="M1385 369H1650" stroke-dasharray="7 11" stroke-width="1.5"/>
+<path d="M1430 275V295M1480 275V295M1530 275V295M1580 275V295" stroke-width="1.5"/>
+</g>
+<g id="biology" stroke="#1A7979" opacity=".3" stroke-width="2" transform="translate(-22 718) rotate(-14)">
+<path d="M47 286C32 148 93 42 254 18C266 153 191 249 47 286Z M47 286Q125 172 254 18M88 229L67 149M88 229L180 206M126 179L108 101M126 179L219 144M171 119L164 59M171 119L244 81"/>
+<path d="M48 284L23 324M65 258Q28 238 5 192"/>
+</g>
+<g id="history" stroke="#8B2942" opacity=".27" stroke-width="2" transform="translate(1220 760)">
+<path d="M0 190L50 174L108 188L165 169L220 185L285 163L335 181V-2L281-19L221 2L165-14L108 3L51-12L0 4Z"/>
+<path d="M51-12V174M108 3V188M165-14V169M220 2V185M285-19V163" opacity=".45"/>
+<path d="M72 144H261M87 144V84H244V144M79 84L166 32L253 84Z M107 144V98H128V144M155 144V98H176V144M203 144V98H224V144"/>
+<circle cx="165" cy="65" r="9"/>
+</g>
+<g stroke="#B28A32" opacity=".3" stroke-width="1.5">
+<path d="M375 956C515 886 616 970 765 923S1010 944 1125 899" stroke-dasharray="3 10"/>
+<circle cx="765" cy="923" r="22"/><path d="M765 890V956M732 923H798M753 911L777 935M777 911L753 935"/>
+</g>
+</g>
+</svg>

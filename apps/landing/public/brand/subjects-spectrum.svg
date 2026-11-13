@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" fill="none">
+<defs>
+<radialGradient id="teal"><stop stop-color="#78B9B7" stop-opacity=".75"/><stop offset="1" stop-color="#78B9B7" stop-opacity="0"/></radialGradient>
+<radialGradient id="gold"><stop stop-color="#E9B85E" stop-opacity=".65"/><stop offset="1" stop-color="#E9B85E" stop-opacity="0"/></radialGradient>
+<radialGradient id="blue"><stop stop-color="#97B7D0" stop-opacity=".6"/><stop offset="1" stop-color="#97B7D0" stop-opacity="0"/></radialGradient>
+</defs>
+<!-- Original Bilim spektri: colored fields reveal enlarged subject contours. -->
+<ellipse cx="1480" cy="90" rx="710" ry="430" fill="url(#teal)"/>
+<ellipse cx="1100" cy="110" rx="580" ry="240" fill="url(#gold)"/>
+<ellipse cx="35" cy="550" rx="340" ry="650" fill="url(#blue)"/>
+<ellipse cx="1390" cy="1020" rx="680" ry="370" fill="url(#gold)"/>
+<g stroke="#176B72" stroke-width="2.2" opacity=".42" stroke-linejoin="round" stroke-linecap="round">
+<path d="M955 71Q1040 33 1145 79Q1250 33 1335 71V199Q1235 162 1145 211Q1055 162 955 199Z M1145 79V211M980 95Q1040 75 1118 103M980 121Q1040 101 1118 129M1173 103Q1250 75 1310 95M1173 129Q1250 101 1310 121"/>
+<path d="M1420 215L1460 240L1500 215V168L1460 143L1420 168Z M1500 168L1540 143M1500 215L1540 240M1420 168L1380 143"/><circle cx="1550" cy="137" r="12"/><circle cx="1550" cy="247" r="12"/>
+<path d="M-10 258H222M48 366V83M-20 333C80 333 58 175 196 126"/>
+<path d="M1550 463C1445 485 1475 584 1570 612C1600 538 1615 473 1550 463Z M1570 612L1550 463M1561 540L1514 510M1567 574L1598 528"/>
+</g>
+<g stroke="#A46E24" stroke-width="2" opacity=".38"><path d="M905 941C965 869 1025 1013 1085 941S1205 869 1265 941S1385 1013 1445 941"/><path d="M1030 975H1450" stroke-dasharray="8 10"/></g>
+</svg>

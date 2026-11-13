@@ -1,0 +1,1120 @@
+{
+  "source_commit": "d54d19cb9ba78a13187362afdb2178e90430cefe",
+  "source_tree": "99f467391e0f68bf1ff31f398bc83b3969a04df2",
+  "consumer_task": "MINI-D54-CONSUMER-01",
+  "target_count": 208,
+  "target_bytes": 2541933,
+  "inventory_policy": "This manifest alone is authoritative for current Backend target rows. All older manifests/checksums remain byte-identical historical evidence and are never fallback inventories.",
+  "acceptance_boundary": "Exact d54 source integrity and bounded local/synthetic Mini consumer checks. Import coverage does not execute runPrepared, SQL/removal/protection paths, production providers, or real student data. Inherited Backend acceptance is not Mini acceptance.",
+  "coverage_policy": "Retain every historical 194 target path, replace only the five independently verified changed digests, add seven reviewed runtime modules and seven frozen Backend provenance tests. Derive runtime import/worker-URL coverage from actual source directories independently of this list.",
+  "historical_snapshots": [
+    {
+      "path": "BACKEND-CURRENT-SHA256SUMS",
+      "source_commit": "fa82166a5eaaa05a8ae254913039771e03e20bfb",
+      "bytes": 21015,
+      "sha256": "0ca4a7676d7d78286f5fd3735f94be8635cbcb81e05639929a96d227867676e0",
+      "status": "HISTORICAL_ONLY_NOT_CURRENT_AUTHORITY",
+      "note": "The retained snapshot contains the old staff-http.ts digest and omits the three added paths. Its file bytes are pinned; its rows are not interpreted as the current inventory."
+    },
+    {
+      "path": "apps/mini-app/tests/fixtures/backend-fa82166-manifest.json",
+      "source_commit": "fa82166a5eaaa05a8ae254913039771e03e20bfb",
+      "bytes": 34192,
+      "sha256": "1a2588f66f261029753b5756e3783adc5940834839b0bfc339f7bc7ffa31f4f7",
+      "status": "HISTORICAL_ONLY_NOT_CURRENT_AUTHORITY"
+    },
+    {
+      "path": "apps/mini-app/tests/fixtures/backend-8a750ee-manifest.json",
+      "source_commit": "8a750ee01eed794bda1942bc1bd0e89829c3a704",
+      "bytes": 36420,
+      "sha256": "9deefd433a9c4709ef037a5142c8a4e39db8f3fb0c2bd3f96fcb20f7d654632e",
+      "status": "HISTORICAL_ONLY_NOT_CURRENT_AUTHORITY"
+    }
+  ],
+  "historical_fixture": {
+    "path": "apps/mini-app/tests/fixtures/attempts-8a750ee.ts.txt",
+    "source_commit": "8a750ee01eed794bda1942bc1bd0e89829c3a704",
+    "original_path": "supabase/functions/univeracademy-api/attempts.ts",
+    "bytes": 9616,
+    "sha256": "b4bc54e39fef6799b6ff83a4be3c474471afd2e4c76e888767e999064a4d9e20",
+    "status": "READ_AS_BYTES_ONLY_NEVER_IMPORTED_OR_EXECUTED"
+  },
+  "source_evidence": {
+    "repository_path": "qa-checkpoints/2026-11-10/backend-r1-tx-bridge-01-r2/source-manifest.json",
+    "bytes": 3225,
+    "sha256": "f4141fbacd694348d0989fcf5297b904847b16fdc41838c9c0166674bef0d879"
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 99,
+      "sha256": "8e4c09e5149a50d6a0ec4b412baa6fdf196c3f4350d7d98e5767fc8fe20662d1"
+    },
+    {
+      "path": "BACKEND-CURRENT-SHA256SUMS",
+      "bytes": 21015,
+      "sha256": "0ca4a7676d7d78286f5fd3735f94be8635cbcb81e05639929a96d227867676e0"
+    },
+    {
+      "path": "BACKEND-SHA256SUMS",
+      "bytes": 4516,
+      "sha256": "5189eff514f03dbac1eda22207839f5208195325cf4f6dc47853766e73dfc535"
+    },
+    {
+      "path": "CLIENT-PRODUCTION-HANDOFF.md",
+      "bytes": 2840,
+      "sha256": "212c0e72c8a3bd4c0c4eb066f2a6c7d9037981c5d28dfc281c9129e747bc201b"
+    },
+    {
+      "path": "README.backend.md",
+      "bytes": 5851,
+      "sha256": "07c7eb54e46cd6e085cd35a71cd1f94e17d47d89f3dc03d2d019cdffda96f725"
+    },
+    {
+      "path": "README.current-backend.md",
+      "bytes": 27588,
+      "sha256": "ad6d96a8de83e700d005a1acd57b3df5e51b0eeeed27a1890ae8c6d21b5bd843"
+    },
+    {
+      "path": "README.enrollment-staff.md",
+      "bytes": 4254,
+      "sha256": "26b70e48719ba0de89c219019e611ac3688544a684119f2326424b389bc5889a"
+    },
+    {
+      "path": "README.persistent-http.md",
+      "bytes": 3426,
+      "sha256": "510e12bc1be2d52fa922a7dd2d511ee4b68742ee0fd9df6999e0e38612ccb231"
+    },
+    {
+      "path": "README.storage-auth.md",
+      "bytes": 1898,
+      "sha256": "1566d6ab399e25ebae0d38a5c5350c564038b4956192941906f5cf4737445630"
+    },
+    {
+      "path": "api/index.mjs",
+      "bytes": 616,
+      "sha256": "e8c6699dbfac16771857c2b684b1198ac53950cf71469149200b619fb9412a4b"
+    },
+    {
+      "path": "contracts/clerk-auth.proposal.patch.json",
+      "bytes": 7354,
+      "sha256": "7ca7874a07960e9e5a32332d6e51e56b0affaee0224d8d8ffefb36a83f2ea019"
+    },
+    {
+      "path": "contracts/clerk-domain.schema-rls.proposal.json",
+      "bytes": 4640,
+      "sha256": "15252ecc611cde79603708f10c9e043ece0ee282723416ee8f0fb3e51ac333d7"
+    },
+    {
+      "path": "contracts/clerk-provider-settings.example.json",
+      "bytes": 957,
+      "sha256": "4648a275902c8b920b9b3cd7e2bed081e5794b8b72c53e4a27ec9adf9a9de9a5"
+    },
+    {
+      "path": "contracts/clerk-review.openapi.json",
+      "bytes": 433064,
+      "sha256": "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28"
+    },
+    {
+      "path": "contracts/clerk-storage.schema-rls.proposal.json",
+      "bytes": 9621,
+      "sha256": "980585b91d4adcd93751ec50a939ac23f378e4610957c5674612c506bc4e20e2"
+    },
+    {
+      "path": "contracts/review-only.openapi.json",
+      "bytes": 430120,
+      "sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4"
+    },
+    {
+      "path": "contracts/roster-return-policy.proposal.patch.json",
+      "bytes": 12280,
+      "sha256": "416be738474fed55bd0390d891b5b03c73916b16caaa53a089ef2bc05c6d474f"
+    },
+    {
+      "path": "docs/api/backend-current-verification-2026-11-07.json",
+      "bytes": 2287,
+      "sha256": "cd489421905854cd803f88e2d3ad2bdafa393558c5a7f6fe731d07f22e22d570"
+    },
+    {
+      "path": "docs/api/clerk-atomic-storage-plan-2026-11-07.md",
+      "bytes": 11069,
+      "sha256": "93068754a462782c5c0ab11d4723405b3ca23a6dfa247ccea8c6f8d3ebd2ee0e"
+    },
+    {
+      "path": "docs/api/clerk-auth-local-proposal-2026-11-07.md",
+      "bytes": 9978,
+      "sha256": "e3aa4624d9d61bb72f82943b7b475844768bc2ce5fd5b9bcc147bf8b3994b1d2"
+    },
+    {
+      "path": "docs/api/clerk-auth-publication-verification-2026-11-07.json",
+      "bytes": 3126,
+      "sha256": "1713a952205c5986c1023c0578c06a0612fb2b07459c4fefd934fa597042365b"
+    },
+    {
+      "path": "docs/api/clerk-callback-reauth-retention-2026-11-07.md",
+      "bytes": 7851,
+      "sha256": "2ccb3faab664fd06de6ce0f9793dfc1456f17bea2d430c24af0f779077b0c66e"
+    },
+    {
+      "path": "docs/api/clerk-domain-review-2026-11-07.md",
+      "bytes": 7611,
+      "sha256": "f93cdeb309a20026695b1ea8bb5638480f1c8fb105509c99928256436a5597db"
+    },
+    {
+      "path": "docs/api/clerk-domain-tcp-publication-verification-2026-11-07.json",
+      "bytes": 5608,
+      "sha256": "2427897db15f8400e101a471c58aed56e59ded93d7dfc1fd5f292a37e91258fd"
+    },
+    {
+      "path": "docs/api/clerk-f1-family-context-2026-11-07.md",
+      "bytes": 5976,
+      "sha256": "9834181d9e1b65d3e2858a9046ff9d5c7ac362f730c6c8b92ae70d13f6978f1f"
+    },
+    {
+      "path": "docs/api/clerk-f1-publication-verification-2026-11-07.json",
+      "bytes": 3753,
+      "sha256": "98bf1a845ff5dfe38ef2e2d9e89028fd98a59010bd93c0086ccbd669bec6c7a5"
+    },
+    {
+      "path": "docs/api/clerk-provider-candidate-2026-11-07.md",
+      "bytes": 8033,
+      "sha256": "00678c8870d83da0857e329d763afe1d0620fab4819e623fe7e258a2f77849b5"
+    },
+    {
+      "path": "docs/api/clerk-provider-publication-verification-2026-11-07.json",
+      "bytes": 3603,
+      "sha256": "29ebeec4730a16e7b926162329a6165519d90534c0d330a6684b1ceaa349e021"
+    },
+    {
+      "path": "docs/api/clerk-review-handoff-2026-11-07.md",
+      "bytes": 8625,
+      "sha256": "32380352894e059cdb294de0adf3d43d411ec323ffd81ffc1b1b1aa673476016"
+    },
+    {
+      "path": "docs/api/clerk-review-publication-verification-2026-11-07.json",
+      "bytes": 4346,
+      "sha256": "7d8fa44fd71ab6f2d5a282690b5b2f1480c9514089b95779ccb2c76c6339d75c"
+    },
+    {
+      "path": "docs/api/clerk-sdk-cancel-2026-11-07.md",
+      "bytes": 3504,
+      "sha256": "6d386c0543cb2f8cb4c8391bc3170628ab6e61ae8df3b512c46ae97965acb8f6"
+    },
+    {
+      "path": "docs/api/clerk-sdk-cancel-publication-verification-2026-11-07.json",
+      "bytes": 2865,
+      "sha256": "f8ab72eea05df04ece9fd3297872844d077c2d60935a6a4bed2d5d4b27556fc3"
+    },
+    {
+      "path": "docs/api/clerk-sdk-scoped-storage-2026-11-07.md",
+      "bytes": 9601,
+      "sha256": "9b5a116ff15800310bd7a089b61530c51feaebec08904cacf7f47a98b1f91fb8"
+    },
+    {
+      "path": "docs/api/clerk-sdk-storage-publication-verification-2026-11-07.json",
+      "bytes": 4446,
+      "sha256": "2a63a20500e780fce68457d82ac215d2cb24a67597880a4293f005b238ee861f"
+    },
+    {
+      "path": "docs/api/clerk-timing-d1-d2-2026-11-07.md",
+      "bytes": 11111,
+      "sha256": "0fd76309a328351bb5186b4a9689fccd3827c55faf3f016c067d55686276dec8"
+    },
+    {
+      "path": "docs/api/content-pilot-candidate-2026-11-06.md",
+      "bytes": 4995,
+      "sha256": "5e1890d1ce21a6858c773dd60cfbff66f66d413f5caa6bdbaa8776b42a469e61"
+    },
+    {
+      "path": "docs/api/first-test-publication-verification-2026-11-07.json",
+      "bytes": 2717,
+      "sha256": "a16591353054ceff3e3dc86bfc3a877789f5abbe0f37f38585dfb423f20c329f"
+    },
+    {
+      "path": "docs/api/first-test-relational-local-2026-11-07.md",
+      "bytes": 7956,
+      "sha256": "21d9b02abeab25201fe637a51a6c70cce61b97a6dc312eea6bb2fd4a46ac7a6e"
+    },
+    {
+      "path": "docs/api/identity-link-return-proposal-2026-11-07.md",
+      "bytes": 11986,
+      "sha256": "b9fd5708d9271c898cdf6ce0c606b45638083c7bc8cbae1489d162f111438b97"
+    },
+    {
+      "path": "docs/api/identity-staff-readers-2026-11-07.md",
+      "bytes": 6933,
+      "sha256": "f4aa21ad78e95fec17fe085f56d77d86b1a233fb0ece9f932353bcec7ef28bc5"
+    },
+    {
+      "path": "docs/api/persistent-http-review-2026-11-07.md",
+      "bytes": 9473,
+      "sha256": "a235062899d80e769919ceac5cd212e4eed91ad5915c13063012ec20050188ef"
+    },
+    {
+      "path": "docs/api/removal-active-invariant-local-2026-11-09.md",
+      "bytes": 18404,
+      "sha256": "dbd3c47189917bf9ea57837f020d47e8b67f8d59c54d9cf9f2bdc4993efdda36",
+      "role": "provenance"
+    },
+    {
+      "path": "docs/api/storage-auth-local-proposal-2026-11-06.md",
+      "bytes": 13069,
+      "sha256": "c3471587ea66dac673def00553da8cc4a6cfb8e221188e1da136e2c15e3f47d1"
+    },
+    {
+      "path": "docs/api/tcp-cancel-2026-11-07.md",
+      "bytes": 2697,
+      "sha256": "65fd1ce969ca8c48d2a31a5b3844e8f848629344a9193f3e07612c115e1b4cc2"
+    },
+    {
+      "path": "docs/api/vercel-node-local-proposal-2026-11-07.md",
+      "bytes": 10434,
+      "sha256": "bf84218a2ce8fc7d02fc819ea24a96c18e9a47c556d1285ace710c136f4b4ccc"
+    },
+    {
+      "path": "docs/api/vercel-node-publication-verification-2026-11-07.json",
+      "bytes": 3037,
+      "sha256": "2440ef6b5fd622908cfd94871bbf2248bf839799c8d18a02eb74322780efe653"
+    },
+    {
+      "path": "evidence/clerk-auth-2026-11-07/source-manifest.json",
+      "bytes": 2750,
+      "sha256": "2b9bd03563d308abee6aa6b22c919908d19a2ca6c1a473ece9a18e02afa4223a"
+    },
+    {
+      "path": "evidence/clerk-auth-2026-11-07/tests.log",
+      "bytes": 2751,
+      "sha256": "ed91e30094f81dd094cbc1528adaf3c04efb462917b980d01839d3794afdaafc"
+    },
+    {
+      "path": "evidence/clerk-auth-2026-11-07/typecheck.log",
+      "bytes": 561,
+      "sha256": "efea2ea69ee34f38658c32817823ab5cc0e68bc27a99eba0bfe57ce934cb995f"
+    },
+    {
+      "path": "evidence/clerk-auth-2026-11-07/verification.json",
+      "bytes": 2842,
+      "sha256": "c65f46dd85d6d2c8e27148edced712f66713cdc80ec82deb5843dfdf8f3f2bce"
+    },
+    {
+      "path": "evidence/clerk-domain-2026-11-07/source-manifest.json",
+      "bytes": 8362,
+      "sha256": "ecccbde7939faae7128aad5f629078f3cb9083406ad75c58a1527ffa0e992155"
+    },
+    {
+      "path": "evidence/clerk-domain-2026-11-07/tests.log",
+      "bytes": 17742,
+      "sha256": "0b3eb2fbdcab26a35e69ffa377ae3bc7d206540e561baa89dbefab71c368968e"
+    },
+    {
+      "path": "evidence/clerk-domain-2026-11-07/typecheck.log",
+      "bytes": 353,
+      "sha256": "e4013abb72157734e39e32f023561333a9b407824cb68b45acb8a18f78d576cc"
+    },
+    {
+      "path": "evidence/clerk-domain-2026-11-07/verification.json",
+      "bytes": 1610,
+      "sha256": "0e8d340bdc087a4daa392cf9ba3d0c754d0dcdddd4fb832bcd255c0fc9754bae"
+    },
+    {
+      "path": "evidence/clerk-f1-2026-11-07/red.log",
+      "bytes": 3678,
+      "sha256": "a56cb4eaca39dea22130d574b30a430988c52e2aec65f6489b90fedb41efa93a"
+    },
+    {
+      "path": "evidence/clerk-f1-2026-11-07/repro-before.json",
+      "bytes": 301,
+      "sha256": "23db3ea25580047c9cb671da8ca60489eee8f7a7572d1bf95ba43884fc7d5d68"
+    },
+    {
+      "path": "evidence/clerk-f1-2026-11-07/source-manifest.json",
+      "bytes": 2065,
+      "sha256": "3491adb3236e80e531e4b18c89c491ebc4d8acd2386371abbfdbd5c14f7901d4"
+    },
+    {
+      "path": "evidence/clerk-f1-2026-11-07/tests.log",
+      "bytes": 3425,
+      "sha256": "4ba86b3ca17c4348a7593818c4c2954ff71de082da07d2420b9eebb9c9e51b2e"
+    },
+    {
+      "path": "evidence/clerk-f1-2026-11-07/typecheck.log",
+      "bytes": 561,
+      "sha256": "efea2ea69ee34f38658c32817823ab5cc0e68bc27a99eba0bfe57ce934cb995f"
+    },
+    {
+      "path": "evidence/clerk-f1-2026-11-07/verification.json",
+      "bytes": 4093,
+      "sha256": "b3455996b7548085270b8cac4a3ef68f07e4540abade97c3159bfff013b88d9f"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/initial-fixture-key-rotation.log",
+      "bytes": 2405,
+      "sha256": "c638b7338860cb899accec580025309ec6aa33cf63f03ba1931e30fcd16c838f"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/source-manifest.json",
+      "bytes": 5420,
+      "sha256": "3c4074c2956a85f325b114ce9221841a865e27e83106bc737a07bf037506c0a3"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/tests.log",
+      "bytes": 1477,
+      "sha256": "a0b0a2b68f67fafdc0aac8fd0153e623b596b36aa8f72e7526cc7ad4fa057c35"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/timing-red.log",
+      "bytes": 6175,
+      "sha256": "64a5c84bba11d48660256f57dcfe9f78c920dd241387445f653c5ecb4c35b8f0"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/timing-tests.log",
+      "bytes": 5926,
+      "sha256": "1fd318b2152f7110f88ddfee279191a9599e917a71cabf643b0bca788b180bbd"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/timing-typecheck.log",
+      "bytes": 594,
+      "sha256": "36f6f167f98f9ef69c152569dfd8bcd0837c181ba693a19cf46be63476829a8d"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/typecheck.log",
+      "bytes": 594,
+      "sha256": "36f6f167f98f9ef69c152569dfd8bcd0837c181ba693a19cf46be63476829a8d"
+    },
+    {
+      "path": "evidence/clerk-provider-2026-11-07/verification.json",
+      "bytes": 2581,
+      "sha256": "536388b8c1289bbee6fb03a3bcf8641aed9e58762ffe652ebffbb24e0bc4ebb1"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/cli-smoke.json",
+      "bytes": 395,
+      "sha256": "7c7ba48a66edb9c51337505a130d74d1119eeeb0b830e6c697126b979d96cfb1"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/initial-error-enum-mismatch.log",
+      "bytes": 5076,
+      "sha256": "7e692ce4d218aad70287ae271cb7e3b341d69d8d8f407121445fa7eb086e1f6d"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/regeneration.log",
+      "bytes": 1089,
+      "sha256": "909236ad2c412741d22bfb50eb281d226c960c7d4549804efde3df69386df08c"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/source-manifest.json",
+      "bytes": 5872,
+      "sha256": "d4a0323ce17b700c6ab2b07b9f50830201bd0d8dbfc181eea44ef52e490c9dcc"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/tests.log",
+      "bytes": 3515,
+      "sha256": "ca4ef3ef579f1c6b4e2463393ec3a9a03502c250ba883c28e4d88c351e7480dd"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/transport-auth-order-expectation.log",
+      "bytes": 3135,
+      "sha256": "99024b79894893dc3f387d8679883771849c480090289e70c7419961754b94a6"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/typecheck.log",
+      "bytes": 858,
+      "sha256": "d2fbe9e2039dddfd15f59e2f771551898703dc2e56430268fa7297497e46f8bc"
+    },
+    {
+      "path": "evidence/clerk-review-2026-11-07/verification.json",
+      "bytes": 2521,
+      "sha256": "5e107ba264798c4c2223f31481807b186ab762d366670405a233291c768e77b0"
+    },
+    {
+      "path": "evidence/clerk-sdk-cancel-2026-11-07/before.log",
+      "bytes": 951,
+      "sha256": "6307c54776820a9d90a6a122ac2fc39585550b1be46f5e701ab404dd1bafd961"
+    },
+    {
+      "path": "evidence/clerk-sdk-cancel-2026-11-07/source-manifest.json",
+      "bytes": 1164,
+      "sha256": "683437bf68c3cedfbb8ed04fd9037e03765756bed74765945b3c65114761986e"
+    },
+    {
+      "path": "evidence/clerk-sdk-cancel-2026-11-07/source.patch",
+      "bytes": 18393,
+      "sha256": "ec972ea5ce005ca15160fb0490b6591caa26118f660040d66b6488b0722ba3e7"
+    },
+    {
+      "path": "evidence/clerk-sdk-cancel-2026-11-07/tests.log",
+      "bytes": 8565,
+      "sha256": "2ad9fd868b8513f791e2bb768811bfdc1fa7116d33fe1f05820aa5cbf07a78a9"
+    },
+    {
+      "path": "evidence/clerk-sdk-cancel-2026-11-07/typecheck.log",
+      "bytes": 353,
+      "sha256": "e4013abb72157734e39e32f023561333a9b407824cb68b45acb8a18f78d576cc"
+    },
+    {
+      "path": "evidence/clerk-sdk-cancel-2026-11-07/verification.json",
+      "bytes": 2196,
+      "sha256": "2222159d938fa4e4d2175c9d4b8bfd80bcb60baf42065a38745af2e1680bd514"
+    },
+    {
+      "path": "evidence/clerk-sdk-storage-2026-11-07/sdk-inspection.json",
+      "bytes": 1605,
+      "sha256": "deb635fa1f15fc5ac3f4f003240596a59879b79a0de38d58472948ef1f34a1a6"
+    },
+    {
+      "path": "evidence/clerk-sdk-storage-2026-11-07/source-manifest.json",
+      "bytes": 4364,
+      "sha256": "9779e41c808555c8a30f2a17f3cafdb144f9df6895698f5af251210d56180cbf"
+    },
+    {
+      "path": "evidence/clerk-sdk-storage-2026-11-07/tests.log",
+      "bytes": 7801,
+      "sha256": "897ba23e6ccee08d35638641150158f845ca56f2694108394bd31cec4d25c9b9"
+    },
+    {
+      "path": "evidence/clerk-sdk-storage-2026-11-07/typecheck.log",
+      "bytes": 422,
+      "sha256": "e33adee6eb91aaf2de248b4d11b966150c05429d3e89e933844930e821ea4fe9"
+    },
+    {
+      "path": "evidence/clerk-sdk-storage-2026-11-07/verification.json",
+      "bytes": 2074,
+      "sha256": "75d707c917451575bc336182d94343879fe7a44bde2c4e7639770ef269ef17a5"
+    },
+    {
+      "path": "evidence/first-test-2026-11-07/source-manifest.json",
+      "bytes": 2840,
+      "sha256": "483a997017c2af919521c8100134e7e6da153e7afcbeef3ab9f266c801f6342d"
+    },
+    {
+      "path": "evidence/first-test-2026-11-07/tests.log",
+      "bytes": 4202,
+      "sha256": "4507ac1809046803540c291329d448ccef2ea11415dda24c519a0533aec44cf0"
+    },
+    {
+      "path": "evidence/first-test-2026-11-07/typecheck.log",
+      "bytes": 561,
+      "sha256": "efea2ea69ee34f38658c32817823ab5cc0e68bc27a99eba0bfe57ce934cb995f"
+    },
+    {
+      "path": "evidence/first-test-2026-11-07/verification.json",
+      "bytes": 1750,
+      "sha256": "07053949e8cdc83432934121770f7e11c978667327696456a4e80b82f41e1e98"
+    },
+    {
+      "path": "evidence/tcp-cancel-2026-11-07/before.log",
+      "bytes": 1025,
+      "sha256": "3f63ceac7a154d1d0e94b7afed82f8bdcdfee4254950c55418483c75851bfb0a"
+    },
+    {
+      "path": "evidence/tcp-cancel-2026-11-07/source-manifest.json",
+      "bytes": 2614,
+      "sha256": "99bff54378d692aabdf3cbddde5dd0d05e4d0f765db9d91db7b22683e364b40f"
+    },
+    {
+      "path": "evidence/tcp-cancel-2026-11-07/tests.log",
+      "bytes": 7408,
+      "sha256": "134642f9ecb540828fc3fdbd0baabccd215b1b43b4451318a713ff5ef46df392"
+    },
+    {
+      "path": "evidence/tcp-cancel-2026-11-07/typecheck.log",
+      "bytes": 353,
+      "sha256": "e4013abb72157734e39e32f023561333a9b407824cb68b45acb8a18f78d576cc"
+    },
+    {
+      "path": "evidence/tcp-cancel-2026-11-07/verification.json",
+      "bytes": 1535,
+      "sha256": "3a138b34a0cc185f4f4f50b5fcbf8ef7d5467ac696b5dcf652c4c321188e0aa9"
+    },
+    {
+      "path": "evidence/vercel-node-2026-11-07/source-manifest.json",
+      "bytes": 2482,
+      "sha256": "bec1d1c2a0f2c747b468cdd02973807f6e5bbad88ef1a66cdf012a7ef1a90510"
+    },
+    {
+      "path": "evidence/vercel-node-2026-11-07/tests.log",
+      "bytes": 1747,
+      "sha256": "54d4e91a60c2c69110af7b0666d5939abefc008fca71c604f8c711686a009c70"
+    },
+    {
+      "path": "evidence/vercel-node-2026-11-07/typecheck.log",
+      "bytes": 561,
+      "sha256": "efea2ea69ee34f38658c32817823ab5cc0e68bc27a99eba0bfe57ce934cb995f"
+    },
+    {
+      "path": "evidence/vercel-node-2026-11-07/verification.json",
+      "bytes": 2163,
+      "sha256": "acca8e406b70e0d9dc692722f7787377b971d9899ec208d347d2650a1ce3ce9a"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 19609,
+      "sha256": "62c3094c5ff8b464aaa86836c83e3dd455f193d58a4296d08274d5a0d2772222"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1744,
+      "sha256": "05bd3c8c58e5e898b577ca3106b8a77d018ef01a39d9975e5551453f507436a4"
+    },
+    {
+      "path": "packages/api-client/staff-openapi.json",
+      "bytes": 46045,
+      "sha256": "a1bdcd4e7177388e6eb0cf77bdde00a4a962ca7ac13fb921277f863ea0acacff"
+    },
+    {
+      "path": "packages/api-client/staff-types.d.ts",
+      "bytes": 28222,
+      "sha256": "669f574310968bb85565cedf11e3f44963438908dcd9294d60a854a02a1a9731"
+    },
+    {
+      "path": "packages/api-client/student-client.ts",
+      "bytes": 8952,
+      "sha256": "61cf1d2d0681f3bf25a610c73eff7470159bca45679c5def42101e9a58017494"
+    },
+    {
+      "path": "packages/api-client/student-openapi.json",
+      "bytes": 86307,
+      "sha256": "5bb3f266acd8f699ff10df8ef0522852b5d7657af0df349f95d7ac52440020cb"
+    },
+    {
+      "path": "packages/api-client/student-types.d.ts",
+      "bytes": 48905,
+      "sha256": "bc658b13af2d2a75fb88af415637d4c4a63e33c3767f00120242099c86c637cc"
+    },
+    {
+      "path": "runtime/clerk-review-server.mjs",
+      "bytes": 2390,
+      "sha256": "04941545a0f98e4fb0f52c490af3129c7fbbe44720b7ee6b199dc6dfed24db16"
+    },
+    {
+      "path": "runtime/clerk-sdk-bindings.mjs",
+      "bytes": 6984,
+      "sha256": "fc8d588919e598ba599c4c724bd2cf12ae61bc38e9a5af18a5420adc44bb4ef7"
+    },
+    {
+      "path": "runtime/clerk-sdk-worker.mjs",
+      "bytes": 2062,
+      "sha256": "75aef2bbd53a86920d1a1786745ce33545627e147a1a8b6a5b3b95dd08e0604f"
+    },
+    {
+      "path": "runtime/configured-server.mjs",
+      "bytes": 2957,
+      "sha256": "a8d50828f7ee85b1b5624d939020dd847a696c49b3ad8f294ca616805772affe"
+    },
+    {
+      "path": "runtime/content-pilot-driver.mjs",
+      "bytes": 3294,
+      "sha256": "a118db0f7531e4005edd8388e93a25cfe2952cb223e80a752a6ddd617543466e"
+    },
+    {
+      "path": "runtime/content-pilot-lab.mjs",
+      "bytes": 2068,
+      "sha256": "4bda938261a208c9c632022a86a31e447c56e4cb38e4e209401d1c8e3b14cfee"
+    },
+    {
+      "path": "runtime/content-pilot-server.mjs",
+      "bytes": 653,
+      "sha256": "13174482a20e214d52a1e0f12033d6f609b85497cf83ae714fef945df6114c91"
+    },
+    {
+      "path": "runtime/local-cors.mjs",
+      "bytes": 3289,
+      "sha256": "c8c7cf03b13c0b86723a64732098fe19e9fa1daa26bbcf085b64baf4d7d995c2"
+    },
+    {
+      "path": "runtime/local-lab.mjs",
+      "bytes": 2154,
+      "sha256": "5cc1443c0fc9e0b23a50ee8e9ca195e47f2a041099ea6feeeaf3bfbc0bd87830"
+    },
+    {
+      "path": "runtime/local-server.mjs",
+      "bytes": 3505,
+      "sha256": "3b27100d39d89fbffdec938ffc5c4dbbdd2d1110ab71db604b055089ed081062"
+    },
+    {
+      "path": "runtime/node-request-abort.mjs",
+      "bytes": 642,
+      "sha256": "3511ce2225a1b8fb22e3c7723aa5e9913d9bed1e713e8c5daecfaed02d8bcbe8"
+    },
+    {
+      "path": "runtime/production-options.mjs",
+      "bytes": 7544,
+      "sha256": "251a124def286b6b42f11602cdaf79fd73d42f1b696eba89e6d9697169937989",
+      "role": "runtime",
+      "reason": "Accepted standalone production-options validator; retain complete runtime source inventory without claiming a current production call site."
+    },
+    {
+      "path": "runtime/ungrouped-driver.mjs",
+      "bytes": 2282,
+      "sha256": "3a2ec8f1608c498b98de8e02abb5908839db51f8f13e5f95312c5dcfe5b8dab4"
+    },
+    {
+      "path": "runtime/ungrouped-fixture.mjs",
+      "bytes": 1753,
+      "sha256": "12efbe082d9db82749f2185db7f9284a51fb3e6b830aa015a5fd80e3188b5c08"
+    },
+    {
+      "path": "runtime/ungrouped-lab.mjs",
+      "bytes": 3494,
+      "sha256": "93abc2e195f37268eb0c9ccb990601c6612ae5ccd52c547fd370f44f03a1aa38"
+    },
+    {
+      "path": "runtime/ungrouped-server.mjs",
+      "bytes": 774,
+      "sha256": "3b6e687b1415dd0fd877e3589f3386fc8d07e421da000e04713e28d7b6a74611"
+    },
+    {
+      "path": "runtime/vercel-node.mjs",
+      "bytes": 4161,
+      "sha256": "eb95ef50e999b44403f20fa2bdd51923443f1ef6038f60c7588bda1820537171"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/attempts.ts",
+      "bytes": 9727,
+      "sha256": "b95d33d535d37ee1beeef6123985771b5c05e921ed3a4f9e0694eafaea381721"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-auth.ts",
+      "bytes": 4980,
+      "sha256": "278d4d6deaaf9a9b53e1fa1feb6f677b29b81761b6c3eb3f85a3b80cf31f3565"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "bytes": 15215,
+      "sha256": "79fade5bdc4bb4e9ccbf09b2cf7de3101a7a11406457e4bbcb361074dbfc85e0"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+      "bytes": 10057,
+      "sha256": "06a295c8a0fe24fd8815ebd1f35ae2e77a4895635ab7f5df2a9576926720739b"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/configured-http.ts",
+      "bytes": 8697,
+      "sha256": "3ab2e3c9393080c41347bf98f1e83d1a0a1ca3b64dbc847bf6a2c9d52ef7c708"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/fault.ts",
+      "bytes": 422,
+      "sha256": "e405799dd809d8118f764e8fea8361f9117e2635b37e3afce93d63e64cafed8f"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/individual-points.ts",
+      "bytes": 729,
+      "sha256": "49f7108ad311b45b8491fa932eefff04ec4a4422969f17b84b522ea68ee1b8c2"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-activity.ts",
+      "bytes": 7617,
+      "sha256": "c4149e06a68778b39bd2e229188605d84fc4dda756dc5fc95016259a9226eb6b",
+      "role": "runtime"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-effects.ts",
+      "bytes": 3852,
+      "sha256": "8bf5a68911587a16177650087fea108dac32a5aef5bba53cb8250f584da761c5"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-preflight.ts",
+      "bytes": 7061,
+      "sha256": "17b49301bca7ae3e79d5436dba281f0263c05e819754ad71522190a90e14c4bf",
+      "role": "runtime",
+      "reason": "Accepted preflight composition and its authority/transaction/port imports; static source coverage only."
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-removal-http.ts",
+      "bytes": 5504,
+      "sha256": "66a13bd5396ea3f79b18fb5aa2345e8e978fd6878f8aabcf952303452287730b",
+      "role": "runtime",
+      "reason": "Accepted local removal-only HTTP composition; not exercised by the Mini current-flow memory fixture."
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-removal.ts",
+      "bytes": 7598,
+      "sha256": "3477846790c594c6baf96ea5a15a0be83bcde6f33328d57feb5c6917139e4ccb",
+      "role": "runtime",
+      "reason": "Accepted removal domain command and its authority/effects dependencies; static coverage is not execution."
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/ordinary.ts",
+      "bytes": 2889,
+      "sha256": "acd083fa6874fb4c8dfd8ec7551c9b12842dca1c07c970a8c7f0f5988cf1fd52"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/pilot-provisioning.ts",
+      "bytes": 9741,
+      "sha256": "c7967d846727e2ad00ae386654d07caf81de3b7b273b57ef4832c49a22c53cd3"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/removal-authority.ts",
+      "bytes": 812,
+      "sha256": "cc1739e0fe87e1aa88f964bdbd1e9562a3781df902a0486e5fe29ab3c1e44cd7",
+      "role": "runtime",
+      "reason": "Required new transitive runtime import: staff-http -> membership-activity -> removal-authority."
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-content.ts",
+      "bytes": 5127,
+      "sha256": "913a89409e68425ff664def9c76f9be80478cd47f50e4144cff21a0547d49e0e"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-http.ts",
+      "bytes": 16079,
+      "sha256": "76dab2bc435a9d79a6983ec47c3800876856daeed3a806f45a7b33c8a65bb4e2"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-json.ts",
+      "bytes": 1615,
+      "sha256": "8d93c68cce2dcdaf68ad96bf8f710d3f0a379e7db62db642583dd23218089b9d"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-jwt.ts",
+      "bytes": 3535,
+      "sha256": "6b28fe7ab3c08a6f4c6b6867dd353a98dc397afd006236a510324c9e4cc3fc1b"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-state.ts",
+      "bytes": 5790,
+      "sha256": "b6699ac9973c0054bcf84ccd7437b3f411f66303a288e31a9c657e5ed641a40d"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/attempt-rows.ts",
+      "bytes": 8740,
+      "sha256": "aab9cb3964cbb9ecc196a0400790395c1512f4418d6ce85df29117f0cb15e010"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+      "bytes": 22634,
+      "sha256": "02de46baf1ec90442bfb958c264f4192948afe08c9c2b4e3e2a767eac2b445d2"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-domain.ts",
+      "bytes": 10501,
+      "sha256": "8d2f69c9a4a970c85ff2594fa23cd8cd7441d0ae3b74ee265919381f2d44ea77"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/membership-preflight-port.ts",
+      "bytes": 15991,
+      "sha256": "6eab8c2c749616d1b1b9c4e5c17fabe73de3f7ad07e9455f3328210eedc315fc",
+      "role": "runtime",
+      "reason": "Required local port and coverage types/helpers imported by membership-preflight."
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/membership-protection-contract.ts",
+      "bytes": 30680,
+      "sha256": "ad4486106fb32ef8ee50e8db151549726bc8fa36b16a21396d7d02d1921d2ed8",
+      "role": "runtime",
+      "reason": "Accepted local protection contract source; not proof of SQL locks or browser execution."
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/postgres-transaction.ts",
+      "bytes": 9620,
+      "sha256": "fca20362989fe6abecabcff80ffd7787fc6e573379268a7af6236e141856f96f"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/session-rows.ts",
+      "bytes": 6717,
+      "sha256": "492d043bbe322752a8ef3e2a5abd2daf1d117068fc00c74d0f9ec73143f5916b"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/staff-access-rows.ts",
+      "bytes": 3744,
+      "sha256": "cec02c6a6392c51fdcd004189fbcb504d1a48efbf20e5f6b2af912f5244ab700"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts",
+      "bytes": 15858,
+      "sha256": "744a44d3504b9b98b24e9b42fcd2f602c28869479e984166f02de22af2df95d9"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-http-rows.ts",
+      "bytes": 13250,
+      "sha256": "a6a97239245a086d5e6c51fbb6ddd9977b2e781b5ef92071d89bbfd71a909595"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-identity-rows.ts",
+      "bytes": 3051,
+      "sha256": "ba1c07668261045f555dc2110d51eee6f74f37b19711416b13428a9068f05070"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-scope.ts",
+      "bytes": 3575,
+      "sha256": "263238b744240af6e62cfd14c6dc00943bf840f7fe9c6e2ed18acbd914dd38bd"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/transaction-pool-port.ts",
+      "bytes": 1102,
+      "sha256": "79b9dcf8a9c27ef1ccc3f86a9233e8988731e17b2d9bdd330e3aa3872f084153"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-http.ts",
+      "bytes": 17650,
+      "sha256": "32bc06bab2e7422544ee5b0f5831330755c8befaa579d8d7e5fee1b0db24cee0"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-state.ts",
+      "bytes": 7532,
+      "sha256": "208f220a3b72a572a37ab0ffba6763193b67beb3732aebe521f2295039333f72"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-wire.ts",
+      "bytes": 9974,
+      "sha256": "a43b5e043ca19c2e45cf83e1b76dddf0a89422633eeb2eefa19e647a847699af"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/telegram.ts",
+      "bytes": 3303,
+      "sha256": "415f843c5139285cbe3a4338072e05e50d33bebcbee3059362a3118281b8a3b3"
+    },
+    {
+      "path": "tests/backend/http-fixture.ts",
+      "bytes": 7081,
+      "sha256": "b3593fb05cc32f6edf876c2120c24934338f2fbc3f3e8f658c666cbd8e2841d1"
+    },
+    {
+      "path": "tests/backend/staff-fixture.ts",
+      "bytes": 8646,
+      "sha256": "e173224b8d323b983e6510ec1cbddd3a108d79e72056a133a38a3fa9bda0814e"
+    },
+    {
+      "path": "tests/backend/validator/ajv-config.cjs",
+      "bytes": 2461,
+      "sha256": "55865a95c45cab29495f77cbc41fb4cdfc94f83960ce6168a838c2e64f800253"
+    },
+    {
+      "path": "tests/backend/validator/base-ajv-config.cjs",
+      "bytes": 2044,
+      "sha256": "74ef231957dc1b528f73ea61206a890d8c1fa16a9d97bca42bc8195b285ff774"
+    },
+    {
+      "path": "tests/backend/validator/tooling/package-lock.json",
+      "bytes": 2789,
+      "sha256": "bf49238f558d7a6f85562a52998e31f105f9e69e66892f785da9ab8cfca9bdf7"
+    },
+    {
+      "path": "tests/backend/validator/tooling/package.json",
+      "bytes": 76,
+      "sha256": "83086e236c60ca828b6d118d35f55c5834cc70e3b5d5cb8dfc8d628ffcd21149"
+    },
+    {
+      "path": "tests/backend/validator/view-builder.cjs",
+      "bytes": 10788,
+      "sha256": "0c12d242980b3899a4ded8bb8072ad8cf512170098ee8dd6e639198cd9833303"
+    },
+    {
+      "path": "tests/clerk-auth/contract.test.mjs",
+      "bytes": 2639,
+      "sha256": "d1450ed5ddc892b42eea52aec84ee32c8fd9721b895ed97afb9337fd6689eb99"
+    },
+    {
+      "path": "tests/clerk-auth/domain-executor.mjs",
+      "bytes": 4815,
+      "sha256": "78bf1357f8876a1d8dc59caca9ca235761d552f9f9ddacc9794bba9d5a55a757"
+    },
+    {
+      "path": "tests/clerk-auth/domain-http.test.mjs",
+      "bytes": 13849,
+      "sha256": "24b8aef28ab138f65fecde222945ad8769635555c64925aeac16bf8886a18678"
+    },
+    {
+      "path": "tests/clerk-auth/family-context.test.mjs",
+      "bytes": 5841,
+      "sha256": "20977f27a559fb9b2a80f21899208c660dadbaac65ac80aabdf54d3894fae7ec"
+    },
+    {
+      "path": "tests/clerk-auth/fixture.mjs",
+      "bytes": 5634,
+      "sha256": "1dae0182015c155aec6da31e88e1f51dc75d15e3d777c1df1ddc6c485bda8d11"
+    },
+    {
+      "path": "tests/clerk-auth/http.test.mjs",
+      "bytes": 12183,
+      "sha256": "db182096422e367993ba15f34d3a412bf65a1b269f1a4f4954dd7436c13a3a59"
+    },
+    {
+      "path": "tests/clerk-auth/provider-adapter.test.mjs",
+      "bytes": 21868,
+      "sha256": "29587109cb40ce005417bee69a14eca9c9426e063b51ca159c682f040dc40aee"
+    },
+    {
+      "path": "tests/clerk-auth/review-listener.test.mjs",
+      "bytes": 11215,
+      "sha256": "040c085d8649094e0ff18d8c00c6ec72d385461787dc55af548fcbbe04a0ff1f"
+    },
+    {
+      "path": "tests/clerk-auth/review-types.test.ts",
+      "bytes": 689,
+      "sha256": "81fffa224c5f3b27a0d56ee5c3e25f91475a0cc14a0c28a13fb594b40bedd534"
+    },
+    {
+      "path": "tests/clerk-auth/scoped-store.test.mjs",
+      "bytes": 14224,
+      "sha256": "e301a111d26b64fc2de1bdb9d62a9c0f3308d4c7401c351ea828cfc7bfe52c64"
+    },
+    {
+      "path": "tests/clerk-auth/sdk-binding.test.mjs",
+      "bytes": 8171,
+      "sha256": "6e42092ca6ada3590b5a9b517e376cc72ab19474c35e50d34d5bf7f65b3a362f"
+    },
+    {
+      "path": "tests/clerk-auth/sdk-cancel.test.mjs",
+      "bytes": 10469,
+      "sha256": "0cd4918952b587929d0e4e446b5e1d7a4772ec039d7f401c23e34d99f5293c42"
+    },
+    {
+      "path": "tests/clerk-auth/staff-parallel.test.mjs",
+      "bytes": 3798,
+      "sha256": "bfa54cb9f778a5202705e415f92d25497640f8847acc963182064c6ef8328a45"
+    },
+    {
+      "path": "tests/clerk-auth/tcp-cancel.test.mjs",
+      "bytes": 6661,
+      "sha256": "89ff63e911cd10816cdfc2d33cfa5f7f57556fc476edd8817727fe605b469ffe"
+    },
+    {
+      "path": "tests/clerk-auth/verifier.test.mjs",
+      "bytes": 4509,
+      "sha256": "73dc09ba11d9598b3e00daaf6b8b24b9468b32d6ad6ed17bc600677f579a8628"
+    },
+    {
+      "path": "tests/enrollment/identity-staff.test.mjs",
+      "bytes": 15670,
+      "sha256": "ed14bfbd5f231463ebf2376304add8b6226645db3a4d811855a9b355e2335c0a"
+    },
+    {
+      "path": "tests/enrollment/production-client.test.mjs",
+      "bytes": 4808,
+      "sha256": "4bbe5b112b5b81f738760748dee7aa25cf141e2ab990e16aaeb06bc4b5861165"
+    },
+    {
+      "path": "tests/first-test/cors.test.mjs",
+      "bytes": 3479,
+      "sha256": "ef4ea2228157b718baa7f580bfe07403139a6d5294ed4609278dd0e3352eb6f1"
+    },
+    {
+      "path": "tests/first-test/executor.mjs",
+      "bytes": 3803,
+      "sha256": "6734a0d8221092978b7676bd4835e03124ffe18b11c323523348ec8cbef7520e"
+    },
+    {
+      "path": "tests/first-test/fixture.mjs",
+      "bytes": 7281,
+      "sha256": "6e9c113a2d754fcdf5ca54e382b949e21859beb61a77016bdebaab0be7f4f35f"
+    },
+    {
+      "path": "tests/first-test/http.test.mjs",
+      "bytes": 13002,
+      "sha256": "c1b72ff57078ca3edaff572cf9282f4a69da65a7fbe7e9c2741bc3a4daa32f57"
+    },
+    {
+      "path": "tests/local-content-pilot.test.mjs",
+      "bytes": 19865,
+      "sha256": "74c29b5306d0e09ec0efcda48afac04684230ef4347339617657de7daa190f2b"
+    },
+    {
+      "path": "tests/membership/preflight-adapter.test.mjs",
+      "bytes": 52377,
+      "sha256": "9b989fd50294146601f4176b45bb4f0f3ed5d20b0d122d3aa98dc4880dbbc6d7",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tests/membership/protection-contract.test.mjs",
+      "bytes": 38971,
+      "sha256": "a1f0014d99ab4ec898d3331622d2eff3c09ab5c3fb8427cae890d53cc497a111",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tests/membership/protection-postgres-transaction.test.mjs",
+      "bytes": 33274,
+      "sha256": "49db7421e71cd71966bbf1bd24e952539b8f5062f0621fd349db38f22eca6beb",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tests/membership/removal-active.test.mjs",
+      "bytes": 35811,
+      "sha256": "853da6086e13bad983176eb1febb2f78176f619b8732b292329e471cb6aedb44",
+      "role": "provenance"
+    },
+    {
+      "path": "tests/membership/removal-command.test.mjs",
+      "bytes": 40020,
+      "sha256": "76d693b6074f1b3e89eac36bbfb05ee65c3ac490754ca2182490f94d58523cc2",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tests/membership/removal-http.test.mjs",
+      "bytes": 47840,
+      "sha256": "e5a392c95f6838d54037a8dce5db42ba0b8267ab9e89d452cd3bf1260bd2e160",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tests/membership/shared-expiry-invariant.test.mjs",
+      "bytes": 18548,
+      "sha256": "9de546a587d6b3aac367f9f17db704c9d54c318694c58c89cfbf6963abc3ab68",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tests/persistent-http/executor.mjs",
+      "bytes": 7574,
+      "sha256": "ad86e0734e7e7cc19c310300f8417cde07c2d17c763b85a61714a7ae299f6cc6"
+    },
+    {
+      "path": "tests/persistent-http/http.test.mjs",
+      "bytes": 17759,
+      "sha256": "ad3c1b5a1865b62c20cebc3769a7cc16f74eff45a019edb2dfc21b1335c1c260"
+    },
+    {
+      "path": "tests/storage-auth/disk-executor.mjs",
+      "bytes": 7084,
+      "sha256": "4103509484ffcbd1f04b4924e9e99380ce60e206ae60de6c955f49657e8f8690"
+    },
+    {
+      "path": "tests/storage-auth/staff-jwt.test.mjs",
+      "bytes": 4981,
+      "sha256": "801baa55d2c706c5d266e88e59c4a2c4489fcd30b0e588720b32fa18e36a24d3"
+    },
+    {
+      "path": "tests/storage-auth/storage.test.mjs",
+      "bytes": 12570,
+      "sha256": "9f2729b65a61ab0f3b3a0436e8df6620474da009427651e092b65d2b9491bc22"
+    },
+    {
+      "path": "tests/vercel-node/adapter.test.mjs",
+      "bytes": 11454,
+      "sha256": "a3c38ef203b6fdd39ae9cbdcebecd1dc5bf20744b9104d4f0cd075819a3d9629"
+    },
+    {
+      "path": "tests/vercel-node/pool-port.test.mjs",
+      "bytes": 3692,
+      "sha256": "8cad9affbcab42ca1daa74da7153de4f8b3d44b443120f199fb4df96216c98a2"
+    },
+    {
+      "path": "tests/vercel-node/production-options.test.mjs",
+      "bytes": 21924,
+      "sha256": "052e7e8aa70519c35d03d2de7d673db3737b4bcfd9858ae351ee2761ae0fc2ac",
+      "role": "provenance",
+      "reason": "Frozen Backend regression provenance for the corresponding accepted source delta; pinned bytes do not mean this suite was rerun here."
+    },
+    {
+      "path": "tools/generate-clerk-review.py",
+      "bytes": 5560,
+      "sha256": "3649c8fd251aa8b40ae0e9042a2bfac56e26c945b247d6a52546b927fb253f5e"
+    },
+    {
+      "path": "tools/generate-staff-contract.py",
+      "bytes": 2125,
+      "sha256": "aa5bc79040dbdc9eeb7b9b211bb8ff57c8c21adc9aa2e4a62eed3e6dcc29dc3e"
+    },
+    {
+      "path": "vercel.json",
+      "bytes": 163,
+      "sha256": "29c44dcff6c14b92cdd84a68afaba6dae869577dfceba54dfd911eb2d9427148"
+    }
+  ]
+}

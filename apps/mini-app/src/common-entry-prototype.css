@@ -1,0 +1,16 @@
+.entry-shell { padding-top: max(24px, env(safe-area-inset-top)); }
+.entry-card { margin-top: 28px; }
+.entry-card h1 { font-size: clamp(1.65rem, 6vw, 2.15rem); margin-bottom: 16px; }
+.entry-google, .entry-telegram { width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.entry-google { margin-top: 22px; min-height: 52px; }
+.entry-google-mark { color: #315aab; font-size: 1.3rem; font-weight: 750; }
+.entry-divider { display: flex; align-items: center; gap: 12px; color: #6b7869; font-size: .72rem; margin: 25px 0 0; }
+.entry-divider::before, .entry-divider::after { content: ''; height: 1px; flex: 1; background: #e1e7df; }
+.entry-card form > .primary { width: 100%; margin-top: 20px; }
+.entry-card form small, .entry-unlinked { color: #68796f; font-size: .7rem; display: block; margin-top: 10px; }
+.entry-optional { border-top: 1px solid #e1e7df; margin: 28px 0 14px; padding-top: 20px; font-size: .78rem; }
+.entry-telegram { font-size: .8rem; }
+.entry-unlinked { text-align: center; }
+.entry-code { text-align: center; letter-spacing: .3em; font-variant-numeric: tabular-nums; font-size: 1.4rem; }
+.entry-demo-banner { margin: 0; padding: 10px 16px; text-align: center; font-size: .7rem; background: #fff0c9; color: #73510d; }
+.entry-card .notice { margin-top: 20px; }

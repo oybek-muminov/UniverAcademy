@@ -1,0 +1,37 @@
+{
+  "name": "univeracademy-student-points-local-candidate",
+  "version": "0.0.0-local-candidate",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "start": "node runtime/configured-server.mjs",
+    "test": "node --test tests/local-content-pilot.test.mjs",
+    "test:backend-flow": "node --test tests/local-content-pilot.test.mjs",
+    "setup:validator": "npm ci --ignore-scripts --prefix tests/backend/validator/tooling",
+    "typecheck": "tsc --noEmit --allowImportingTsExtensions --target es2023 --module esnext --moduleResolution bundler --lib es2023,dom,dom.iterable --strict supabase/functions/univeracademy-api/*.ts packages/api-client/student-client.ts supabase/functions/univeracademy-api/storage/*.ts",
+    "generate:staff-schema": "python3 tools/generate-staff-contract.py",
+    "generate:staff-types": "openapi-typescript packages/api-client/staff-openapi.json -o packages/api-client/staff-types.d.ts",
+    "test:storage-auth": "node --test tests/storage-auth/*.test.mjs",
+    "test:persistent-http": "node --test tests/persistent-http/*.test.mjs",
+    "start:local-ram": "node runtime/content-pilot-server.mjs",
+    "test:production-client": "node --test tests/enrollment/production-client.test.mjs",
+    "test:enrollment-staff": "node --test tests/enrollment/identity-staff.test.mjs",
+    "test:first-test": "node --test tests/first-test/*.test.mjs",
+    "test:vercel-node": "node --test tests/vercel-node/*.test.mjs",
+    "test:clerk-auth": "node --test tests/clerk-auth/*.test.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@clerk/backend": "3.27.0",
+    "jose": "6.2.15",
+    "pg": "8.16.3",
+    "pg-cloudflare": "1.2.7"
+  }
+}

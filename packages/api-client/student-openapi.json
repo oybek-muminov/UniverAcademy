@@ -1,0 +1,3065 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UniverAcademy student Clerk exchange review — NOT ACCEPTED",
+    "version": "0.3.1-telegram-return-review.1",
+    "description": "PROVISIONAL / NOT ACCEPTED. Telegram link/resume derived review; prior endpoints retained byte-equivalent as JSON values. No runtime or deployment acceptance."
+  },
+  "paths": {
+    "/auth/clerk": {
+      "post": {
+        "operationId": "exchangeClerkSession",
+        "summary": "Exchange verified Clerk session for a student opaque application session",
+        "description": "LOCAL CANDIDATE / NOT ACCEPTED. Explicit Clerk v2 RS256 bearer profile, case-sensitive user_/sess_ IDs, authorized party and current provider liveness plus server identity mapping. Existing account is reused; absent mapping creates only an incomplete ungrouped student. Same email/name never links identities. New successful student login supersedes old app family; retired provider sessions cannot reclaim it. No staff entitlement or device policy is inferred. PROVISIONAL / NOT ACCEPTED. Active opaque families require F1 server provenance and an immutable provider binding; missing or unmarked active context fails closed with 503.",
+        "security": [
+          {
+            "ClerkSessionBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClerkExchangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/auth/telegram": {
+      "post": {
+        "operationId": "telegramLogin",
+        "summary": "telegramLogin",
+        "description": "Verify raw initData HMAC/freshness/configured bot, consumed409 INIT_DATA_REPLAY, invalid401 INIT_DATA_INVALID, stale401 INIT_DATA_EXPIRED. Fresh login proposed single active family revokes predecessors. Lost response uses existing local session first then fresh launch; reload not guaranteed new initData. No attempt reset.",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramLogin"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "refreshStudentSession",
+        "summary": "refreshStudentSession",
+        "description": "Opaque body proof distinct from staff SDK. Fixed absolute lifetime, atomic consume+rotation+old access revoke, reuse revokes entire family. Single-flight; lost refresh response no blind retry, fresh Telegram launch. AUTH expiry never restarts or pauses exam.",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Refresh"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logoutStudent",
+        "summary": "logoutStudent",
+        "description": "PROPOSED CONTRACT CHANGE, NOT A BUGFIX: tombstone receipt ACK is limited to a known refresh proof supplied in a schema-valid Logout body with Authorization ABSENT. A known revoked bearer is not a receipt carrier. A supplied bearer must authenticate as a current StudentSession first: malformed/unknown/revoked ->401 SESSION_REVOKED; expired unrevoked access/family ->401 APP_SESSION_EXPIRED; superseded ->401 ACCESS_SUPERSEDED; disabled account ->403 ACCOUNT_DISABLED; missing current student role ->403 FORBIDDEN. Never ignore an invalid bearer to downgrade to body proof. After bearer validation (if present), parse supplied optional body: malformed JSON ->400 MALFORMED_JSON; empty object/null/array/empty or non-string refresh_token/additional fields ->422 VALIDATION_ERROR. No bearer and no body ->401 LOGOUT_PROOF_REQUIRED. Resolve any supplied body proof to retained hashed-proof/family mapping; unknown/unverifiable ->401 REFRESH_INVALID even with a valid bearer. When both supplied, known families must match else401 LOGOUT_PROOF_MISMATCH. For body-only known previously revoked family, check receipt window BEFORE family/refresh expiry: now < retain_until ->200 SuccessAck, including expired family/proof; now >= retain_until ->401 REFRESH_EXPIRED even if physical mappings remain. For known unrevoked body proof, family expiry ->401 REFRESH_EXPIRED with first_revoke remaining null. Current valid bearer-only, valid matching both, or known unrevoked unexpired body proof atomically revoke once and return200 only after commit. first_revoked_at and retain_until are fixed by the first committed revocation and reviewed policy; retries/ACK/policy cutover never extend them. ACK never reactivates sessions, issues tokens or alters exams. retain_until is the logical receipt window end, distinct from purge_not_before. W=24h is an unapproved candidate, not a deployed default. GC must preserve active-family replay and receipt mappings through their reviewed horizons, using the same serialization/locks. Retain hashed proof only; never raw proof in storage/logs. Client body-only receipt requests MUST omit Authorization; local credential clearing without a committed server response is not server ACK. Unknown/lost commit outcome remains uncertain, not a new success claim.",
+        "security": [
+          {
+            "StudentSession": []
+          },
+          {}
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Logout"
+              }
+            }
+          }
+        },
+        "x-auth-proof-required": true
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "studentProfile",
+        "summary": "studentProfile",
+        "description": "Inherited non-grading operation. See baseline hashes and current contract; updated grading requirements/wire proposals are specified in x-grading-review. No runtime acceptance or implementation approval.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateStudentProfile",
+        "summary": "updateStudentProfile",
+        "description": "Inherited non-grading operation. See baseline hashes and current contract; updated grading requirements/wire proposals are specified in x-grading-review. No runtime acceptance or implementation approval.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exams": {
+      "get": {
+        "operationId": "eligibleExams",
+        "summary": "eligibleExams",
+        "description": "Return only personally granted eligible assignments and previously attempted demo history routes. No global inventory, hidden totals or other group demos. Counts/search/errors filtered before pagination; unknown and unauthorized IDs both404. Prior history eligibility is ownership, not new-start grant. Historical independent per-person granting is deferred beyond this single-group pilot.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMetaList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/exams/{assignment_id}": {
+      "get": {
+        "operationId": "examMetadata",
+        "summary": "examMetadata",
+        "description": "Metadata only, no exam questions before authorized start. Own granted assignment OR original previously attempted assignment may be read after transfer/cancellation for history; historical visibility never permits new start or old active question access. Unknown/foreign404; no global existence/count leaks.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMeta"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/exams/{assignment_id}/attempts": {
+      "post": {
+        "operationId": "startAttempt",
+        "summary": "startAttempt",
+        "description": "Atomic PostgreSQL clock_timestamp() captured after locks (transaction-start now() insufficient); opens<=now<closes gates NEW normal start only. Deadline=start+full duration, never min(close). Enforce unique pupil+stable demo normal attempt across version/group/assignment, active group+roster/profile. Technical current-ready window gates start but full duration persists beyond close. Same active attempt retry resumes; no copied answers. U-GR-15: actual admission must preserve already-rostered late pupils' local EOD start right independently of classroom session end. Full started duration may extend past this cutoff. Asia/Tashkent confirmed; actual demo date/window still to configure.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAttempt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Start"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attempts/{attempt_id}": {
+      "get": {
+        "operationId": "resumeAttempt",
+        "summary": "resumeAttempt",
+        "description": "Own permitted current active -> frozen questions/ACKs and renewed question assets; ready/terminal arrays empty. Lazy deadline materialization if needed; terminal/current Series discovery. Old cancelled content not reopened. No timer reset.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAttempt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/attempts/{attempt_id}/answers/{question_id}": {
+      "put": {
+        "operationId": "saveAnswer",
+        "summary": "saveAnswer",
+        "description": "CAS revision0=new, null clear; advance series_state_revision. Queue bound attempt+generation. REVISION_CONFLICT409 reconcile via GET, never overwrite another-device intent blindly. Old cancelled save409 ATTEMPT_SUPERSEDED. At full deadline equality expire+409 ATTEMPT_EXPIRED. Invalid option422.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAnswer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attempts/{attempt_id}/submit": {
+      "post": {
+        "operationId": "submitAttempt",
+        "summary": "submitAttempt",
+        "description": "Serialize committed answers with deadline/force, store ordinary earned/max/percentage once. At/after deadline outcome is expired, not self-submitted; only valid current submitted enters optional bonus population. Existing current-auth, terminal/generation/idempotency rules retained. Bonus does not delay ordinary result.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "description": "Person+method+canonical path+operation; canonical payload. Reauthorize every replay; revoked rights never bypassed. Stable receipt identity, dynamic flags current."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored ordinary result and nullable separate statistical bonus. Existing terminal/expiry receipt retained, no recalculation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessStudentCompletedGradingResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/attempts/{attempt_id}/result": {
+      "get": {
+        "operationId": "getResultTBD",
+        "summary": "Result boundary pending grading agreement",
+        "description": "Own closed attempt_id/ordinary/statistical_bonus. Active409 ATTEMPT_NOT_COMPLETED. Optional bonus only for this valid attempt in saved original-session cohort. No peer/answer-key/staff statistics or certificate. Ordinary display2 decimals; separate bonus points, no bonus percentage.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessStudentGradingResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/exams/{assignment_id}/history": {
+      "get": {
+        "operationId": "pupilHistory",
+        "summary": "pupilHistory",
+        "description": "Own original assignment history under existing auth after removal/transfer/cancellation. Required lifecycle_status/cancellation metadata remain independent of score. Closed ordinary/optional bonus aggregate only. Cancelled predecessor nonofficial; saved bonus remains attributed to original attempt, never successor.",
+        "security": [
+          {
+            "StudentSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/auth/telegram/link": {
+      "post": {
+        "operationId": "linkTelegramIdentity",
+        "summary": "Link verified Telegram identity to current mapped Clerk person",
+        "description": "Fresh Clerk JWT bearer and fresh signed Telegram init_data. Server verifies both identities/current authority; same pair ACKs without tokens, merge or rebinding. Conflicting side returns409 IDENTITY_LINK_CONFLICT. Clerk JTI exchange ledger does not deny this authenticated link. No client person/role/email identity. No automatic retry after uncertain outcome.",
+        "security": [
+          {
+            "ClerkSessionBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/auth/telegram/resume": {
+      "post": {
+        "operationId": "resumeTelegramSession",
+        "summary": "Resume linked existing Clerk-bound student family with fresh Telegram proof",
+        "description": "Authorization MUST be absent. Fresh signed init_data selects only the persisted link and unique current eligible Clerk-bound family. Current provider liveness and expiry are required. Rotate proofs preserving family ID/absolute expiry; never create a person/family or invent SID. Missing link409 TELEGRAM_LINK_REQUIRED consumes nothing; revoked/expired401 CLERK_SESSION_REVOKED; replay409 INIT_DATA_REPLAY; ambiguous or provider/commit uncertainty503 without retry.",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramResumeRequest"
+              }
+            }
+          }
+        },
+        "x-authorization-header": "MUST_BE_ABSENT"
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "ErrorResponse": {
+        "description": "Structured safe error. See canonical document/code catalog; no credentials/keys/foreign PII.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "const": "no-store"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Ack": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ok": {
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "ActiveOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputBlock"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "display_position",
+          "blocks"
+        ]
+      },
+      "ActiveQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_position": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "prompt_blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputBlock"
+            },
+            "minItems": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActiveOption"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        },
+        "required": [
+          "id",
+          "display_position",
+          "prompt_blocks",
+          "options"
+        ],
+        "description": "Authorized active-attempt question content and frozen ordering. Question grading configuration is excluded from this review copy."
+      },
+      "Answer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "selected_option_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "saved_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "series_state_revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "question_id",
+          "selected_option_id",
+          "revision",
+          "saved_at",
+          "series_state_revision"
+        ]
+      },
+      "AssetLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp"
+            ]
+          }
+        },
+        "required": [
+          "asset_id",
+          "url",
+          "expires_at",
+          "content_type"
+        ]
+      },
+      "Attempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "demo_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "in_progress",
+              "submitted",
+              "expired",
+              "forced",
+              "cancelled",
+              "recovery_lapsed"
+            ]
+          },
+          "state_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "server_now": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "series": {
+            "$ref": "#/components/schemas/Series"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActiveQuestion"
+            },
+            "minItems": 0
+          },
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Answer"
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "id",
+          "demo_id",
+          "assignment_id",
+          "generation",
+          "status",
+          "state_revision",
+          "started_at",
+          "deadline_at",
+          "completed_at",
+          "cancelled_at",
+          "completion_reason",
+          "server_now",
+          "series",
+          "questions",
+          "answers"
+        ],
+        "description": "Only current active own permitted attempt contains question/answer arrays. Ready/terminal arrays empty; each active image URL refresh does not alter mapping/time. Deadline is start+FULL duration, never min(admission close). Technical successor starts blank, new mapping; old cancelled retained.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "ready"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "questions": {
+                  "maxItems": 0
+                },
+                "answers": {
+                  "maxItems": 0
+                },
+                "started_at": {
+                  "type": "null"
+                },
+                "deadline_at": {
+                  "type": "null"
+                },
+                "completed_at": {
+                  "type": "null"
+                },
+                "cancelled_at": {
+                  "type": "null"
+                },
+                "completion_reason": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "in_progress"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "questions": {
+                  "minItems": 1
+                },
+                "started_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "deadline_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "completed_at": {
+                  "type": "null"
+                },
+                "cancelled_at": {
+                  "type": "null"
+                },
+                "completion_reason": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "submitted",
+                    "expired",
+                    "forced"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "questions": {
+                  "maxItems": 0
+                },
+                "answers": {
+                  "maxItems": 0
+                },
+                "started_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "deadline_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "completed_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "cancelled_at": {
+                  "type": "null"
+                },
+                "completion_reason": {
+                  "enum": [
+                    "submitted",
+                    "deadline_expired",
+                    "admin_forced"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "cancelled"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "questions": {
+                  "maxItems": 0
+                },
+                "answers": {
+                  "maxItems": 0
+                },
+                "cancelled_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "completion_reason": {
+                  "const": "technical_failure"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "recovery_lapsed"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "questions": {
+                  "maxItems": 0
+                },
+                "answers": {
+                  "maxItems": 0
+                },
+                "started_at": {
+                  "type": "null"
+                },
+                "deadline_at": {
+                  "type": "null"
+                },
+                "completed_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "cancelled_at": {
+                  "type": "null"
+                },
+                "completion_reason": {
+                  "const": "recovery_window_elapsed"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "submitted"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "completion_reason": {
+                  "const": "submitted"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "expired"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "completion_reason": {
+                  "const": "deadline_expired"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "forced"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "completion_reason": {
+                  "const": "admin_forced"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ClerkExchangeRequest": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "DecimalDisplay2": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]*)\\.[0-9]{2}(?![\\s\\S])",
+        "description": "Server final two-decimal nonnegative display from authoritative exact source; HALF_UP candidate requires approval. 0.00 can represent a positive source such as0.004, never input rejection or source rounding."
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "request_id"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "INIT_DATA_INVALID",
+                  "INIT_DATA_EXPIRED",
+                  "INIT_DATA_REPLAY",
+                  "REFRESH_INVALID",
+                  "REFRESH_EXPIRED",
+                  "REFRESH_REUSED",
+                  "SESSION_REVOKED",
+                  "ACCOUNT_DISABLED",
+                  "APP_SESSION_EXPIRED",
+                  "ACCESS_SUPERSEDED",
+                  "STAFF_NOT_APPROVED",
+                  "STAFF_TOKEN_INVALID",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "MALFORMED_REQUEST",
+                  "INVALID_CURSOR",
+                  "VALIDATION_ERROR",
+                  "INVALID_TIMEZONE",
+                  "RATE_LIMITED",
+                  "INTERNAL_ERROR",
+                  "SERVICE_UNAVAILABLE",
+                  "IDEMPOTENCY_CONFLICT",
+                  "REVISION_CONFLICT",
+                  "RESOURCE_REVISION_CONFLICT",
+                  "STATE_REVISION_CONFLICT",
+                  "REQUEST_TARGET_CHANGED",
+                  "REQUEST_PRECONDITION_MISMATCH",
+                  "REQUEST_TERMINAL",
+                  "ALREADY_APPROVED_TEACHER",
+                  "ADMISSION_CLOSED",
+                  "RECOVERY_ADMISSION_CLOSED",
+                  "NORMAL_ATTEMPT_USED",
+                  "ACTIVE_EXAM_OR_RECOVERY",
+                  "PROFILE_INCOMPLETE",
+                  "ATTEMPT_NOT_COMPLETED",
+                  "ATTEMPT_TERMINAL",
+                  "ATTEMPT_EXPIRED",
+                  "ATTEMPT_SUPERSEDED",
+                  "EXAM_ACCESS_REVOKED",
+                  "INVALID_OPTION",
+                  "VERSION_FROZEN",
+                  "ASSET_NOT_VALIDATED",
+                  "ASSET_PURPOSE_MISMATCH",
+                  "UPLOAD_REJECTED",
+                  "REVIEW_BARRIER_INCOMPLETE",
+                  "REVIEW_NOT_OPEN",
+                  "REVIEW_CLOSED",
+                  "REVIEW_EXPOSURE_OWNER_ACK_REQUIRED",
+                  "CAPABILITY_REQUIRED",
+                  "SUBJECT_NOT_APPROVED",
+                  "LOGOUT_PROOF_REQUIRED",
+                  "LOGOUT_PROOF_MISMATCH",
+                  "MALFORMED_JSON",
+                  "UPLOAD_EXPIRED",
+                  "UPLOAD_NOT_READY",
+                  "UPLOAD_HASH_MISMATCH",
+                  "ASSET_SCOPE_INVALID",
+                  "IDENTIFIER_MISMATCH",
+                  "INVALID_TIME_WINDOW",
+                  "INVALID_REVIEW_WINDOW",
+                  "RESPONSE_INVARIANT_FAILED",
+                  "ADMIN_TRANSFER_REQUIRED",
+                  "ACTIVE_GROUP_EXISTS",
+                  "MEMBERSHIP_STATE_CONFLICT",
+                  "MEMBERSHIP_CHANGED",
+                  "GRADING_POLICY_UNRESOLVED",
+                  "INVALID_GRADING_CONFIG",
+                  "STATISTICAL_BONUS_NOT_READY",
+                  "BONUS_EMPTY_COHORT",
+                  "CLERK_TOKEN_INVALID",
+                  "CLERK_SESSION_REVOKED",
+                  "CLERK_IDENTITY_REVOKED",
+                  "CLERK_SESSION_SUPERSEDED",
+                  "CLERK_TOKEN_REPLAY",
+                  "IDENTITY_LINK_CONFLICT",
+                  "TELEGRAM_LINK_REQUIRED"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "FormulaBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "formula"
+          },
+          "latex": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "block"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "latex",
+          "display"
+        ]
+      },
+      "History": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "series": {
+            "$ref": "#/components/schemas/Series"
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentAttemptHistoryEntry"
+            }
+          }
+        },
+        "required": [
+          "series",
+          "attempts"
+        ],
+        "description": "Own history remains accessible after membership removal/transfer/assignment cancellation, without granting new starts. Required lifecycle_status and cancellation independent of nullable closed score. No staff-only details anywhere in student results; runtime authorization and filtering NOT_TESTED."
+      },
+      "IanaTimezone": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Confirmed project examination timezone: Asia/Tashkent (Uzbekistan). Persist IANA name; derive midnight with timezone calendar, never truncate started duration.",
+        "const": "Asia/Tashkent"
+      },
+      "ImageOutputBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "image"
+          },
+          "asset": {
+            "$ref": "#/components/schemas/AssetLink"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "asset",
+          "alt"
+        ]
+      },
+      "Logout": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "refresh_token"
+        ],
+        "description": "Refresh-proof branch only. Required nonempty refresh token when body supplied. Bearer-only logout omits body entirely."
+      },
+      "Meta": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "demo_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "instructions_blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputBlock"
+            },
+            "minItems": 1
+          },
+          "question_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "opens_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "admission_status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "open",
+              "closed",
+              "cancelled"
+            ]
+          },
+          "server_now": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "series": {
+            "$ref": "#/components/schemas/Series"
+          },
+          "review_gate": {
+            "$ref": "#/components/schemas/ReviewGate"
+          }
+        },
+        "required": [
+          "demo_id",
+          "version_id",
+          "assignment_id",
+          "title",
+          "instructions_blocks",
+          "question_count",
+          "duration_seconds",
+          "opens_at",
+          "closes_at",
+          "admission_status",
+          "server_now",
+          "series",
+          "review_gate"
+        ]
+      },
+      "MetaList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Meta"
+        },
+        "minItems": 0
+      },
+      "OutputBlock": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TextBlock"
+          },
+          {
+            "$ref": "#/components/schemas/FormulaBlock"
+          },
+          {
+            "$ref": "#/components/schemas/ImageOutputBlock"
+          }
+        ]
+      },
+      "Profile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "person_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "student",
+                "teacher",
+                "admin",
+                "owner"
+              ]
+            },
+            "minItems": 0
+          },
+          "registration_complete": {
+            "type": "boolean"
+          },
+          "active_group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qadam_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QadamId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "person_id",
+          "first_name",
+          "last_name",
+          "roles",
+          "registration_complete",
+          "active_group_id",
+          "qadam_id"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "roles": {
+                  "contains": {
+                    "const": "student"
+                  }
+                }
+              },
+              "required": [
+                "roles"
+              ]
+            },
+            "then": {
+              "properties": {
+                "qadam_id": {
+                  "$ref": "#/components/schemas/QadamId"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "qadam_id": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ]
+      },
+      "QadamId": {
+        "type": "string",
+        "pattern": "^[0-9]{10}$",
+        "minLength": 10,
+        "maxLength": 10,
+        "description": "Permanent external student identifier; preserve leading zeroes. Not authentication or authorization. Server generated, never client assigned."
+      },
+      "Recovery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "opens_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "opens_at",
+          "closes_at",
+          "duration_seconds"
+        ],
+        "description": "Current technical successor START eligibility window. Full duration from pinned version. Closing never truncates a started recovery. No original assignment fallback."
+      },
+      "Refresh": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "refresh_token"
+        ]
+      },
+      "ReviewGate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "blocked",
+              "awaiting_teacher",
+              "open",
+              "closed"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "barrier_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "barrier_complete": {
+            "type": "boolean"
+          },
+          "eligible_unresolved_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recovery_ready_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timezone": {
+            "$ref": "#/components/schemas/IanaTimezone"
+          },
+          "first_opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "server_now": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "revision",
+          "barrier_revision",
+          "barrier_complete",
+          "eligible_unresolved_count",
+          "active_count",
+          "recovery_ready_count",
+          "timezone",
+          "first_opened_at",
+          "opens_at",
+          "closes_at",
+          "server_now"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "open"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "barrier_complete": {
+                  "const": true
+                },
+                "eligible_unresolved_count": {
+                  "const": 0
+                },
+                "active_count": {
+                  "const": 0
+                },
+                "recovery_ready_count": {
+                  "const": 0
+                },
+                "first_opened_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "opens_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "closes_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "awaiting_teacher"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "barrier_complete": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "barrier_complete": {
+                  "enum": [
+                    true
+                  ]
+                }
+              },
+              "required": [
+                "barrier_complete"
+              ]
+            },
+            "then": {
+              "properties": {
+                "eligible_unresolved_count": {
+                  "const": 0
+                },
+                "active_count": {
+                  "const": 0
+                },
+                "recovery_ready_count": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SaveAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "selected_option_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "selected_option_id",
+          "expected_revision"
+        ]
+      },
+      "Series": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "demo_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current_attempt_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "current_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ready",
+                  "in_progress",
+                  "submitted",
+                  "expired",
+                  "forced",
+                  "cancelled",
+                  "recovery_lapsed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recovery_state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "ready",
+              "active",
+              "lapsed"
+            ]
+          },
+          "recovery": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recovery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "official_result_attempt_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "normal_attempt_used": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "series_id",
+          "demo_id",
+          "current_attempt_id",
+          "generation",
+          "state_revision",
+          "current_status",
+          "recovery_state",
+          "recovery",
+          "official_result_attempt_id",
+          "normal_attempt_used"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "refresh_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "token_type": {
+            "const": "Bearer"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          }
+        },
+        "required": [
+          "access_token",
+          "expires_at",
+          "refresh_token",
+          "refresh_expires_at",
+          "token_type",
+          "profile"
+        ]
+      },
+      "Start": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "const": true
+          }
+        },
+        "required": [
+          "confirmed"
+        ]
+      },
+      "StudentAttemptGradingResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentOrdinaryScore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statistical_bonus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentOwnStatisticalBonusScore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "attempt_id",
+          "ordinary",
+          "statistical_bonus"
+        ],
+        "description": "Closed current result with ordinary and separate optional statistical_bonus only. Ordinary stored at completion; bonus never delays or changes it. A cancelled predecessor remains historical/nonofficial. Recovery successor has own ordinary, no inherited old bonus. No active Rasch field or certificate in this contract; historical API is archived separately."
+      },
+      "StudentAttemptHistoryEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lifecycle_status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "in_progress",
+              "submitted",
+              "expired",
+              "forced",
+              "cancelled",
+              "recovery_lapsed"
+            ],
+            "description": "Required attempt lifecycle, same enum as Attempt.status, independent of score. Only cancelled requires audience-specific cancellation; every other state requires cancellation:null."
+          },
+          "score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentAttemptGradingResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancellation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentCancellation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "lifecycle_status",
+          "score",
+          "started_at",
+          "deadline_at",
+          "completed_at",
+          "cancellation"
+        ],
+        "description": "Chronological history with required lifecycle_status independent of score; existing cancellation condition unchanged. Proposed score:null before a completed result, closed AttemptGradingResult thereafter. Completed submitted/expired/forced requires ordinary via server cross-state invariant; cancelled historical result is never official. Student wrapper/cancellation/result contain no staff IDs, internal reason, keys or peer data. Staff cancellation details remain current scoped staff only.",
+        "allOf": [
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "lifecycle_status": {
+                  "const": "cancelled"
+                }
+              },
+              "required": [
+                "lifecycle_status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "cancellation": {
+                  "$ref": "#/components/schemas/StudentCancellation"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "cancellation": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "StudentBonusScoreDisplay": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "earned_points"
+        ],
+        "properties": {
+          "earned_points": {
+            "$ref": "#/components/schemas/StudentPointsDisplay1"
+          }
+        }
+      },
+      "StudentCancellation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "prior_status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "in_progress",
+              "submitted",
+              "expired",
+              "forced",
+              "recovery_lapsed"
+            ]
+          },
+          "reason_code": {
+            "const": "technical_failure"
+          }
+        },
+        "required": [
+          "cancelled_at",
+          "prior_status",
+          "reason_code"
+        ],
+        "description": "Pupil-safe cancellation summary: cancelled_at, prior_status and technical_failure reason_code only. No staff actor identity, internal/free-text reason, audit ID or question/answer content."
+      },
+      "StudentCompletedGradingResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StudentAttemptGradingResult"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ordinary": {
+                "$ref": "#/components/schemas/StudentOrdinaryScore"
+              }
+            }
+          }
+        ],
+        "description": "Stored non-null ordinary result on submit/force/expiry; optional statistical_bonus is nullable and never delays completion. Lifecycle/cancellation/generation rules retained."
+      },
+      "StudentOrdinaryScore": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "earned_points": {
+            "type": "number",
+            "description": "Approximate finite JSON number projection of the authoritative unrounded exact amount/ratio; conversion can lose precision. Never recover the source or recompute correct display from this field. Server display is for rendering; source remains exact. Finite/nonnegative/positive and range constraints must be reviewed before release; no clipping or storage rounding.",
+            "minimum": 0
+          },
+          "max_points": {
+            "type": "number",
+            "description": "Approximate finite JSON number projection of the authoritative unrounded exact amount/ratio; conversion can lose precision. Never recover the source or recompute correct display from this field. Server display is for rendering; source remains exact. Finite/nonnegative/positive and range constraints must be reviewed before release; no clipping or storage rounding.",
+            "exclusiveMinimum": 0
+          },
+          "percentage": {
+            "type": "number",
+            "description": "Approximate finite JSON number projection of the authoritative unrounded exact amount/ratio; conversion can lose precision. Never recover the source or recompute correct display from this field. Server display is for rendering; source remains exact. Finite/nonnegative/positive and range constraints must be reviewed before release; no clipping or storage rounding.",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "calculated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "display": {
+            "$ref": "#/components/schemas/StudentOrdinaryScoreDisplay"
+          }
+        },
+        "required": [
+          "earned_points",
+          "max_points",
+          "percentage",
+          "calculated_at",
+          "display"
+        ],
+        "description": "Student projection of exact ordinary. Required display.earned_points/max_points use approved1 decimal HALF_UP; percentage remains existing DecimalDisplay2 policy. No source/per-question rounding; legacy number projection unchanged. Individual-question30 cap is not a total cap. Other lifecycle/nullable/required semantics unchanged."
+      },
+      "StudentOrdinaryScoreDisplay": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "earned_points",
+          "max_points",
+          "percentage"
+        ],
+        "properties": {
+          "earned_points": {
+            "$ref": "#/components/schemas/StudentPointsDisplay1"
+          },
+          "max_points": {
+            "$ref": "#/components/schemas/StudentPointsDisplay1"
+          },
+          "percentage": {
+            "$ref": "#/components/schemas/DecimalDisplay2"
+          }
+        }
+      },
+      "StudentOwnStatisticalBonusScore": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "calculation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "earned_points": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Approximate finite JSON number projection of the authoritative unrounded exact amount/ratio; conversion can lose precision. Never recover the source or recompute correct display from this field. Server display is for rendering; source remains exact. Finite/nonnegative/positive and range constraints must be reviewed before release; no clipping or storage rounding."
+          },
+          "calculated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "display": {
+            "$ref": "#/components/schemas/StudentBonusScoreDisplay"
+          }
+        },
+        "required": [
+          "calculation_id",
+          "earned_points",
+          "calculated_at",
+          "display"
+        ],
+        "description": "Own immutable snapshot bonus aggregate only. No peer results, answer key, staff IDs, per-question statistics or certificate level. Show separately from ordinary score. A post-calculation recovery successor outside the snapshot has statistical_bonus=null; historical predecessor attribution remains unchanged."
+      },
+      "StudentPointsDisplay1": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]*)\\.[0-9](?![\\s\\S])",
+        "description": "Approved student points display: exactly one fractional digit, HALF_UP from authoritative exact nonnegative value. Do not first round through2 decimals or a binary float. Source remains exact. No30-point cap on totals/bonus. Not a percentage or staff display policy."
+      },
+      "SuccessAck": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Ack"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessAnswer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Answer"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Attempt"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/History"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessMeta": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessMetaList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MetaList"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Profile"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Session"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SuccessStudentCompletedGradingResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudentCompletedGradingResult"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "description": ""
+      },
+      "SuccessStudentGradingResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudentAttemptGradingResult"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "description": ""
+      },
+      "TelegramLogin": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          }
+        },
+        "required": [
+          "init_data"
+        ]
+      },
+      "TextBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "text"
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "type",
+          "markdown"
+        ]
+      },
+      "TelegramLinkRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          }
+        },
+        "required": [
+          "init_data"
+        ]
+      },
+      "TelegramResumeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          }
+        },
+        "required": [
+          "init_data"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "ClerkSessionBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Clerk session JWT v2; RS256; sub=user_… sid=sess_…; no cookie fallback"
+      },
+      "StudentSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Only custom opaque student access; staff JWT rejected. Fixed refresh family and current authorization checks."
+      }
+    }
+  },
+  "x-source": {
+    "full_openapi_sha256": "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c",
+    "base_openapi_sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4",
+    "status": "PROVISIONAL / NOT ACCEPTED",
+    "full_openapi_path": "contracts/telegram-return.openapi.json",
+    "previous_full_openapi_sha256": "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28"
+  }
+}

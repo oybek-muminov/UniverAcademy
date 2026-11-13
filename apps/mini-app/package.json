@@ -1,0 +1,45 @@
+{
+  "name": "@univeracademy/mini-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:auth-prototype": "vite --host 127.0.0.1 --mode auth_prototype",
+    "test:auth-prototype": "node --test tests/common-entry-prototype.test.mjs",
+    "test:auth-prototype-browser": "node tests/common-entry-browser.mjs",
+    "check": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "test:current-flow": "node tests/current-flow-driver.mjs",
+    "test:current-flow-guard": "node --test tests/current-flow-guard.test.mjs",
+    "test:bootstrap": "node --test tests/telegram-bootstrap.test.mjs",
+    "test:production-runtime": "node --test tests/production-runtime.test.mjs",
+    "test:production-entry": "node tests/production-entry-browser.mjs",
+    "test:production-build": "node tests/production-entry-browser.mjs --production-gates",
+    "test:common-build": "node tests/production-entry-browser.mjs --common-gates",
+    "test:clerk-sdk": "node --unhandled-rejections=strict --test tests/clerk-sdk-adapter.test.mjs tests/common-production-runtime.test.mjs",
+    "test:clerk-sdk-browser": "node tests/clerk-sdk-browser.mjs",
+    "test:clerk-react-browser": "node tests/clerk-react-browser.mjs",
+    "build": "tsc --noEmit && vite build",
+    "build:demo": "tsc --noEmit && vite build --mode demo --outDir dist-demo",
+    "test:clerk-prebuilt": "node --unhandled-rejections=strict --test tests/clerk-prebuilt-session.test.mjs",
+    "test:clerk-prebuilt-browser": "node tests/clerk-prebuilt-browser.mjs",
+    "test:clerk-load": "node --unhandled-rejections=strict --test tests/clerk-load-promise.test.mjs",
+    "test:clerk-load-browser": "node tests/clerk-load-browser.mjs",
+    "test:clerk-empty-socket": "node tests/clerk-load-browser.mjs --empty-socket"
+  },
+  "dependencies": {
+    "@clerk/react": "6.18.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.6"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "univeracademy-api",
+  "main": "runtime/cloudflare-worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false
+  // Inactive configuration proposal. No account, route, domain, secret, vars or
+  // Hyperdrive ID is supplied. Bindings and a reviewed Workers dependency lock
+  // must be prepared separately; this file grants no deployment permission.
+  // HYPERDRIVE query caching must be disabled, origin TLS verified, and its DB
+  // credential bound to the dedicated non-owner/NOBYPASSRLS runtime role.
+}

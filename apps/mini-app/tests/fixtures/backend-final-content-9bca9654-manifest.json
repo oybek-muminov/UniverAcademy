@@ -1,0 +1,855 @@
+{
+  "format_version": 4,
+  "source_repository": "oybek-muminov/UniverAcademy",
+  "source_commit": "14f0b07441a80aea42d2af7877ad898cd452f50e",
+  "source_tree": "1429493eceb35c0448376bb797eba768d8f8a10c",
+  "application_base": {
+    "repository": "oybek-muminov/UniverAcademy",
+    "commit": "2443889cca3d0c496ccd4e85008bbaaacec6fe6a",
+    "tree": "4d334618ff06ddd6ff89655767563c819e46d3ad",
+    "parent": "3271106b24f9d61568ba1c4ea8ad53740e008411"
+  },
+  "backend_overlays": [
+    {
+      "repository": "oybek-muminov/UniverAcademy",
+      "commit": "32fd4559e54f0dcbe950ad2a2f56bf5140a45798",
+      "tree": "d719c1ab08bafd748113d6648da9c077c8c292b2",
+      "parent": "fadf18fc9485f866d4d6cf6cdbd4440870582a68",
+      "prefix": "",
+      "files": [
+        {
+          "source_path": "supabase/functions/univeracademy-api/storage/telegram-return-rows.ts",
+          "application_path": "supabase/functions/univeracademy-api/storage/telegram-return-rows.ts",
+          "mode": "100644",
+          "bytes": 16821,
+          "sha256": "ca9e1d5c8e418cda1ff4938f969f200a66eac9fb6c1eba4188bee0e33601d5b4",
+          "preimage": {
+            "mode": "100644",
+            "bytes": 16822,
+            "sha256": "ea4ea2b69307bb9ad516aefa1cc79fda6a29ccd5afab61fef1155b5f41399897"
+          }
+        },
+        {
+          "source_path": "supabase/functions/univeracademy-api/telegram-return.ts",
+          "application_path": "supabase/functions/univeracademy-api/telegram-return.ts",
+          "mode": "100644",
+          "bytes": 4237,
+          "sha256": "91ccc1a4b1ab92ea2e116670a4b3849958f4d40994ec654efd91f47c5da492d9",
+          "preimage": {
+            "mode": "100644",
+            "bytes": 4228,
+            "sha256": "1da320be30e11ab48bc126660e76213233dfcc2adcfbe28c82eee2533fcaaa94"
+          }
+        }
+      ]
+    },
+    {
+      "repository": "oybek-muminov/UniverAcademy",
+      "commit": "e6a930625b92c219bb38e6f9b99440474de577bd",
+      "tree": "f73b108dde661ea0114a7a58c6745263e20dbe3c",
+      "parent": "e960f1b2dbcb46147898c429bda17e28776dddc4",
+      "prefix": "",
+      "files": [
+        {
+          "source_path": "tests/clerk-auth/domain-executor-shapes.test.mjs",
+          "application_path": "tests/clerk-auth/domain-executor-shapes.test.mjs",
+          "mode": "100644",
+          "bytes": 7785,
+          "sha256": "26f0b443e7f32a93592477adff667614f5cf79b03d2a98252531425fbfcf7d5f",
+          "preimage": null
+        },
+        {
+          "source_path": "tests/clerk-auth/domain-executor.mjs",
+          "application_path": "tests/clerk-auth/domain-executor.mjs",
+          "mode": "100644",
+          "bytes": 10215,
+          "sha256": "770b520d4492bd947abb1a526de8658f558f9a2b072c8f1c7dd15edd6eece280",
+          "preimage": {
+            "mode": "100644",
+            "bytes": 4815,
+            "sha256": "78bf1357f8876a1d8dc59caca9ca235761d552f9f9ddacc9794bba9d5a55a757"
+          }
+        },
+        {
+          "source_path": "tests/clerk-auth/domain-session-rows.test.mjs",
+          "application_path": "tests/clerk-auth/domain-session-rows.test.mjs",
+          "mode": "100644",
+          "bytes": 8632,
+          "sha256": "b11ec668cf4fbce9407c4de77fce806a9ba93d68ce873cb780f12d4a78b8fc6f",
+          "preimage": null
+        },
+        {
+          "source_path": "tests/storage-auth/context-protocol.test.mjs",
+          "application_path": "tests/storage-auth/context-protocol.test.mjs",
+          "mode": "100644",
+          "bytes": 12262,
+          "sha256": "153ca400372cb3b8998c843ac2c2818d1700305593247a18c80d06fee6149308",
+          "preimage": null
+        },
+        {
+          "source_path": "tests/storage-auth/disk-executor.mjs",
+          "application_path": "tests/storage-auth/disk-executor.mjs",
+          "mode": "100644",
+          "bytes": 13769,
+          "sha256": "41819bd47eb04b68d4a141f7c1d07f01b190b9aab02114bf26dadb7053120c56",
+          "preimage": {
+            "mode": "100644",
+            "bytes": 7084,
+            "sha256": "4103509484ffcbd1f04b4924e9e99380ce60e206ae60de6c955f49657e8f8690"
+          }
+        }
+      ]
+    },
+    {
+      "repository": "oybek-muminov/UniverAcademy",
+      "commit": "14f0b07441a80aea42d2af7877ad898cd452f50e",
+      "tree": "1429493eceb35c0448376bb797eba768d8f8a10c",
+      "parent": "e6a930625b92c219bb38e6f9b99440474de577bd",
+      "prefix": "",
+      "files": [
+        {
+          "source_path": "tests/storage-auth/context-protocol.test.mjs",
+          "application_path": "tests/storage-auth/context-protocol.test.mjs",
+          "mode": "100644",
+          "bytes": 21954,
+          "sha256": "aa8dddf8459f5b15a7f15bac4f94e03449692e58365811ef59c0f79b38550c31",
+          "preimage": {
+            "mode": "100644",
+            "bytes": 12262,
+            "sha256": "153ca400372cb3b8998c843ac2c2818d1700305593247a18c80d06fee6149308"
+          }
+        },
+        {
+          "source_path": "tests/storage-auth/disk-executor.mjs",
+          "application_path": "tests/storage-auth/disk-executor.mjs",
+          "mode": "100644",
+          "bytes": 14861,
+          "sha256": "d875277371372ac7e7de39f1857bbe44c9822cabdc3a5f063011c2ff9663d519",
+          "preimage": {
+            "mode": "100644",
+            "bytes": 13769,
+            "sha256": "41819bd47eb04b68d4a141f7c1d07f01b190b9aab02114bf26dadb7053120c56"
+          }
+        }
+      ]
+    }
+  ],
+  "content_overlays": [
+    {
+      "path": "tests/membership/protection-postgres-transaction.test.mjs",
+      "base_commit": "9bca9654134b37004b5b4693176c7d3df86ec10d",
+      "preimage": {
+        "mode": "100644",
+        "bytes": 33274,
+        "sha256": "49db7421e71cd71966bbf1bd24e952539b8f5062f0621fd349db38f22eca6beb"
+      },
+      "result": {
+        "mode": "100644",
+        "bytes": 34385,
+        "sha256": "1d7205d9f0ce90e7f75030a7fa8049b314e3c951cec970f27dafcaffb60ac4a8"
+      },
+      "patch_sha256": "ca7307938648e18064802b416bf014f2c65a2991ff6567b03540cd9c2bed06ca"
+    },
+    {
+      "path": "tests/clerk-auth/review-listener.test.mjs",
+      "base_commit": "9bca9654134b37004b5b4693176c7d3df86ec10d",
+      "preimage": {
+        "mode": "100644",
+        "bytes": 11200,
+        "sha256": "f78c5b7f2994369043757366cb3a0218174ed7fa52f632dc0c89e7e8a53a6cdb"
+      },
+      "result": {
+        "mode": "100644",
+        "bytes": 11661,
+        "sha256": "095432668b0a0cac2b6e31df574e9da0ddb490a79f9ebbc3dc1bbff8e2a44c78"
+      },
+      "patch_sha256": "fb391668230d4f32f57806ee6f7d6273e4cb0d5864a1d7eb6da6223347a9d6de"
+    }
+  ],
+  "layout": "main-root",
+  "selection_policy": "Selected Backend/client inputs only: clean111 retained plus exact Backend37 and canonical client inputs; owner copies checked by parity. Inactive review SQL is provenance only. Mini source/guard integrity is proved by a separate exact whole-tree delta, not an invented assembled Git identity. Older manifests remain opaque historical fixtures, never fallback authorities. Ordered accepted fixture-only publications e6a930 then14f0b074 replace two executors and add three strict tests; final two replacements are explicit, never runtime-policy changes. Reviewed content delta over9bca965: one test-only patch; preimage/patch replay is proven independently, while this guard checks exact metadata and final bytes. No result commit/tree is claimed. Second reviewed test-only delta: listener asserts the canonical contract while preserving the historical exchange snapshot checks.",
+  "target_count": 136,
+  "target_bytes": 2857629,
+  "files": [
+    {
+      "path": "api/index.mjs",
+      "bytes": 616,
+      "sha256": "e8c6699dbfac16771857c2b684b1198ac53950cf71469149200b619fb9412a4b"
+    },
+    {
+      "path": "contracts/clerk-auth.proposal.patch.json",
+      "bytes": 7354,
+      "sha256": "7ca7874a07960e9e5a32332d6e51e56b0affaee0224d8d8ffefb36a83f2ea019"
+    },
+    {
+      "path": "contracts/clerk-review.openapi.json",
+      "bytes": 433064,
+      "sha256": "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28"
+    },
+    {
+      "path": "contracts/review-only.openapi.json",
+      "bytes": 430120,
+      "sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4"
+    },
+    {
+      "path": "contracts/telegram-return.openapi.json",
+      "bytes": 438861,
+      "sha256": "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 25033,
+      "sha256": "5f1716ee26fbf8e446d7ea6f98f59ea7c05c64535e389f251b725f3df0ed63b0"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1794,
+      "sha256": "87d32d6d22cd3ad2cf09c6a2345094082b353689824223379ea66ae1061c663a"
+    },
+    {
+      "path": "packages/api-client/staff-openapi.json",
+      "bytes": 46045,
+      "sha256": "a1bdcd4e7177388e6eb0cf77bdde00a4a962ca7ac13fb921277f863ea0acacff"
+    },
+    {
+      "path": "packages/api-client/staff-types.d.ts",
+      "bytes": 28222,
+      "sha256": "669f574310968bb85565cedf11e3f44963438908dcd9294d60a854a02a1a9731"
+    },
+    {
+      "path": "packages/api-client/student-client.ts",
+      "bytes": 10615,
+      "sha256": "5dd2825aa14fef481c1ab3e2a2c7f8feb715e73d8d26977a42f135914f0773f2"
+    },
+    {
+      "path": "packages/api-client/student-openapi.json",
+      "bytes": 91884,
+      "sha256": "d500d0c4fcbbf13e6efa8f436cb1c2850a59f751b4c58e331de8546c828d99cc"
+    },
+    {
+      "path": "packages/api-client/student-types.d.ts",
+      "bytes": 53439,
+      "sha256": "786d1ad57f7340cf66ac616dccaaa853207199739ed78d974978b0d374c2df16"
+    },
+    {
+      "path": "runtime/clerk-review-server.mjs",
+      "bytes": 2390,
+      "sha256": "04941545a0f98e4fb0f52c490af3129c7fbbe44720b7ee6b199dc6dfed24db16"
+    },
+    {
+      "path": "runtime/clerk-sdk-bindings.mjs",
+      "bytes": 6984,
+      "sha256": "fc8d588919e598ba599c4c724bd2cf12ae61bc38e9a5af18a5420adc44bb4ef7"
+    },
+    {
+      "path": "runtime/clerk-sdk-worker.mjs",
+      "bytes": 2062,
+      "sha256": "75aef2bbd53a86920d1a1786745ce33545627e147a1a8b6a5b3b95dd08e0604f"
+    },
+    {
+      "path": "runtime/clerk-worker-bindings.mjs",
+      "bytes": 6933,
+      "sha256": "31d44b3103a4fb5426fe113a71c620a25a8367dcaacf15e7ebd9b982ad9ad88c"
+    },
+    {
+      "path": "runtime/cloudflare-api.mjs",
+      "bytes": 4957,
+      "sha256": "1cc68417cf8467aca34f5e0d3a3709fe2ddd5310a009c51a1db380f02de8e96a"
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "bytes": 7075,
+      "sha256": "33e2016b19abe64623b3d9994706895f70158df41e0d9295b50e47d608cd5737"
+    },
+    {
+      "path": "runtime/cloudflare-postgres.mjs",
+      "bytes": 4340,
+      "sha256": "377ecdb75cc2c79654747407ad4644832c71a0c0c5536456b5eeb8ae927a89a8"
+    },
+    {
+      "path": "runtime/cloudflare-telegram-directory.mjs",
+      "bytes": 4719,
+      "sha256": "10cf4faa60c2a2105f1076a56ff5dbcb76d5e08251b08375b298f46c949b416e"
+    },
+    {
+      "path": "runtime/cloudflare-worker.mjs",
+      "bytes": 765,
+      "sha256": "f080176e973c962be8310c9a476cf32030439bf5a7339bdcf169d778facb00b7"
+    },
+    {
+      "path": "runtime/configured-server.mjs",
+      "bytes": 2957,
+      "sha256": "a8d50828f7ee85b1b5624d939020dd847a696c49b3ad8f294ca616805772affe"
+    },
+    {
+      "path": "runtime/content-pilot-driver.mjs",
+      "bytes": 3294,
+      "sha256": "a118db0f7531e4005edd8388e93a25cfe2952cb223e80a752a6ddd617543466e"
+    },
+    {
+      "path": "runtime/content-pilot-lab.mjs",
+      "bytes": 2068,
+      "sha256": "4bda938261a208c9c632022a86a31e447c56e4cb38e4e209401d1c8e3b14cfee"
+    },
+    {
+      "path": "runtime/content-pilot-server.mjs",
+      "bytes": 653,
+      "sha256": "13174482a20e214d52a1e0f12033d6f609b85497cf83ae714fef945df6114c91"
+    },
+    {
+      "path": "runtime/local-cors.mjs",
+      "bytes": 3289,
+      "sha256": "c8c7cf03b13c0b86723a64732098fe19e9fa1daa26bbcf085b64baf4d7d995c2"
+    },
+    {
+      "path": "runtime/local-lab.mjs",
+      "bytes": 2154,
+      "sha256": "5cc1443c0fc9e0b23a50ee8e9ca195e47f2a041099ea6feeeaf3bfbc0bd87830"
+    },
+    {
+      "path": "runtime/local-server.mjs",
+      "bytes": 3505,
+      "sha256": "3b27100d39d89fbffdec938ffc5c4dbbdd2d1110ab71db604b055089ed081062"
+    },
+    {
+      "path": "runtime/node-request-abort.mjs",
+      "bytes": 642,
+      "sha256": "3511ce2225a1b8fb22e3c7723aa5e9913d9bed1e713e8c5daecfaed02d8bcbe8"
+    },
+    {
+      "path": "runtime/production-options.mjs",
+      "bytes": 7544,
+      "sha256": "251a124def286b6b42f11602cdaf79fd73d42f1b696eba89e6d9697169937989"
+    },
+    {
+      "path": "runtime/ungrouped-driver.mjs",
+      "bytes": 2282,
+      "sha256": "3a2ec8f1608c498b98de8e02abb5908839db51f8f13e5f95312c5dcfe5b8dab4"
+    },
+    {
+      "path": "runtime/ungrouped-fixture.mjs",
+      "bytes": 1753,
+      "sha256": "12efbe082d9db82749f2185db7f9284a51fb3e6b830aa015a5fd80e3188b5c08"
+    },
+    {
+      "path": "runtime/ungrouped-lab.mjs",
+      "bytes": 3494,
+      "sha256": "93abc2e195f37268eb0c9ccb990601c6612ae5ccd52c547fd370f44f03a1aa38"
+    },
+    {
+      "path": "runtime/ungrouped-server.mjs",
+      "bytes": 774,
+      "sha256": "3b6e687b1415dd0fd877e3589f3386fc8d07e421da000e04713e28d7b6a74611"
+    },
+    {
+      "path": "runtime/vercel-node.mjs",
+      "bytes": 4161,
+      "sha256": "eb95ef50e999b44403f20fa2bdd51923443f1ef6038f60c7588bda1820537171"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/attempts.ts",
+      "bytes": 9727,
+      "sha256": "b95d33d535d37ee1beeef6123985771b5c05e921ed3a4f9e0694eafaea381721"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-auth.ts",
+      "bytes": 6833,
+      "sha256": "092ba3179c74b6c96d96d28bc215dc44bca2f5e11026b22598bd82819b4bc527"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "bytes": 17702,
+      "sha256": "bb8aff00ce0b6967351c3f6c41245add4db7215d970699d4c983db1dc0185024"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+      "bytes": 10205,
+      "sha256": "e14fd79fa83a5a874ef2d6c338cb210bbd44e9ca1b5bc8024f40933c4a8ee20a"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/configured-http.ts",
+      "bytes": 9359,
+      "sha256": "582819b9a2218d804b8015861405e19b60fe08d440201cf245f266befc6f2c8f"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/fault.ts",
+      "bytes": 422,
+      "sha256": "e405799dd809d8118f764e8fea8361f9117e2635b37e3afce93d63e64cafed8f"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/individual-points.ts",
+      "bytes": 729,
+      "sha256": "49f7108ad311b45b8491fa932eefff04ec4a4422969f17b84b522ea68ee1b8c2"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-activity.ts",
+      "bytes": 7617,
+      "sha256": "c4149e06a68778b39bd2e229188605d84fc4dda756dc5fc95016259a9226eb6b"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-effects.ts",
+      "bytes": 3852,
+      "sha256": "8bf5a68911587a16177650087fea108dac32a5aef5bba53cb8250f584da761c5"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-preflight.ts",
+      "bytes": 7061,
+      "sha256": "17b49301bca7ae3e79d5436dba281f0263c05e819754ad71522190a90e14c4bf"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-removal-http.ts",
+      "bytes": 5504,
+      "sha256": "66a13bd5396ea3f79b18fb5aa2345e8e978fd6878f8aabcf952303452287730b"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/membership-removal.ts",
+      "bytes": 7598,
+      "sha256": "3477846790c594c6baf96ea5a15a0be83bcde6f33328d57feb5c6917139e4ccb"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/ordinary.ts",
+      "bytes": 2889,
+      "sha256": "acd083fa6874fb4c8dfd8ec7551c9b12842dca1c07c970a8c7f0f5988cf1fd52"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/pilot-provisioning.ts",
+      "bytes": 9741,
+      "sha256": "c7967d846727e2ad00ae386654d07caf81de3b7b273b57ef4832c49a22c53cd3"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/removal-authority.ts",
+      "bytes": 812,
+      "sha256": "cc1739e0fe87e1aa88f964bdbd1e9562a3781df902a0486e5fe29ab3c1e44cd7"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-content.ts",
+      "bytes": 5127,
+      "sha256": "913a89409e68425ff664def9c76f9be80478cd47f50e4144cff21a0547d49e0e"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-http.ts",
+      "bytes": 16079,
+      "sha256": "76dab2bc435a9d79a6983ec47c3800876856daeed3a806f45a7b33c8a65bb4e2"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-json.ts",
+      "bytes": 1615,
+      "sha256": "8d93c68cce2dcdaf68ad96bf8f710d3f0a379e7db62db642583dd23218089b9d"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-jwt.ts",
+      "bytes": 3624,
+      "sha256": "090b6811c4010c58b0cd9f14999cc0657b8385fba6ee1f6be838e6cfe49b1635"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-state.ts",
+      "bytes": 5790,
+      "sha256": "b6699ac9973c0054bcf84ccd7437b3f411f66303a288e31a9c657e5ed641a40d"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/attempt-rows.ts",
+      "bytes": 8740,
+      "sha256": "aab9cb3964cbb9ecc196a0400790395c1512f4418d6ce85df29117f0cb15e010"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+      "bytes": 27800,
+      "sha256": "3c7e160bf776791d294e2aa7a639cff6817d2f9a094d401b8f66679fddbf4a98"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-domain.ts",
+      "bytes": 22931,
+      "sha256": "51673c36c76d46103b6b23b4a0f37f21cc9fb5b7e53dac9640cb92a76ea3cc75"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/membership-preflight-port.ts",
+      "bytes": 15991,
+      "sha256": "6eab8c2c749616d1b1b9c4e5c17fabe73de3f7ad07e9455f3328210eedc315fc"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/membership-protection-contract.ts",
+      "bytes": 30680,
+      "sha256": "ad4486106fb32ef8ee50e8db151549726bc8fa36b16a21396d7d02d1921d2ed8"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/postgres-transaction.ts",
+      "bytes": 9696,
+      "sha256": "306fa158dafe2108b94b42ed3e152820f852a22e633f6bd76ab0301509f9cfd6"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/prepared-student.ts",
+      "bytes": 10298,
+      "sha256": "d1826ecb8082bbc93260ab0e13375524a828fbdc83e518f0d3e9eceb690ff20c"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/session-rows.ts",
+      "bytes": 6717,
+      "sha256": "492d043bbe322752a8ef3e2a5abd2daf1d117068fc00c74d0f9ec73143f5916b"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/staff-access-rows.ts",
+      "bytes": 3744,
+      "sha256": "cec02c6a6392c51fdcd004189fbcb504d1a48efbf20e5f6b2af912f5244ab700"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts",
+      "bytes": 15858,
+      "sha256": "744a44d3504b9b98b24e9b42fcd2f602c28869479e984166f02de22af2df95d9"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-http-rows.ts",
+      "bytes": 13877,
+      "sha256": "7e374d1cd2891f056475141ceadca733a1a96f75e6a0c35190e6fd69b58d8f6e"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-identity-rows.ts",
+      "bytes": 3051,
+      "sha256": "ba1c07668261045f555dc2110d51eee6f74f37b19711416b13428a9068f05070"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-scope.ts",
+      "bytes": 7108,
+      "sha256": "e79872af89c0d677b9ef46376fefda33e713a1c22045970040e540aa004dddda"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-return-rows.ts",
+      "bytes": 16821,
+      "sha256": "ca9e1d5c8e418cda1ff4938f969f200a66eac9fb6c1eba4188bee0e33601d5b4"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/transaction-pool-port.ts",
+      "bytes": 1102,
+      "sha256": "79b9dcf8a9c27ef1ccc3f86a9233e8988731e17b2d9bdd330e3aa3872f084153"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/trusted-server-context.ts",
+      "bytes": 3434,
+      "sha256": "5d34a1b02896f3465501391ddc0b5f16ec2ecd9528a2cf02b8a332e8da2c5ace"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-http.ts",
+      "bytes": 17650,
+      "sha256": "32bc06bab2e7422544ee5b0f5831330755c8befaa579d8d7e5fee1b0db24cee0"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-state.ts",
+      "bytes": 7532,
+      "sha256": "208f220a3b72a572a37ab0ffba6763193b67beb3732aebe521f2295039333f72"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-wire.ts",
+      "bytes": 9974,
+      "sha256": "a43b5e043ca19c2e45cf83e1b76dddf0a89422633eeb2eefa19e647a847699af"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/telegram-return.ts",
+      "bytes": 4237,
+      "sha256": "91ccc1a4b1ab92ea2e116670a4b3849958f4d40994ec654efd91f47c5da492d9"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/telegram.ts",
+      "bytes": 3303,
+      "sha256": "415f843c5139285cbe3a4338072e05e50d33bebcbee3059362a3118281b8a3b3"
+    },
+    {
+      "path": "supabase/proposals/telegram-identity-permissions.review.sql",
+      "bytes": 13967,
+      "sha256": "9b398bfdb1e64235f2ac3db6f54b74f837c5426131fe67aede6cafb316d0d931"
+    },
+    {
+      "path": "tests/backend/http-fixture.ts",
+      "bytes": 7081,
+      "sha256": "b3593fb05cc32f6edf876c2120c24934338f2fbc3f3e8f658c666cbd8e2841d1"
+    },
+    {
+      "path": "tests/backend/staff-fixture.ts",
+      "bytes": 8646,
+      "sha256": "e173224b8d323b983e6510ec1cbddd3a108d79e72056a133a38a3fa9bda0814e"
+    },
+    {
+      "path": "tests/backend/student-prepared/memory-pool.mjs",
+      "bytes": 8971,
+      "sha256": "0ede9e037c97a2b36d569d52c56434309ae1efb86e6c95f0154e5460f4ac710e"
+    },
+    {
+      "path": "tests/backend/student-prepared/profile-context.test.mjs",
+      "bytes": 24941,
+      "sha256": "f19df9458cacbe2f28deea2754eff5e936a9a5242fe16f3861782599a5538898"
+    },
+    {
+      "path": "tests/backend/student-prepared/telegram-return.test.mjs",
+      "bytes": 7435,
+      "sha256": "37d8a7b45dcddd2e1ae7fa48afd09d259133f77eb63e74276b5cacd3b3b9a548"
+    },
+    {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "bytes": 40057,
+      "sha256": "7e026a22434fa559dcd6801bb4507f844f99cfb4658c6c7f89e4513b7bdfe09a"
+    },
+    {
+      "path": "tests/backend/validator/ajv-config.cjs",
+      "bytes": 2461,
+      "sha256": "55865a95c45cab29495f77cbc41fb4cdfc94f83960ce6168a838c2e64f800253"
+    },
+    {
+      "path": "tests/backend/validator/base-ajv-config.cjs",
+      "bytes": 2044,
+      "sha256": "74ef231957dc1b528f73ea61206a890d8c1fa16a9d97bca42bc8195b285ff774"
+    },
+    {
+      "path": "tests/backend/validator/tooling/package-lock.json",
+      "bytes": 2789,
+      "sha256": "bf49238f558d7a6f85562a52998e31f105f9e69e66892f785da9ab8cfca9bdf7"
+    },
+    {
+      "path": "tests/backend/validator/tooling/package.json",
+      "bytes": 76,
+      "sha256": "83086e236c60ca828b6d118d35f55c5834cc70e3b5d5cb8dfc8d628ffcd21149"
+    },
+    {
+      "path": "tests/backend/validator/view-builder.cjs",
+      "bytes": 10788,
+      "sha256": "0c12d242980b3899a4ded8bb8072ad8cf512170098ee8dd6e639198cd9833303"
+    },
+    {
+      "path": "tests/clerk-auth/contract.test.mjs",
+      "bytes": 2639,
+      "sha256": "d1450ed5ddc892b42eea52aec84ee32c8fd9721b895ed97afb9337fd6689eb99"
+    },
+    {
+      "path": "tests/clerk-auth/domain-executor-shapes.test.mjs",
+      "bytes": 7785,
+      "sha256": "26f0b443e7f32a93592477adff667614f5cf79b03d2a98252531425fbfcf7d5f"
+    },
+    {
+      "path": "tests/clerk-auth/domain-executor.mjs",
+      "bytes": 10215,
+      "sha256": "770b520d4492bd947abb1a526de8658f558f9a2b072c8f1c7dd15edd6eece280"
+    },
+    {
+      "path": "tests/clerk-auth/domain-http.test.mjs",
+      "bytes": 13849,
+      "sha256": "24b8aef28ab138f65fecde222945ad8769635555c64925aeac16bf8886a18678"
+    },
+    {
+      "path": "tests/clerk-auth/domain-session-rows.test.mjs",
+      "bytes": 8632,
+      "sha256": "b11ec668cf4fbce9407c4de77fce806a9ba93d68ce873cb780f12d4a78b8fc6f"
+    },
+    {
+      "path": "tests/clerk-auth/family-context.test.mjs",
+      "bytes": 5841,
+      "sha256": "20977f27a559fb9b2a80f21899208c660dadbaac65ac80aabdf54d3894fae7ec"
+    },
+    {
+      "path": "tests/clerk-auth/fixture.mjs",
+      "bytes": 5634,
+      "sha256": "1dae0182015c155aec6da31e88e1f51dc75d15e3d777c1df1ddc6c485bda8d11"
+    },
+    {
+      "path": "tests/clerk-auth/http.test.mjs",
+      "bytes": 12151,
+      "sha256": "c94f5fc18069284f935de02fb0fef9e11464d0d0d5ae787ec147ac3b55cdd989"
+    },
+    {
+      "path": "tests/clerk-auth/provider-adapter.test.mjs",
+      "bytes": 22068,
+      "sha256": "4d65fc4d972aa82ed85f86dcf6392eba3e67243399e792e538a53f54cf4a30ea"
+    },
+    {
+      "path": "tests/clerk-auth/review-listener.test.mjs",
+      "bytes": 11661,
+      "sha256": "095432668b0a0cac2b6e31df574e9da0ddb490a79f9ebbc3dc1bbff8e2a44c78"
+    },
+    {
+      "path": "tests/clerk-auth/review-types.test.ts",
+      "bytes": 689,
+      "sha256": "81fffa224c5f3b27a0d56ee5c3e25f91475a0cc14a0c28a13fb594b40bedd534"
+    },
+    {
+      "path": "tests/clerk-auth/scoped-store.test.mjs",
+      "bytes": 22487,
+      "sha256": "1e5280ac00ded86d510b3a908b87337fc387f6ff7f003bd2905c554546594a82"
+    },
+    {
+      "path": "tests/clerk-auth/sdk-binding.test.mjs",
+      "bytes": 8171,
+      "sha256": "6e42092ca6ada3590b5a9b517e376cc72ab19474c35e50d34d5bf7f65b3a362f"
+    },
+    {
+      "path": "tests/clerk-auth/sdk-cancel.test.mjs",
+      "bytes": 10469,
+      "sha256": "0cd4918952b587929d0e4e446b5e1d7a4772ec039d7f401c23e34d99f5293c42"
+    },
+    {
+      "path": "tests/clerk-auth/staff-parallel.test.mjs",
+      "bytes": 3798,
+      "sha256": "bfa54cb9f778a5202705e415f92d25497640f8847acc963182064c6ef8328a45"
+    },
+    {
+      "path": "tests/clerk-auth/tcp-cancel.test.mjs",
+      "bytes": 6661,
+      "sha256": "89ff63e911cd10816cdfc2d33cfa5f7f57556fc476edd8817727fe605b469ffe"
+    },
+    {
+      "path": "tests/clerk-auth/verifier.test.mjs",
+      "bytes": 4509,
+      "sha256": "73dc09ba11d9598b3e00daaf6b8b24b9468b32d6ad6ed17bc600677f579a8628"
+    },
+    {
+      "path": "tests/cloudflare/api-postgres.test.mjs",
+      "bytes": 26817,
+      "sha256": "11f7b05be24daca3e395db2e6ec730f1c246d6e8c947cc4698e8175624be15f5"
+    },
+    {
+      "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+      "bytes": 20727,
+      "sha256": "514687b02f84b0247bd65fade4d62445f4e82e6d87c91d1ed529621423078360"
+    },
+    {
+      "path": "tests/cloudflare/entry.test.mjs",
+      "bytes": 20738,
+      "sha256": "a11f5f06a9121b7a2e8c6f79d88ac25a2eecfefc5eefaff4a6be436cd60a39a0"
+    },
+    {
+      "path": "tests/cloudflare/telegram-wiring.test.mjs",
+      "bytes": 20048,
+      "sha256": "a56f44a0e4d17870a3adb2143ee58d46a85abee5961bfdc65934bca070b145be"
+    },
+    {
+      "path": "tests/enrollment/identity-staff.test.mjs",
+      "bytes": 15670,
+      "sha256": "ed14bfbd5f231463ebf2376304add8b6226645db3a4d811855a9b355e2335c0a"
+    },
+    {
+      "path": "tests/enrollment/production-client.test.mjs",
+      "bytes": 4808,
+      "sha256": "4bbe5b112b5b81f738760748dee7aa25cf141e2ab990e16aaeb06bc4b5861165"
+    },
+    {
+      "path": "tests/enrollment/telegram-client.test.mjs",
+      "bytes": 8396,
+      "sha256": "de019f2d9c7644140fdf9cb1242c72de44b88f2de640f61ff84be15b0c11207d"
+    },
+    {
+      "path": "tests/first-test/cors.test.mjs",
+      "bytes": 3479,
+      "sha256": "ef4ea2228157b718baa7f580bfe07403139a6d5294ed4609278dd0e3352eb6f1"
+    },
+    {
+      "path": "tests/first-test/executor.mjs",
+      "bytes": 3803,
+      "sha256": "6734a0d8221092978b7676bd4835e03124ffe18b11c323523348ec8cbef7520e"
+    },
+    {
+      "path": "tests/first-test/fixture.mjs",
+      "bytes": 7281,
+      "sha256": "6e9c113a2d754fcdf5ca54e382b949e21859beb61a77016bdebaab0be7f4f35f"
+    },
+    {
+      "path": "tests/first-test/http.test.mjs",
+      "bytes": 13002,
+      "sha256": "c1b72ff57078ca3edaff572cf9282f4a69da65a7fbe7e9c2741bc3a4daa32f57"
+    },
+    {
+      "path": "tests/local-content-pilot.test.mjs",
+      "bytes": 19865,
+      "sha256": "74c29b5306d0e09ec0efcda48afac04684230ef4347339617657de7daa190f2b"
+    },
+    {
+      "path": "tests/membership/preflight-adapter.test.mjs",
+      "bytes": 52377,
+      "sha256": "9b989fd50294146601f4176b45bb4f0f3ed5d20b0d122d3aa98dc4880dbbc6d7"
+    },
+    {
+      "path": "tests/membership/protection-contract.test.mjs",
+      "bytes": 38971,
+      "sha256": "a1f0014d99ab4ec898d3331622d2eff3c09ab5c3fb8427cae890d53cc497a111"
+    },
+    {
+      "path": "tests/membership/protection-postgres-transaction.test.mjs",
+      "bytes": 34385,
+      "sha256": "1d7205d9f0ce90e7f75030a7fa8049b314e3c951cec970f27dafcaffb60ac4a8"
+    },
+    {
+      "path": "tests/membership/removal-active.test.mjs",
+      "bytes": 35811,
+      "sha256": "853da6086e13bad983176eb1febb2f78176f619b8732b292329e471cb6aedb44"
+    },
+    {
+      "path": "tests/membership/removal-command.test.mjs",
+      "bytes": 40020,
+      "sha256": "76d693b6074f1b3e89eac36bbfb05ee65c3ac490754ca2182490f94d58523cc2"
+    },
+    {
+      "path": "tests/membership/removal-http.test.mjs",
+      "bytes": 47840,
+      "sha256": "e5a392c95f6838d54037a8dce5db42ba0b8267ab9e89d452cd3bf1260bd2e160"
+    },
+    {
+      "path": "tests/membership/shared-expiry-invariant.test.mjs",
+      "bytes": 18548,
+      "sha256": "9de546a587d6b3aac367f9f17db704c9d54c318694c58c89cfbf6963abc3ab68"
+    },
+    {
+      "path": "tests/persistent-http/executor.mjs",
+      "bytes": 7574,
+      "sha256": "ad86e0734e7e7cc19c310300f8417cde07c2d17c763b85a61714a7ae299f6cc6"
+    },
+    {
+      "path": "tests/persistent-http/http.test.mjs",
+      "bytes": 17759,
+      "sha256": "ad3c1b5a1865b62c20cebc3769a7cc16f74eff45a019edb2dfc21b1335c1c260"
+    },
+    {
+      "path": "tests/storage-auth/context-protocol.test.mjs",
+      "bytes": 21954,
+      "sha256": "aa8dddf8459f5b15a7f15bac4f94e03449692e58365811ef59c0f79b38550c31"
+    },
+    {
+      "path": "tests/storage-auth/disk-executor.mjs",
+      "bytes": 14861,
+      "sha256": "d875277371372ac7e7de39f1857bbe44c9822cabdc3a5f063011c2ff9663d519"
+    },
+    {
+      "path": "tests/storage-auth/staff-jwt.test.mjs",
+      "bytes": 4981,
+      "sha256": "801baa55d2c706c5d266e88e59c4a2c4489fcd30b0e588720b32fa18e36a24d3"
+    },
+    {
+      "path": "tests/storage-auth/storage.test.mjs",
+      "bytes": 12570,
+      "sha256": "9f2729b65a61ab0f3b3a0436e8df6620474da009427651e092b65d2b9491bc22"
+    },
+    {
+      "path": "tests/vercel-node/adapter.test.mjs",
+      "bytes": 11454,
+      "sha256": "a3c38ef203b6fdd39ae9cbdcebecd1dc5bf20744b9104d4f0cd075819a3d9629"
+    },
+    {
+      "path": "tests/vercel-node/pool-port.test.mjs",
+      "bytes": 3833,
+      "sha256": "493899b7c65dae3a4146a9999a8ff4e5948c550e513b25b89c5ac958f1721a9d"
+    },
+    {
+      "path": "tests/vercel-node/production-options.test.mjs",
+      "bytes": 21924,
+      "sha256": "052e7e8aa70519c35d03d2de7d673db3737b4bcfd9858ae351ee2761ae0fc2ac"
+    },
+    {
+      "path": "tools/generate-staff-contract.py",
+      "bytes": 2125,
+      "sha256": "aa5bc79040dbdc9eeb7b9b211bb8ff57c8c21adc9aa2e4a62eed3e6dcc29dc3e"
+    },
+    {
+      "path": "vercel.json",
+      "bytes": 163,
+      "sha256": "29c44dcff6c14b92cdd84a68afaba6dae869577dfceba54dfd911eb2d9427148"
+    },
+    {
+      "path": "wrangler.api.jsonc",
+      "bytes": 658,
+      "sha256": "d8c45f39aa743118db0d76b6a79f5161009ac27b71e08b9ecd6e89bcff315273"
+    }
+  ]
+}
