@@ -4,7 +4,7 @@ import type { SignInFutureResource, SignUpFutureResource } from '@clerk/react/ty
 import { createCommonProductionRuntime } from './common-production-runtime.ts';
 import type { CommonEntryConfig } from './common-production-runtime.ts';
 import { createPrebuiltSessionGate } from './clerk-prebuilt-session.ts';
-import { readTelegramBridge } from './telegram-bootstrap.ts';
+import { hasTelegramLaunchContext, readTelegramBridge } from './telegram-bootstrap.ts';
 import { StudentApp } from './student-app.tsx';
 import { createTelegramReturnLaunch } from './telegram-return-launch.ts';
 
@@ -16,7 +16,7 @@ export function PrebuiltReadyEntry({ config, scope, signIn, signUp }: {
 }) {
   const clerk = useClerk(), { session } = useSession();
   const latest = useRef({ clerk, signIn, signUp, scope }); latest.current = { clerk, signIn, signUp, scope };
-  const webview = !!readTelegramBridge(scope);
+  const webview = hasTelegramLaunchContext(scope);
   const [launch] = useState(() => config.telegramEnabled && webview
     ? createTelegramReturnLaunch(() => readTelegramBridge(latest.current.scope)) : undefined);
   const [runtime] = useState(() => createCommonProductionRuntime(config, {

@@ -3,7 +3,7 @@ import type { StudentPort } from './flow.ts';
 import { asFailure, failureMessage, StudentFailure } from './transport.ts';
 import { STUDENT_CONTRACT_SHA256 } from './owner-client/student-client.ts';
 
-export type TelegramBridge = { readonly initData?: string; ready?(): void };
+export type TelegramBridge = { readonly initData?: string; readonly platform?: string; ready?(): void };
 export type StudentConnection = {
   port: StudentPort;
   auth: { login(rawInitData: string): Promise<string>; logout(): Promise<void>; person(): string | null };
@@ -19,6 +19,15 @@ export function readTelegramBridge(scope: unknown): TelegramBridge | undefined {
   if (!telegram || typeof telegram !== 'object') return;
   const bridge = (telegram as { WebApp?: unknown }).WebApp;
   return bridge && typeof bridge === 'object' ? bridge as TelegramBridge : undefined;
+}
+
+// Loading the official SDK also creates WebApp in an ordinary browser. Only its
+// exact empty/unknown default is non-Telegram here; any other present bridge
+// retains the return flow's missing/invalid-proof rejection. This selects UI
+// context only. Backend alone verifies initData and grants Telegram identity.
+export function hasTelegramLaunchContext(scope: unknown): boolean {
+  const bridge = readTelegramBridge(scope);
+  return !!bridge && !(bridge.platform === 'unknown' && bridge.initData === '');
 }
 
 export function createTelegramBootstrap(options: {

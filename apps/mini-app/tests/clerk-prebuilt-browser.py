@@ -48,8 +48,18 @@ with sync_playwright() as p:
             assert exchange.value.status == 200 and exchange.value.request.post_data_json == {}; entered()
         def count(path): return len([r for r in audit if r['path'] == path])
         query = '?cached=1' if scenario == 'cached-session' else '?webview=1' if scenario == 'webview' else ''
-        page.goto('https://app.example.test/sign-in' + query)
-        if scenario == 'webview':
+        if scenario.startswith('sdk-browser-'): query = '?sdk_browser=1'
+        if scenario.startswith('telegram-empty-'): query = '?telegram_empty=1&cached=1'
+        path = '/' if scenario.endswith('-root') else '/sign-in'
+        page.goto('https://app.example.test' + path + query)
+        if scenario.startswith('telegram-empty-'):
+            if scenario.endswith('-sign-in'):
+                proof(0)
+                page.get_by_role('button', name='Tasdiqlangan hisob bilan davom etish', exact=True).click()
+            expect(page.get_by_role('alert')).to_contain_text('Kirishni yangidan tasdiqlang.')
+            assert state()['mounts'] == [] and not audit
+            assert page.get_by_role('heading', name='Mening testlarim', exact=True).count() == 0
+        elif scenario == 'webview':
             expect(page.get_by_role('heading', name='Brauzerda davom etish kerak')).to_be_visible()
             assert state()['mounts'] == [] and not audit and state()['proofReads'] == 0
         else:
@@ -117,6 +127,9 @@ with sync_playwright() as p:
                     expect(page.get_by_text('Server sessiya yopilganini tasdiqladi.', exact=True)).to_be_visible()
                     assert state()['session'] is None and state()['signOuts'] == [original]
                     assert count('/api/v1/auth/clerk') == 1
+        if scenario.startswith('sdk-browser-'):
+            assert count('/api/v1/auth/clerk') == 1
+            assert all('/auth/telegram' not in item['path'] for item in audit)
         assert not errors, errors
         assert not blocked, blocked
         assert not referrers

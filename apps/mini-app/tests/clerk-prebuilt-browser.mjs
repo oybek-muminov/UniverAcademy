@@ -8,7 +8,8 @@ await build({ configFile: false, build: { outDir, emptyOutDir: true,
   rollupOptions: { input: 'tests/clerk-prebuilt.fixture.html' } } });
 const assets = await preview({ configFile: false, build: { outDir }, preview: { host: '127.0.0.1', port: 0 } });
 try {
-  for (const scenario of ['widget-explicit', 'cached-session', 'cancel-body', 'user-cancel', 'logout-new-session', 'revoked', 'webview']) {
+  for (const scenario of ['widget-explicit', 'cached-session', 'cancel-body', 'user-cancel', 'logout-new-session', 'revoked', 'webview',
+    'sdk-browser-root', 'sdk-browser-sign-in', 'telegram-empty-root', 'telegram-empty-sign-in']) {
     const backend = await startClerkReviewServer();
     try {
       const proofs = [await backend.lab.sign(), await backend.lab.sign()];

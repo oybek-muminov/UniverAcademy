@@ -58,11 +58,15 @@ window.fetch = async (...args) => {
 };
 const query = new URLSearchParams(location.search);
 if (query.has('cached')) fixture.setSession(fixture.makeSession('sess_CachedSynthetic'));
-const scope = query.has('webview') ? { Telegram: { WebApp: { initData: 'query_id=synthetic-prebuilt-view', ready() {}, expand() {} } } } : {};
+const scope = query.has('sdk_browser') ? { Telegram: { WebApp: { platform: 'unknown', initData: '' } } }
+  : query.has('telegram_empty') ? { Telegram: { WebApp: { platform: 'ios', initData: '' } } }
+  : query.has('webview') ? { Telegram: { WebApp: { initData: 'query_id=synthetic-prebuilt-view', ready() {}, expand() {} } } } : {};
 emit();
 const config = readCommonEntryConfig({ VITE_MINI_APP_ORIGIN: 'https://app.example.test', VITE_API_ORIGIN: 'https://api.example.test',
   VITE_STUDENT_CONTRACT_SHA256: STUDENT_CONTRACT_SHA256, VITE_CLERK_PUBLISHABLE_KEY: 'pk_test_' + btoa('clerk.example.test$'),
-  VITE_CLERK_FRONTEND_ORIGIN: 'https://clerk.example.test' }, location.origin);
+  VITE_CLERK_FRONTEND_ORIGIN: 'https://clerk.example.test',
+  VITE_TELEGRAM_SDK_ENABLED: query.has('sdk_browser') || query.has('telegram_empty') ? 'true' : 'false',
+}, location.origin);
 createRoot(document.getElementById('root')).render(createElement(ClerkProvider, {
   publishableKey: config.publishableKey, Clerk: client, telemetry: { disabled: true }, prefetchUI: false,
 }, createElement(ClerkLoaded, null, createElement(CommonClerkEntry, { config, scope }))));
