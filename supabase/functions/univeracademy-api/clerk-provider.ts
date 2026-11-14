@@ -112,7 +112,8 @@ export function createClerkProviderAdapter(input: ClerkProviderSettings, binding
     [customFetch]: (url, options) => bounded(async signal => {
       if (url !== jwksUrl || options.method !== "GET") throw unavailable();
       const combined = AbortSignal.any([signal, options.signal]);
-      const response = await bindings.fetchJwks(new Request(jwksUrl, { method: "GET", redirect: "error", credentials: "omit", cache: "no-store",
+      // Workers requires manual; publicJwks rejects non-200 responses.
+      const response = await bindings.fetchJwks(new Request(jwksUrl, { method: "GET", redirect: "manual", credentials: "omit", cache: "no-store",
         headers: { accept: "application/json" }, signal: combined }));
       if (response.url && response.url !== jwksUrl) throw unavailable();
       return publicJwks(response, c.maxJwksBytes, combined);

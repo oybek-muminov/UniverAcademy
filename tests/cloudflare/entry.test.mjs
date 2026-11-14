@@ -107,7 +107,7 @@ for(const patch of [
   {UA_SESSION_POLICY:JSON.stringify({...testPolicy,accessTtlMs:-1})},{UA_SESSION_POLICY:JSON.stringify({...testPolicy,trusted:true})},
   {UA_CLERK_PROVIDER_SETTINGS:"[]"},{UA_CLERK_SECRET_KEY:""},{UA_CLERK_SECRET_KEY:"bad\nvalue"},
   {HYPERDRIVE:{}},{HYPERDRIVE:{connectionString:"postgres://u:p@host/db"}},
-  {HYPERDRIVE:{connectionString:"postgres://u:p@host:5432/db?sslmode=disable"}},{trusted:true},
+  {HYPERDRIVE:{connectionString:"postgres://u:p@host:5432/db?sslmode=disable&sslmode=disable"}},{trusted:true},
 ])test("malformed/overridden private binding fails closed "+Object.keys(patch)[0],async()=>{
   const f=await fixture();await safe(await f.app.fetch(request(),{...bindings(),...patch}));assert.equal(f.clients.length,0);assert.equal(f.calls.length,0);
 });
@@ -234,4 +234,10 @@ test("actual accepted provider adapter serves bound opaque-session GET/exams thr
       {id:identity.userId,banned:false,locked:false,deprovisioned:false};return new Response(JSON.stringify(value),{headers:{"content-type":"application/json"}});
   }});
   assert.equal((await real.fetch(request("GET","/exams",f.token),bindings())).status,200);assert.ok(calls>=2);
+});
+
+test("native Hyperdrive local-hop query reaches auth rejection without DB/provider I/O",async()=>{
+ const f=await fixture(),env=bindings();env.HYPERDRIVE.connectionString+='?sslmode=disable';
+ await safe(await f.app.fetch(request(),env),401);
+ assert.equal(f.clients.length,0);assert.equal(f.calls.length,0);
 });

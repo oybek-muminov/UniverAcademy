@@ -1,3 +1,4 @@
+import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
 import {createCloudflarePostgres} from './cloudflare-postgres.mjs';
 import {createTelegramStartLookup,telegramStartInput} from '../supabase/functions/univeracademy-api/telegram-return.ts';
 import {resetTrustedServerContext,setTrustedPhase,closeTrustedServerContext} from '../supabase/functions/univeracademy-api/storage/trusted-server-context.ts';
@@ -15,8 +16,7 @@ function bindings(env){
  if(typeof milliseconds!=='string'||! /^[1-9][0-9]*$/.test(milliseconds)||Number(milliseconds)>5000||!drive||typeof drive!=='object'||Array.isArray(drive))throw unavailable();
  const connectionString=drive.connectionString; // Trusted platform accessor only.
  if(typeof connectionString!=='string')throw unavailable();
- let url;try{url=new URL(connectionString);}catch{throw unavailable();}
- if(!['postgres:','postgresql:'].includes(url.protocol)||!url.hostname||!url.port||!url.username||!url.password||url.pathname.length<2||url.search||url.hash||/\s|\0/.test(connectionString))throw unavailable();
+ if(!isHyperdriveConnectionString(connectionString))throw unavailable();
  return {milliseconds:Number(milliseconds),postgres:{connectionString}};
 }
 async function untilAborted(work,signal){
