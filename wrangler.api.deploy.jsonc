@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "univeracademy-api",
+  "account_id": "78634501073c56e90dfd1662b729885a",
+  "main": "runtime/cloudflare-worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "keep_vars": true,
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "075d873d9cdd4ad48a027b5e5a6f7acf"
+    }
+  ],
+  "vars": {
+    "UA_API_ORIGIN": "https://univeracademy-api.oybekmominov227.workers.dev",
+    "UA_ALLOWED_ORIGINS": "[\"https://univeracademy-mini.oybekmominov227.workers.dev\"]",
+    "UA_SESSION_POLICY": "{\"initDataMaxAgeSeconds\":300,\"futureSkewSeconds\":0,\"accessTtlMs\":900000,\"familyTtlMs\":86400000,\"logoutTombstoneMs\":86400000,\"identityCollisionAttempts\":4,\"newLogin\":\"revoke_previous\"}",
+    "UA_CLERK_PROVIDER_SETTINGS": "{\"issuer\":\"https://quick-zebra-3590.clerk.accounts.dev\",\"authorizedParties\":[\"https://univeracademy-mini.oybekmominov227.workers.dev\"],\"audience\":{\"kind\":\"clerk_default_no_audience\"},\"jwksCacheMs\":60000,\"jwksCooldownMs\":5000,\"timeoutMs\":3000,\"maxJwksBytes\":65536}",
+    "UA_TELEGRAM_LOOKUP_TIMEOUT_MS": "3000"
+  }
+  // INACTIVE / LOCAL PROPOSAL. Account and Hyperdrive IDs are confirmed; the
+  // workers.dev origins and public exposure are proposed, not live endpoints.
+  // Session/Clerk policy, private bindings and deployment approval remain pending.
+  // HYPERDRIVE query caching must be disabled, origin TLS verified, and its DB
+  // credential bound to the dedicated non-owner/NOBYPASSRLS runtime role.
+}
