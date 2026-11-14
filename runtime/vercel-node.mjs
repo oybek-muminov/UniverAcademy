@@ -33,7 +33,7 @@ async function boundedRequest(request) {
   // Keep raw bytes for the existing strict JSON/auth boundary. No req.body helper,
   // numeric coercion, URL/route remapping or proof reconstruction in this adapter.
   return new Request(request.url,{method:request.method,headers:request.headers,body,
-    signal:request.signal,redirect:"error",credentials:"omit",cache:"no-store"});
+    signal:request.signal,redirect:"manual",credentials:"omit",cache:"no-store"});
 }
 
 /** configuration is the existing HttpConfiguration, supplied by reviewed server bindings. */

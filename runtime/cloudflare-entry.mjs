@@ -1,3 +1,4 @@
+import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
 import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
 import {checkSessionPolicy} from "../supabase/functions/univeracademy-api/student-state.ts";
 import {createCloudflareApi} from "./cloudflare-api.mjs";
@@ -45,9 +46,7 @@ function privateBindings(env,telegram){
   if(!drive||typeof drive!=="object"||Array.isArray(drive))throw unavailable();
   const connectionString=drive.connectionString;
   if(typeof secretKey!=="string"||!secretKey||/[\r\n\0]/.test(secretKey)||typeof connectionString!=="string")throw unavailable();
-  let u;try{u=new URL(connectionString);}catch{throw unavailable();}
-  if(!["postgres:","postgresql:"].includes(u.protocol)||!u.hostname||!u.port||!u.username||!u.password||
-    u.pathname.length<2||u.search||u.hash||/\s|\0/.test(connectionString))throw unavailable();
+  if(!isHyperdriveConnectionString(connectionString))throw unavailable();
   // Optional for every accepted non-Telegram route. Do not even evaluate an
   // accessor for an unused secret. The new proof routes require an own value.
   let botToken;
