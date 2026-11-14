@@ -1,5 +1,5 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "tooling/node_modules/wrangler/config-schema.json",
   "name": "univeracademy-api",
   "account_id": "78634501073c56e90dfd1662b729885a",
   "main": "runtime/cloudflare-worker.mjs",

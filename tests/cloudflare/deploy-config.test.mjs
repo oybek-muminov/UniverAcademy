@@ -14,7 +14,7 @@ const candidate = parseConfig(candidateBytes);
 const apiOrigin = 'https://univeracademy-api.oybekmominov227.workers.dev';
 const miniOrigin = 'https://univeracademy-mini.oybekmominov227.workers.dev';
 const expectedSettings = {
-  $schema: 'node_modules/wrangler/config-schema.json',
+  $schema: 'tooling/node_modules/wrangler/config-schema.json',
   name: 'univeracademy-api',
   account_id: '78634501073c56e90dfd1662b729885a',
   main: 'runtime/cloudflare-worker.mjs',
@@ -76,14 +76,15 @@ test('inert API proposal remains the exact 658-byte account-free source', () => 
 });
 
 test('explicit deployment candidate is unchanged and separate from the inert proposal', () => {
-  assert.equal(candidateBytes.length, 1626);
-  assert.equal(sha256(candidateBytes), 'e29d8f6ac5d6d2d67d457bcc794a973aeda7fdcbb9f15f06a38bc58e958d007c');
+  assert.equal(candidateBytes.length, 1634);
+  assert.equal(sha256(candidateBytes), '880bb207b68f15bffa4ad309f38e446dac349930b702f6c825588d3bf2714fbd');
   assertDeploymentConfig(candidate);
   assert.doesNotMatch(candidateBytes.toString('utf8'),
     /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|postgres(?:ql)?:\/\/|UA_CLERK_SECRET_KEY|UA_TELEGRAM_BOT_TOKEN/);
 });
 
 const invalidConfigurations = [
+  ['root dependency schema path', config => { config.$schema = 'node_modules/wrangler/config-schema.json'; }],
   ['bot Worker name', config => { config.name = 'univeracademy-bot'; }],
   ['different entrypoint', config => { config.main = 'apps/telegram-bot/worker.mjs'; }],
   ['different account', config => { config.account_id = '0'.repeat(32); }],
