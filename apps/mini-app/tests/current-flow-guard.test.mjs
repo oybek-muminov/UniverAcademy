@@ -9,7 +9,8 @@ import { spawnSync } from 'node:child_process';
 
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
-const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
+const current = 'apps/mini-app/tests/fixtures/backend-runtime-8ef6c879-manifest.json';
+const previousRuntime = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
 const previousContentBase = 'apps/mini-app/tests/fixtures/backend-accepted-fixtures-14f0b074-manifest.json';
 const previousAssembly = 'apps/mini-app/tests/fixtures/backend-telegram-return-assembly-manifest.json';
 const previousClean = 'apps/mini-app/tests/fixtures/backend-d54d19c-clean-manifest.json';
@@ -33,7 +34,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts]]);
+const manifestErrors = new Map([['PRIOR_RUNTIME_MANIFEST_MISMATCH', previousRuntime],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -41,7 +42,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, current, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, current, previousRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -94,7 +95,7 @@ function oldAttempts(root) {
   return old; // Exact historical bytes; never executed or written over owner source.
 }
 
-test('current guard accepts exact corrected types base plus two Backend corrections and both owner copies', () => check());
+test('current guard accepts reviewed runtime publication while retaining historical provenance and owner copies', () => check());
 test('stale source claim for historical 194-target checkpoint is rejected', () => check(root => {
   mutateCurrentManifest(root, value => { value.source_commit = '8a750ee01eed794bda1942bc1bd0e89829c3a704'; });
 }, 'RUNTIME_MANIFEST_MISMATCH'));
@@ -521,3 +522,21 @@ const listenerCases=[
 for(const part of ['preimage','result'])for(const key of ['mode','bytes','sha256'])
  listenerCases.push([part+' '+key,v=>{const x=v.content_overlays[1][part];x[key]=key==='mode'?'100755':key==='bytes'?x.bytes-1:'0'.repeat(64);},key==='mode'?'MODE':part.toUpperCase()]);
 for(const [label,mutate,code] of listenerCases)test('listener content metadata rejects '+label,()=>check(root=>mutateCurrentManifest(root,mutate),'CONTENT_OVERLAY_'+code+'_MISMATCH',{rebindDigest:true}));
+
+for (const [label, mutate] of [
+  ['source commit', value => { value.runtime_publication.commit = '0'.repeat(40); }],
+  ['preimage', value => { value.runtime_publication.files[0].preimage.sha256 = '0'.repeat(64); }],
+  ['blob identity', value => { value.runtime_publication.files[0].git_blob = '0'.repeat(40); }],
+  ['result', value => { value.runtime_publication.files[0].result.sha256 = '0'.repeat(64); }],
+  ['omitted publication file', value => { value.runtime_publication.files.pop(); }],
+  ['extra publication file', value => { value.runtime_publication.files.push(value.runtime_publication.files[0]); }],
+  ['previous authority', value => { value.runtime_publication.previous_manifest.sha256 = '0'.repeat(64); }],
+]) test('runtime publication rejects rebound ' + label, () => check(root => mutateCurrentManifest(root, mutate),
+  'ASSEMBLY_METADATA_MISMATCH: runtime_publication', { rebindDigest: true }));
+
+for (const [label, mutate] of [
+  ['missing', root => rmSync(join(root, previousRuntime))],
+  ['wrong size', root => appendFileSync(join(root, previousRuntime), '\n')],
+  ['same-size corruption', root => { const p = join(root, previousRuntime), b = readFileSync(p); b[0] ^= 1; writeFileSync(p, b); }],
+]) test('historical runtime authority remains pinned: ' + label, () => check(mutate,
+  label === 'missing' ? 'ENOENT' : 'PRIOR_RUNTIME_MANIFEST_MISMATCH'));

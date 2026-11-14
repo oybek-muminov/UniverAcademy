@@ -32,6 +32,7 @@ const expectedPaths = [
   "runtime/content-pilot-driver.mjs",
   "runtime/content-pilot-lab.mjs",
   "runtime/content-pilot-server.mjs",
+  "runtime/hyperdrive-connection-string.mjs",
   "runtime/local-cors.mjs",
   "runtime/local-lab.mjs",
   "runtime/local-server.mjs",
@@ -112,9 +113,11 @@ const expectedPaths = [
   "tests/clerk-auth/staff-parallel.test.mjs",
   "tests/clerk-auth/tcp-cancel.test.mjs",
   "tests/clerk-auth/verifier.test.mjs",
+  "tests/cloudflare-runtime/workerd-smoke.test.mjs",
   "tests/cloudflare/api-postgres.test.mjs",
   "tests/cloudflare/clerk-worker-bindings.test.mjs",
   "tests/cloudflare/entry.test.mjs",
+  "tests/cloudflare/hyperdrive-connection-string.test.mjs",
   "tests/cloudflare/telegram-wiring.test.mjs",
   "tests/enrollment/identity-staff.test.mjs",
   "tests/enrollment/production-client.test.mjs",
@@ -144,7 +147,7 @@ const expectedPaths = [
   "vercel.json",
   "wrangler.api.jsonc"
 ];
-const ACTIVE_MANIFEST_SHA256 = '3fa06b7fdd5dcd8b129776a2679ccea98c3aa84807c73902eecb3e1356dc2ce8';
+const ACTIVE_MANIFEST_SHA256 = '30598dde90b39518dca8e3a6da92d783f6b73a6b213777d66fa0379be42dfe02';
 const expectedAssembly = {
   "format_version": 4,
   "source_repository": "oybek-muminov/UniverAcademy",
@@ -314,11 +317,220 @@ const expectedAssembly = {
     }
   ],
   "layout": "main-root",
-  "selection_policy": "Selected Backend/client inputs only: clean111 retained plus exact Backend37 and canonical client inputs; owner copies checked by parity. Inactive review SQL is provenance only. Mini source/guard integrity is proved by a separate exact whole-tree delta, not an invented assembled Git identity. Older manifests remain opaque historical fixtures, never fallback authorities. Ordered accepted fixture-only publications e6a930 then14f0b074 replace two executors and add three strict tests; final two replacements are explicit, never runtime-policy changes. Reviewed content delta over9bca965: one test-only patch; preimage/patch replay is proven independently, while this guard checks exact metadata and final bytes. No result commit/tree is claimed. Second reviewed test-only delta: listener asserts the canonical contract while preserving the historical exchange snapshot checks.",
-  "target_count": 136,
-  "target_bytes": 2857629
+  "selection_policy": "Selected Backend/client inputs only: clean111 retained plus exact Backend37 and canonical client inputs; owner copies checked by parity. Inactive review SQL is provenance only. Mini source/guard integrity is proved by a separate exact whole-tree delta, not an invented assembled Git identity. Older manifests remain opaque historical fixtures, never fallback authorities. Ordered accepted fixture-only publications e6a930 then14f0b074 replace two executors and add three strict tests; final two replacements are explicit, never runtime-policy changes. Reviewed content delta over9bca965: one test-only patch; preimage/patch replay is proven independently, while this guard checks exact metadata and final bytes. No result commit/tree is claimed. Second reviewed test-only delta: listener asserts the canonical contract while preserving the historical exchange snapshot checks. Runtime authority extension: exact 15-file publication 8ef6c879, including three new runtime/test inputs. Prior source, base, and overlay identities remain historical provenance; runtime_publication identifies the later selected-file authority. No assembled result tree is claimed.",
+  "target_count": 139,
+  "target_bytes": 2866214,
+  "runtime_publication": {
+    "repository": "oybek-muminov/UniverAcademy",
+    "commit": "8ef6c879b89da4a525f2c2fd96059c40e177010a",
+    "previous_manifest": {
+      "path": "apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json",
+      "bytes": 31668,
+      "sha256": "3fa06b7fdd5dcd8b129776a2679ccea98c3aa84807c73902eecb3e1356dc2ce8"
+    },
+    "files": [
+      {
+        "path": "runtime/clerk-worker-bindings.mjs",
+        "git_blob": "4a2b2b6cd39b7e180a4ac57392aea5d9acc71687",
+        "preimage": {
+          "path": "runtime/clerk-worker-bindings.mjs",
+          "bytes": 6933,
+          "sha256": "31d44b3103a4fb5426fe113a71c620a25a8367dcaacf15e7ebd9b982ad9ad88c"
+        },
+        "result": {
+          "path": "runtime/clerk-worker-bindings.mjs",
+          "bytes": 7090,
+          "sha256": "312b04575d075e56fd24abd8af595229ecd313e8bac9f6116979d6a11e18b452"
+        }
+      },
+      {
+        "path": "runtime/cloudflare-api.mjs",
+        "git_blob": "d28843f341b806b971178c75c92f4bff7c9658ee",
+        "preimage": {
+          "path": "runtime/cloudflare-api.mjs",
+          "bytes": 4957,
+          "sha256": "1cc68417cf8467aca34f5e0d3a3709fe2ddd5310a009c51a1db380f02de8e96a"
+        },
+        "result": {
+          "path": "runtime/cloudflare-api.mjs",
+          "bytes": 4958,
+          "sha256": "d98825f44a16c564f4995bf1a24d4e250d6e5e42ddb437f14a92d28fd0b16567"
+        }
+      },
+      {
+        "path": "runtime/cloudflare-entry.mjs",
+        "git_blob": "cf005a64cba43b0a86a8f3f6554b114763623c66",
+        "preimage": {
+          "path": "runtime/cloudflare-entry.mjs",
+          "bytes": 7075,
+          "sha256": "33e2016b19abe64623b3d9994706895f70158df41e0d9295b50e47d608cd5737"
+        },
+        "result": {
+          "path": "runtime/cloudflare-entry.mjs",
+          "bytes": 6961,
+          "sha256": "67fc2e604657951880224bac6a93f412fd2d4bec56c69ba7055c2dacf7be873d"
+        }
+      },
+      {
+        "path": "runtime/cloudflare-postgres.mjs",
+        "git_blob": "f33c6bc07a4c9b92210c420aea9988615df7ecd8",
+        "preimage": {
+          "path": "runtime/cloudflare-postgres.mjs",
+          "bytes": 4340,
+          "sha256": "377ecdb75cc2c79654747407ad4644832c71a0c0c5536456b5eeb8ae927a89a8"
+        },
+        "result": {
+          "path": "runtime/cloudflare-postgres.mjs",
+          "bytes": 4215,
+          "sha256": "da9626dd8ee00270b7861205b0f2dc15e9656b7c2b2aafe44491f5f6991506be"
+        }
+      },
+      {
+        "path": "runtime/cloudflare-telegram-directory.mjs",
+        "git_blob": "054ef7c05820215b1139a5e11ebde3e3ee0ea98a",
+        "preimage": {
+          "path": "runtime/cloudflare-telegram-directory.mjs",
+          "bytes": 4719,
+          "sha256": "10cf4faa60c2a2105f1076a56ff5dbcb76d5e08251b08375b298f46c949b416e"
+        },
+        "result": {
+          "path": "runtime/cloudflare-telegram-directory.mjs",
+          "bytes": 4591,
+          "sha256": "039bd8247076d3b896f998de52b2b1c28df5f97d5d0c510e78723cff73c91e38"
+        }
+      },
+      {
+        "path": "runtime/hyperdrive-connection-string.mjs",
+        "git_blob": "f250dae01252182303a9241e5f76cbd406994b03",
+        "preimage": null,
+        "result": {
+          "path": "runtime/hyperdrive-connection-string.mjs",
+          "bytes": 850,
+          "sha256": "3e4c1ad846b520c582b40ad45cf9d39f8c0d88169c141fc70dbe3cca2c0b3c77"
+        }
+      },
+      {
+        "path": "runtime/vercel-node.mjs",
+        "git_blob": "b6bd26087474badba4acc249bcfcccc236487cbc",
+        "preimage": {
+          "path": "runtime/vercel-node.mjs",
+          "bytes": 4161,
+          "sha256": "eb95ef50e999b44403f20fa2bdd51923443f1ef6038f60c7588bda1820537171"
+        },
+        "result": {
+          "path": "runtime/vercel-node.mjs",
+          "bytes": 4162,
+          "sha256": "ca88a7b07585dd2a44d2b02b438110d1a2567caeb44c73cfbe19c19b03830d1c"
+        }
+      },
+      {
+        "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+        "git_blob": "bdd92a7053eaf3753f544c57279bb988662275b9",
+        "preimage": {
+          "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+          "bytes": 10205,
+          "sha256": "e14fd79fa83a5a874ef2d6c338cb210bbd44e9ca1b5bc8024f40933c4a8ee20a"
+        },
+        "result": {
+          "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+          "bytes": 10278,
+          "sha256": "18147adc1e7a07e53aa1138578781599124bd1cc0398242f4891478e29fe3b27"
+        }
+      },
+      {
+        "path": "tests/clerk-auth/provider-adapter.test.mjs",
+        "git_blob": "1cebef3df68e1482d2fcef3d9c3eaea6c0639331",
+        "preimage": {
+          "path": "tests/clerk-auth/provider-adapter.test.mjs",
+          "bytes": 22068,
+          "sha256": "4d65fc4d972aa82ed85f86dcf6392eba3e67243399e792e538a53f54cf4a30ea"
+        },
+        "result": {
+          "path": "tests/clerk-auth/provider-adapter.test.mjs",
+          "bytes": 22069,
+          "sha256": "c9a111eadb208907c486ad444e7e0d73f881b85a686856115f41851ccbfc27a2"
+        }
+      },
+      {
+        "path": "tests/cloudflare-runtime/workerd-smoke.test.mjs",
+        "git_blob": "0a66b2263475f8175985b49861e5c17a632d1a84",
+        "preimage": null,
+        "result": {
+          "path": "tests/cloudflare-runtime/workerd-smoke.test.mjs",
+          "bytes": 5264,
+          "sha256": "90c449c79dd6d4eb0eff0163dc65c175c6f897db32f176cbefebdc757ab30912"
+        }
+      },
+      {
+        "path": "tests/cloudflare/api-postgres.test.mjs",
+        "git_blob": "966ec732634db75c5d3969239dd54afc6091e66b",
+        "preimage": {
+          "path": "tests/cloudflare/api-postgres.test.mjs",
+          "bytes": 26817,
+          "sha256": "11f7b05be24daca3e395db2e6ec730f1c246d6e8c947cc4698e8175624be15f5"
+        },
+        "result": {
+          "path": "tests/cloudflare/api-postgres.test.mjs",
+          "bytes": 27235,
+          "sha256": "cf40377e78e6f980a93e397e81a57dcd3a7fdda5bc0743bb74e6d117a67dc248"
+        }
+      },
+      {
+        "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+        "git_blob": "157a971d44b7b6787b2a30df4393968f164d3de5",
+        "preimage": {
+          "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+          "bytes": 20727,
+          "sha256": "514687b02f84b0247bd65fade4d62445f4e82e6d87c91d1ed529621423078360"
+        },
+        "result": {
+          "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+          "bytes": 20850,
+          "sha256": "16f58744a7531813a35524468d696439b56ae46f2ba01a6c7e463f617024ec2a"
+        }
+      },
+      {
+        "path": "tests/cloudflare/entry.test.mjs",
+        "git_blob": "bb3d8ab562cc9e7ba3603106484a58a77dbbcaf4",
+        "preimage": {
+          "path": "tests/cloudflare/entry.test.mjs",
+          "bytes": 20738,
+          "sha256": "a11f5f06a9121b7a2e8c6f79d88ac25a2eecfefc5eefaff4a6be436cd60a39a0"
+        },
+        "result": {
+          "path": "tests/cloudflare/entry.test.mjs",
+          "bytes": 21068,
+          "sha256": "211c5757f0ec2c9e1d7ea5f31b91061e93ca4573518cec9bdf687ddb6889ca85"
+        }
+      },
+      {
+        "path": "tests/cloudflare/hyperdrive-connection-string.test.mjs",
+        "git_blob": "0f98b80cf1c10ca1d2b3a6e4a51563b7c38640e2",
+        "preimage": null,
+        "result": {
+          "path": "tests/cloudflare/hyperdrive-connection-string.test.mjs",
+          "bytes": 935,
+          "sha256": "b66fcf5999af468b027403dffbbcb0728aad66d259ae571f5232c6e7c0b76bf7"
+        }
+      },
+      {
+        "path": "tests/cloudflare/telegram-wiring.test.mjs",
+        "git_blob": "e4570261c804f3ca29a1d96b2ab2c66da545a419",
+        "preimage": {
+          "path": "tests/cloudflare/telegram-wiring.test.mjs",
+          "bytes": 20048,
+          "sha256": "a56f44a0e4d17870a3adb2143ee58d46a85abee5961bfdc65934bca070b145be"
+        },
+        "result": {
+          "path": "tests/cloudflare/telegram-wiring.test.mjs",
+          "bytes": 20847,
+          "sha256": "cefd57f5fc61bf1ae07cc3db8c956caa45c2aad01dc15752d6f3a8d043ec32a8"
+        }
+      }
+    ]
+  }
 };
-const runtimeRaw = readFileSync(new URL('./fixtures/backend-final-content-9bca9654-manifest.json', import.meta.url));
+const runtimeRaw = readFileSync(new URL('./fixtures/backend-runtime-8ef6c879-manifest.json', import.meta.url));
 assert.equal(sha256(runtimeRaw), ACTIVE_MANIFEST_SHA256, 'RUNTIME_MANIFEST_MISMATCH');
 const runtime = JSON.parse(runtimeRaw);
 assert(runtime && typeof runtime === 'object' && !Array.isArray(runtime), 'RUNTIME_MANIFEST_SHAPE_MISMATCH');
@@ -408,8 +620,17 @@ const contentTarget = runtime.files.find(file => file.path === content.path);
 assert(contentTarget && contentTarget.bytes === content.result.bytes && contentTarget.sha256 === content.result.sha256,
   'CONTENT_OVERLAY_TARGET_MISMATCH');
 }
-// Exact Backend correction provenance, not a claim about an assembled Git tree.
-export const BACKEND_SOURCE_COMMIT = runtime.source_commit;
+// The historical authority is immutable; later publication must chain from its exact rows.
+const priorRaw = readFileSync(new URL('./fixtures/backend-final-content-9bca9654-manifest.json', import.meta.url));
+assert.equal(priorRaw.length, runtime.runtime_publication.previous_manifest.bytes, 'PRIOR_RUNTIME_MANIFEST_MISMATCH');
+assert.equal(sha256(priorRaw), runtime.runtime_publication.previous_manifest.sha256, 'PRIOR_RUNTIME_MANIFEST_MISMATCH');
+const priorRows = new Map(JSON.parse(priorRaw).files.map(row => [row.path, row]));
+for (const update of runtime.runtime_publication.files) {
+  assert.deepEqual(update.preimage, priorRows.get(update.path) ?? null, 'RUNTIME_PUBLICATION_PREIMAGE_MISMATCH: ' + update.path);
+  assert.deepEqual(runtime.files.find(row => row.path === update.path), update.result, 'RUNTIME_PUBLICATION_TARGET_MISMATCH: ' + update.path);
+}
+// Latest verified selected-file publication, not a claim about an assembled Git tree.
+export const BACKEND_SOURCE_COMMIT = runtime.runtime_publication.commit;
 const repo = realpathSync(fileURLToPath(new URL('../../../', import.meta.url)));
 function readTarget(path) {
   const target = resolve(repo, path);
