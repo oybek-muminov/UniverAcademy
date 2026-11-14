@@ -1,0 +1,8 @@
+{
+  "name": "univeracademy-cloudflare-build-tooling",
+  "version": "0.0.0-private",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "4.160.1"
+  }
+}
