@@ -3,6 +3,18 @@
 This change prepares the existing production flow. It does not activate registration,
 change credentials, create users, or prove an end-to-end login.
 
+## Review branch status: incomplete, do not merge
+
+Production source changes are preserved here, but five existing fixture-based test
+source updates were not published under the owner's no-synthetic-data restriction:
+apps/telegram-bot/tests/returning-worker.test.mjs and tests/cloudflare/{api-postgres,
+clerk-worker-bindings,entry,telegram-wiring}.test.mjs. The candidate integrity overlay
+references the prepared versions of the four Cloudflare test files, so the remote
+branch's integrity verifier is expected to fail until this discrepancy is resolved
+within the owner's restrictions. Do not treat the local candidate's successful static
+checks as validation of this partial remote branch. No deployment or merge is approved
+by this document. Live provider prerequisites below remain unresolved.
+
 ## Intended flow
 
 1. Telegram sends `/start` to the bot's verified webhook.
