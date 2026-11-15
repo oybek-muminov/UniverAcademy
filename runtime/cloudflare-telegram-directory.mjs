@@ -19,6 +19,15 @@ function bindings(env){
  if(!['postgres:','postgresql:'].includes(url.protocol)||!url.hostname||!url.port||!url.username||!url.password||url.pathname.length<2||url.search||url.hash||/\s|\0/.test(connectionString))throw unavailable();
  return {milliseconds:Number(milliseconds),postgres:{connectionString}};
 }
+// Owner-requested interim routing policy, NOT a database lookup result. This
+// setting is private deployment configuration; callers cannot select the mode.
+function startMode(env){
+ if(!env||typeof env!=='object'||![Object.prototype,null].includes(Object.getPrototypeOf(env)))throw unavailable();
+ if(!Object.hasOwn(env,'UA_TELEGRAM_START_MODE'))return 'database';
+ const mode=own(env,'UA_TELEGRAM_START_MODE');
+ if(mode!=='database'&&mode!=='registration_only')throw unavailable();
+ return mode;
+}
 async function untilAborted(work,signal){
  let abort;
  try{
@@ -55,8 +64,15 @@ export function createTelegramDirectory({loadClient=async()=>(await import('pg')
  return Object.freeze({async lookupTelegramStart(input,env,{signal}={}){
   let resource,timer,controller;
   try{
-   const value=telegramStartInput(input),config=bindings(env);
+   const value=telegramStartInput(input),mode=startMode(env);
    if(signal!==undefined&&!(signal instanceof AbortSignal))throw unavailable();
+   if(signal?.aborted)throw unavailable();
+   // Still validate the exact RPC input. Do not connect, load a DB client, read
+   // Hyperdrive credentials, grant a session, or claim the person is absent.
+   // All users (including existing/disabled users) receive sign-in navigation;
+   // authentication/authorization remain the responsibility of the real API.
+   if(mode==='registration_only')return Object.freeze({status:'needs_clerk'});
+   const config=bindings(env);
    controller=new AbortController();const scoped=signal?AbortSignal.any([controller.signal,signal]):controller.signal;
    if(scoped.aborted)throw unavailable();timer=setTimer(()=>controller.abort(),config.milliseconds);
    const Client=await untilAborted(()=>loadClient(),scoped);if(typeof Client!=='function'||scoped.aborted)throw unavailable();

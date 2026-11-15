@@ -1,0 +1,18 @@
+{
+  "name": "univeracademy-api",
+  "main": "runtime/cloudflare-worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "keep_vars": false,
+  "observability": {
+    "enabled": true,
+    "traces": {"enabled": true}
+  },
+  "vars": {"UA_TELEGRAM_START_MODE": "registration_only"}
+  // LOCAL CANDIDATE ONLY. No public route or database/auth binding is enabled.
+  // Requires separate upload/deploy approval and verified target account.
+  // Bot service binding: TELEGRAM_START_LOOKUP -> univeracademy-api,
+  // named entrypoint TelegramAccountDirectory (not default).
+}
