@@ -171,3 +171,13 @@ test('private deadline during end cannot emit a routing ACK and waits for one di
  const work=f.directory.lookupTelegramStart({update_id:1,telegram_user_id:1},f.env);await entered.promise;f.timers[0].callback();let finished=false;work.finally(()=>finished=true).catch(()=>{});await new Promise(setImmediate);assert.equal(finished,false);
  end.resolve();await assert.rejects(work,e=>e.message==='SERVICE_UNAVAILABLE');assert.equal(f.clients[0].ends,1);
 });
+
+test('private directory accepts exact platform query and preserves it for driver',async()=>{
+ const f=directoryFixture();f.env.HYPERDRIVE.connectionString+='?sslmode=disable';
+ assert.deepEqual(await f.directory.lookupTelegramStart({update_id:1,telegram_user_id:1},f.env),{status:'linked'});
+ assert.equal(f.clients[0].options.connectionString,f.env.HYPERDRIVE.connectionString);
+});
+for(const query of ['?sslmode=disable&sslmode=disable','?sslmode=disable&x=1','?sslmode=require'])test('private directory rejects unsupported platform query '+query,async()=>{
+ const f=directoryFixture();f.env.HYPERDRIVE.connectionString+=query;
+ await assert.rejects(f.directory.lookupTelegramStart({update_id:1,telegram_user_id:1},f.env),e=>e.message==='SERVICE_UNAVAILABLE');assert.equal(f.loads.length,0);
+});

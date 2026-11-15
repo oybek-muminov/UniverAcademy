@@ -47,7 +47,7 @@ test("real jose signature validation uses only issuer-pinned public JWKS; no bea
   assert.equal(proof.userId, users.student); assert.equal(proof.sessionId, sids.first); assert.equal(proof.role, undefined);
   await verify(await f.f.sign()); assert.equal(f.calls.jwks.length, 1);
   const request = f.calls.jwks[0]; assert.equal(request.url, issuer + "/.well-known/jwks.json");
-  assert.equal(request.method, "GET"); assert.equal(request.redirect, "error"); assert.equal(request.credentials, "omit"); assert.equal(request.cache, "no-store");
+  assert.equal(request.method, "GET"); assert.equal(request.redirect, "manual"); assert.equal(request.credentials, "omit"); assert.equal(request.cache, "no-store");
   assert.equal(request.headers.get("authorization"), null); assert.equal(request.headers.get("cookie"), null);
   assert.equal(await f.live(), f.wire.session.abandonAt); await f.live();
   assert.equal(f.calls.sessions.length, 2); assert.equal(f.calls.users.length, 2);

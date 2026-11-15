@@ -30,8 +30,10 @@ export function createClerkWorkerBindings({issuer,secretKey,transport,now,timeou
       const aborted=new Promise((_,reject)=>{cancel=()=>reject(unavailable());controller.signal.addEventListener("abort",cancel,{once:true});});
       const work=async()=>{
         if(controller.signal.aborted)throw unavailable();
+        // Workers supports manual, not error. Non-200/redirect responses below
+        // fail closed without following Location or forwarding the secret.
         const request=new Request(url,{method:"GET",headers:{accept:"application/json","cache-control":"no-store",...(authenticated?{authorization:"Bearer "+secretKey}:{})},
-          redirect:"error",credentials:"omit",cache:"no-store",signal:controller.signal});
+          redirect:"manual",credentials:"omit",cache:"no-store",signal:controller.signal});
         const response=await transport(request);
         if(controller.signal.aborted){void response.body?.cancel().catch(()=>{});throw unavailable();}
         try{
