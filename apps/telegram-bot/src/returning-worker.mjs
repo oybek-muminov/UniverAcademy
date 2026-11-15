@@ -11,7 +11,7 @@ const errors = Object.freeze({
   NAVIGATION_LOOKUP_UNAVAILABLE: 503, DEPENDENCY_UNAVAILABLE: 503,
 });
 const GREETINGS = Object.freeze({
-  linked: 'Assalomu alaykum! UniverAcademy kabinetiga kirish uchun quyidagi tugmani bosing.',
+  linked: 'Assalomu alaykum! Kabinetingizni chat menyusidagi «Kabinet» tugmasi orqali oching.',
   needs_clerk: 'Assalomu alaykum! UniverAcademy’ga xush kelibsiz.\n\nHisobingiz bo‘lsa kiring, yangi foydalanuvchi bo‘lsangiz ro‘yxatdan o‘ting. Quyidagi tugma kirish oynasini ochadi.',
 });
 function json(value, status = 200) {
@@ -55,11 +55,13 @@ export function createReturningBotWorker() {
       const navigation = await lookupValidatedStart(context, env.TELEGRAM_START_LOOKUP);
       if (navigation.status === 'disabled') return ack(); // Denied: no message/button.
       const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
-      const linked = navigation.status === 'linked';
+      // Linked users use the persistent Menu Button, not another inline button.
+      if (navigation.status === 'linked') return json({method: 'sendMessage',
+        chat_id: context.telegram_user_id, text: GREETINGS.linked});
       return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
         text: GREETINGS[navigation.status], reply_markup: { inline_keyboard: [[{
-          text: linked ? 'Kabinet' : 'Kirish / Ro‘yxatdan o‘tish',
-          web_app: { url: linked ? urls.cabinet : urls.signIn },
+          text: 'Kirish / Ro‘yxatdan o‘tish',
+          web_app: { url: urls.signIn },
         }]] } });
     } catch (error) { return failure(error); }
   } };
