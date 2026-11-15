@@ -38,7 +38,7 @@ function ownBody(request){
   request.signal.addEventListener("abort",close,{once:true});if(request.signal.aborted)close();
   try{
     return {request:new Request(request.url,{method:request.method,headers:request.headers,body,signal:request.signal,
-      redirect:"error",credentials:"omit",cache:"no-store",duplex:"half"}),close};
+      redirect:"manual",credentials:"omit",cache:"no-store",duplex:"half"}),close};
   }catch(error){close();throw error;}
 }
 async function untilAborted(work,signal){
