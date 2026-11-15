@@ -2,5 +2,12 @@
   "name": "univeracademy-bot",
   "main": "src/returning-worker.mjs",
   "compatibility_date": "2026-11-11",
-  "keep_vars": true
+  "keep_vars": true,
+  "services": [
+    {
+      "binding": "TELEGRAM_START_LOOKUP",
+      "service": "univeracademy-api",
+      "entrypoint": "TelegramAccountDirectory"
+    }
+  ]
 }
