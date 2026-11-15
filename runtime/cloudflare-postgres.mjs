@@ -1,3 +1,4 @@
+import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
 import {StorageUnavailable} from "../supabase/functions/univeracademy-api/storage/postgres-transaction.ts";
 import {transactionPoolPort} from "../supabase/functions/univeracademy-api/storage/transaction-pool-port.ts";
 
@@ -11,9 +12,7 @@ function privateOptions(options){
   if(!options||![Object.prototype,null].includes(Object.getPrototypeOf(options)))throw unavailable();
   const keys=Reflect.ownKeys(options),d=Object.getOwnPropertyDescriptor(options,"connectionString");
   if(keys.length!==1||keys[0]!=="connectionString"||!d||!Object.hasOwn(d,"value")||typeof d.value!=="string")throw unavailable();
-  let url;try{url=new URL(d.value);}catch{throw unavailable();}
-  if(!["postgres:","postgresql:"].includes(url.protocol)||!url.hostname||!url.port||
-    !url.username||!url.password||url.pathname.length<2||url.search||url.hash||/\s|\0/.test(d.value))throw unavailable();
+  if(!isHyperdriveConnectionString(d.value))throw unavailable();
   return Object.freeze({connectionString:d.value,connectionTimeoutMillis:5000});
 }
 function noAmbientPg(){
