@@ -4,7 +4,7 @@ type Runtime = ReturnType<typeof createSignInController>;
 type Session = { id: string; status: string; currentTask?: unknown } | null | undefined;
 
 // A widget/cookie/callback session alone never grants application access. This
-// gate binds the explicit existing Continue action to one SDK session context.
+// gate binds automatic entry and the Continue action to one SDK session context.
 export function createPrebuiltSessionGate(runtime: Runtime, session: () => Session) {
   let expected: string | null = null;
   function active() { const value = session(); return value?.status === 'active' && !value.currentTask ? value : null; }
