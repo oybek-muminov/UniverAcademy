@@ -423,7 +423,33 @@ const historicalAttemptsRaw = readTarget('apps/mini-app/tests/fixtures/attempts-
 assert.equal(historicalAttemptsRaw.length, 9616, 'HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH');
 assert.equal(sha256(historicalAttemptsRaw), 'b4bc54e39fef6799b6ff83a4be3c474471afd2e4c76e888767e999064a4d9e20',
   'HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH');
-for (const file of runtime.files) {
+// Explicit selected-file extension. Preserve the frozen historical manifest and
+// validate every replacement preimage before accepting its pinned candidate bytes.
+const overlayRaw = readTarget('apps/mini-app/tests/fixtures/backend-telegram-runtime-overlay-20261115.json');
+assert.equal(sha256(overlayRaw), '839abafe7c733bfc1244d0f65d0440abe3f3da72df5c3b5c3eaf1a3788409d56', 'RUNTIME_OVERLAY_MANIFEST_MISMATCH');
+const overlay = JSON.parse(overlayRaw);
+assert.equal(overlay.base_manifest_sha256, ACTIVE_MANIFEST_SHA256, 'RUNTIME_OVERLAY_BASE_MISMATCH');
+const overlayPaths = [
+  "runtime/clerk-worker-bindings.mjs",
+  "runtime/cloudflare-api.mjs",
+  "runtime/cloudflare-entry.mjs",
+  "runtime/cloudflare-postgres.mjs",
+  "runtime/cloudflare-telegram-directory.mjs",
+  "runtime/hyperdrive-connection-string.mjs",
+  "tests/cloudflare/api-postgres.test.mjs",
+  "tests/cloudflare/clerk-worker-bindings.test.mjs",
+  "tests/cloudflare/entry.test.mjs",
+  "tests/cloudflare/telegram-wiring.test.mjs"
+];
+assert.deepEqual(overlay.files.map(file => file.path), overlayPaths, 'RUNTIME_OVERLAY_PATH_SET_MISMATCH');
+const selected = new Map(runtime.files.map(file => [file.path, file]));
+for (const file of overlay.files) {
+  assert(canonicalPath(file.path), 'RUNTIME_OVERLAY_PATH_MISMATCH');
+  assert.deepEqual(file.preimage, selected.get(file.path) ?? null, 'RUNTIME_OVERLAY_PREIMAGE_MISMATCH: ' + file.path);
+  assert.equal(file.result.path, file.path, 'RUNTIME_OVERLAY_RESULT_PATH_MISMATCH');
+  selected.set(file.path, file.result);
+}
+for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   assert.equal(bytes.length, file.bytes, `BACKEND_TARGET_SIZE_MISMATCH: ${file.path}`);
   assert.equal(sha256(bytes), file.sha256, `BACKEND_TARGET_HASH_MISMATCH: ${file.path}`);
