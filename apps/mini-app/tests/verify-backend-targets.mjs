@@ -653,6 +653,39 @@ for (const file of routeClassification) {
 const routeInventory = {"path": "runtime/contract-paths.mjs", "bytes": 951, "sha256": "d962f6460b39529e2ff2b8b4a630e51d5e747a43811284fa581e6038ddfb0582"};
 assert(!selected.has(routeInventory.path),"ROUTE_INVENTORY_COLLISION");
 selected.set(routeInventory.path,routeInventory);
+// Liveness-only health; no private dependency readiness claim.
+const livenessOnly = [
+  {
+    "path": "runtime/cloudflare-entry.mjs",
+    "preimage": {
+      "path": "runtime/cloudflare-entry.mjs",
+      "bytes": 7092,
+      "sha256": "ad26bb5441020ff2ee599d56bf10d687f63538c5ee4171174f650c8c608f3ea7"
+    },
+    "result": {
+      "path": "runtime/cloudflare-entry.mjs",
+      "bytes": 7403,
+      "sha256": "86fc848067651db8a0ef2aa73a63202b6e61692aad44b3e78efa73681d720a1d"
+    }
+  },
+  {
+    "path": "tests/cloudflare/entry.test.mjs",
+    "preimage": {
+      "path": "tests/cloudflare/entry.test.mjs",
+      "bytes": 21187,
+      "sha256": "438bf18423705e206886249b9d3190ba085c4c0456e1452ef2ab73666d8818d7"
+    },
+    "result": {
+      "path": "tests/cloudflare/entry.test.mjs",
+      "bytes": 22092,
+      "sha256": "4d1f2b21c48b83e1aa66ff17b5ce63229a058026618348a13f87c2799cc4d499"
+    }
+  }
+];
+for (const file of livenessOnly) {
+  assert.deepEqual(selected.get(file.path),file.preimage,"LIVENESS_PREIMAGE_MISMATCH");
+  selected.set(file.path,file.result);
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

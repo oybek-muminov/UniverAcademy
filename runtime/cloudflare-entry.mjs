@@ -82,6 +82,9 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
       publics=publicBindings(env);
       if(new URL(request.url).origin!==publics.apiOrigin)return response("MALFORMED_REQUEST",400);
       return await withPublicCors(async scopedRequest=>{
+        // Liveness only: no private binding, database, provider, version or topology.
+        if(scopedRequest.method==="GET"&&new URL(scopedRequest.url).pathname==="/health")
+          return new Response('{"status":"ok"}',{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
         if(!new URL(scopedRequest.url).pathname.startsWith("/api/v1/"))return response("NOT_FOUND",404);
         if(!registrationRoute(scopedRequest))return isContractPath(new URL(scopedRequest.url).pathname)?response():response("NOT_FOUND",404);
         let clerk,result;

@@ -242,3 +242,15 @@ test("native Hyperdrive local-hop query reaches auth rejection without DB/provid
  await safe(await f.app.fetch(request(),env),401);
  assert.equal(f.clients.length,0);assert.equal(f.calls.length,0);
 });
+
+test("public health reports liveness only without private bindings or external I/O",async()=>{
+  const f=await fixture(),env={UA_API_ORIGIN:api,UA_ALLOWED_ORIGINS:JSON.stringify([ui])};
+  const response=await f.app.fetch(new Request(api+"/health",{headers:{origin:ui}}),env);
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{status:"ok"});
+  assert.equal(response.headers.get("cache-control"),"no-store");
+  assert.equal((await f.app.fetch(new Request(api+"/health"),env)).status,200);
+  assert.equal(f.loads,0);assert.equal(f.clients.length,0);assert.equal(f.clerks.length,0);assert.equal(f.calls.length,0);
+  const hostile=await f.app.fetch(new Request(api+"/health",{headers:{origin:"https://foreign.invalid"}}),env);
+  assert.equal(hostile.status,403);
+  assert.equal((await f.app.fetch(new Request(api+"/health",{method:"POST",headers:{origin:ui}}),env)).status,404);
+});
