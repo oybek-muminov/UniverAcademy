@@ -1,3 +1,4 @@
+import {isContractPath} from "./contract-paths.mjs";
 import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
 import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
 import {checkSessionPolicy} from "../supabase/functions/univeracademy-api/student-state.ts";
@@ -82,7 +83,7 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
       if(new URL(request.url).origin!==publics.apiOrigin)return response("MALFORMED_REQUEST",400);
       return await withPublicCors(async scopedRequest=>{
         if(!new URL(scopedRequest.url).pathname.startsWith("/api/v1/"))return response("NOT_FOUND",404);
-        if(!registrationRoute(scopedRequest))return response();
+        if(!registrationRoute(scopedRequest))return isContractPath(new URL(scopedRequest.url).pathname)?response():response("NOT_FOUND",404);
         let clerk,result;
         try{
           if(scopedRequest.signal.aborted)throw unavailable();

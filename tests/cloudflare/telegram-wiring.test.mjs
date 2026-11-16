@@ -56,7 +56,7 @@ for(const bad of ['absent','getter','wrong type'])test('unrelated accepted route
  const r=await safe(f,await f.entry.fetch(f.request('/me',undefined,{authorization:'Bearer missing'},'GET'),f.env),401);assert.equal(r.error.code,'SESSION_REVOKED');assert.equal(gets,0);assert.equal(f.clients[0].ends,1);
 });
 for(const path of ['/lookupTelegramStart','/auth/telegram','/auth/telegram/lookup','/unknown/auth/telegram/resume'])test('default fetch never exposes private RPC or legacy provisioning '+path,async()=>{
- const f=fixture();await safe(f,await f.entry.fetch(f.request(path,{update_id:1,telegram_user_id:4000000123},{'x-trusted':'true'}),f.env),503);assert.equal(f.loads,0);assert.equal(f.providerCalls,0);assert.equal(f.clerks.length,0);
+ const f=fixture();await safe(f,await f.entry.fetch(f.request(path,{update_id:1,telegram_user_id:4000000123},{'x-trusted':'true'}),f.env),path==='/auth/telegram'?503:404);assert.equal(f.loads,0);assert.equal(f.providerCalls,0);assert.equal(f.clerks.length,0);
 });
 test('wrong Telegram method and denied origin do no private I/O',async()=>{
  const f=fixture();await safe(f,await f.entry.fetch(f.request('/auth/telegram/resume',undefined,{},'GET'),f.env),503);const r=await f.entry.fetch(f.request('/auth/telegram/link',{}, {origin:'https://foreign.invalid'}),f.env);assert.equal(r.status,403);assert.equal(r.headers.get('access-control-allow-origin'),null);assert.equal(f.loads,0);

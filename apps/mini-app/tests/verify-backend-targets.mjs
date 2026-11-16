@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync, statSync, lstatSync } from 'node:fs';
-import { posix, relative, resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
+import { isStrictlyWithin } from './path-containment.mjs';
 import { fileURLToPath } from 'node:url';
 
 // Fixed synchronous selected-file authority; no network, override or fallback.
@@ -413,8 +414,7 @@ export const BACKEND_SOURCE_COMMIT = runtime.source_commit;
 const repo = realpathSync(fileURLToPath(new URL('../../../', import.meta.url)));
 function readTarget(path) {
   const target = resolve(repo, path);
-  const within = relative(repo, realpathSync(target));
-  assert(within !== '..' && !within.startsWith('../') && !posix.isAbsolute(within),
+  assert(isStrictlyWithin(repo, realpathSync(target)),
     `BACKEND_TARGET_PATH_ESCAPE: ${path}`);
   assert(statSync(target).isFile(), `BACKEND_TARGET_NOT_FILE: ${path}`);
   return readFileSync(target);
@@ -604,6 +604,55 @@ const databaseDiagnostic = {
 };
 assert.deepEqual(selected.get(databaseDiagnostic.path), databaseDiagnostic.preimage, "DATABASE_DIAGNOSTIC_PREIMAGE_MISMATCH");
 selected.set(databaseDiagnostic.path, databaseDiagnostic.result);
+// Reviewed unknown-route classification; no known operation is activated.
+const routeClassification = [
+  {
+    "path": "tests/cloudflare/telegram-wiring.test.mjs",
+    "preimage": {
+      "path": "tests/cloudflare/telegram-wiring.test.mjs",
+      "bytes": 20847,
+      "sha256": "cefd57f5fc61bf1ae07cc3db8c956caa45c2aad01dc15752d6f3a8d043ec32a8"
+    },
+    "result": {
+      "path": "tests/cloudflare/telegram-wiring.test.mjs",
+      "bytes": 20875,
+      "sha256": "7b7a6c100d71a0b0ecf73134945e9678483fe9249a581d99b61f0f430b22d63f"
+    }
+  },
+  {
+    "path": "runtime/cloudflare-entry.mjs",
+    "preimage": {
+      "path": "runtime/cloudflare-entry.mjs",
+      "bytes": 6961,
+      "sha256": "67fc2e604657951880224bac6a93f412fd2d4bec56c69ba7055c2dacf7be873d"
+    },
+    "result": {
+      "path": "runtime/cloudflare-entry.mjs",
+      "bytes": 7092,
+      "sha256": "ad26bb5441020ff2ee599d56bf10d687f63538c5ee4171174f650c8c608f3ea7"
+    }
+  },
+  {
+    "path": "tests/cloudflare/entry.test.mjs",
+    "preimage": {
+      "path": "tests/cloudflare/entry.test.mjs",
+      "bytes": 21068,
+      "sha256": "211c5757f0ec2c9e1d7ea5f31b91061e93ca4573518cec9bdf687ddb6889ca85"
+    },
+    "result": {
+      "path": "tests/cloudflare/entry.test.mjs",
+      "bytes": 21187,
+      "sha256": "438bf18423705e206886249b9d3190ba085c4c0456e1452ef2ab73666d8818d7"
+    }
+  }
+];
+for (const file of routeClassification) {
+  assert.deepEqual(selected.get(file.path),file.preimage,"ROUTE_CLASSIFICATION_PREIMAGE_MISMATCH");
+  selected.set(file.path,file.result);
+}
+const routeInventory = {"path": "runtime/contract-paths.mjs", "bytes": 951, "sha256": "d962f6460b39529e2ff2b8b4a630e51d5e747a43811284fa581e6038ddfb0582"};
+assert(!selected.has(routeInventory.path),"ROUTE_INVENTORY_COLLISION");
+selected.set(routeInventory.path,routeInventory);
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

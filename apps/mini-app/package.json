@@ -23,7 +23,7 @@
     "test:clerk-sdk": "node --unhandled-rejections=strict --test tests/clerk-sdk-adapter.test.mjs tests/common-production-runtime.test.mjs",
     "test:clerk-sdk-browser": "node tests/clerk-sdk-browser.mjs",
     "test:clerk-react-browser": "node tests/clerk-react-browser.mjs",
-    "build": "tsc --noEmit && vite build",
+    "build": "node tests/verify-backend-targets.mjs && tsc --noEmit && vite build",
     "build:demo": "tsc --noEmit && vite build --mode demo --outDir dist-demo",
     "test:clerk-prebuilt": "node --unhandled-rejections=strict --test tests/clerk-prebuilt-session.test.mjs",
     "test:clerk-prebuilt-browser": "node tests/clerk-prebuilt-browser.mjs",

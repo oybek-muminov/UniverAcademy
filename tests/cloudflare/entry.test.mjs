@@ -131,7 +131,8 @@ test("CORS, origin, preflight and registration route rejection happen before pri
   const foreign=await f.app.fetch(request("GET","/me",undefined,undefined,undefined,"https://foreign.invalid"),env);assert.equal(foreign.status,403);assert.equal(foreign.headers.get("access-control-allow-origin"),null);
   const forwarded=await f.app.fetch(new Request("https://foreign.invalid/api/v1/me",{headers:{origin:ui,"x-forwarded-host":new URL(api).host}}),env);assert.equal(forwarded.status,400);assert.equal(forwarded.headers.get("access-control-allow-origin"),null);
   const preflight=await f.app.fetch(new Request(api+"/api/v1/exams",{method:"OPTIONS",headers:{origin:ui,"access-control-request-method":"GET","access-control-request-headers":"authorization"}}),env);assert.equal(preflight.status,204);
-  for(const [method,path] of [["POST","/exams"],["PUT","/me"],["GET","/admin/groups"],["POST","/exams/00000000-0000-4000-8000-000000000001/attempts"]])await safe(await f.app.fetch(request(method,path),env));
+  for(const [method,path] of [["POST","/exams"],["PUT","/me"],["POST","/exams/00000000-0000-4000-8000-000000000001/attempts"]])await safe(await f.app.fetch(request(method,path),env));
+  for(const path of ["/unknown","/admin/groups","/me/unknown","/exams/id/unknown"])await safe(await f.app.fetch(request("GET",path),env),404);
   assert.equal(f.loads,0);assert.equal(f.clients.length,0);assert.equal(f.clerks.length,0);assert.equal(f.calls.length,0);
 });
 test("shared body limits and absent authorization reject without DB/provider I/O",async()=>{
