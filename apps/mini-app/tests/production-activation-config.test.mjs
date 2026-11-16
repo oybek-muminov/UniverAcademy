@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { readCommonEntryConfig } from '../src/common-production-runtime.ts';
+import { readClerkProductionAuthSettings } from '../../../supabase/functions/univeracademy-api/clerk-provider.ts';
+import { checkSessionPolicy } from '../../../supabase/functions/univeracademy-api/student-state.ts';
+const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+const api = JSON.parse(read('../../../wrangler.api.registration-only.jsonc').replace(/^\s*\/\/.*$/gm, ''));
+const env = Object.fromEntries(read('../production.env.example').split('\n').filter(x => x && !x.startsWith('#')).map(x => [x.slice(0,x.indexOf('=')),x.slice(x.indexOf('=')+1)]));
+test('public Mini activation inputs pin one same-site production', () => {
+  const mini = readCommonEntryConfig(env, 'https://mini.univeracademy.uz');
+  assert.equal(mini.apiBaseUrl, 'https://api.univeracademy.uz/api/v1');
+  assert.equal(mini.clerkFrontendOrigin, 'https://clerk.univeracademy.uz');
+  assert.equal(mini.telegramEnabled, true);
+  assert.equal(env.VITE_AUTH_ENTRY, 'common');
+  assert.equal(env.VITE_CLERK_SDK_ENABLED, 'true');
+  assert.equal(mini.signInUrl,'https://mini.univeracademy.uz/sign-in');
+  assert.equal(mini.callbackUrl,'https://mini.univeracademy.uz/auth/callback');
+  assert.equal(api.vars.UA_API_ORIGIN, 'https://api.univeracademy.uz');
+  assert.deepEqual(JSON.parse(api.vars.UA_ALLOWED_ORIGINS), [mini.appOrigin]);
+  const clerk = readClerkProductionAuthSettings(api.vars);
+  assert.equal(clerk.issuer, mini.clerkFrontendOrigin);
+  assert.deepEqual(clerk.authorizedParties, [mini.appOrigin]);
+  assert.deepEqual(clerk.audience, {kind:'clerk_default_no_audience'});
+  assert.doesNotThrow(() => checkSessionPolicy(JSON.parse(api.vars.UA_SESSION_POLICY)));
+});
+test('source activation config contains no server secrets, stale mode or retired issuer', () => {
+  assert(!Object.hasOwn(api.vars,'UA_CLERK_SECRET_KEY'));
+  assert(!Object.hasOwn(api.vars,'UA_TELEGRAM_BOT_TOKEN'));
+  assert(!Object.hasOwn(api.vars,'UA_TELEGRAM_START_MODE'));
+  assert.doesNotMatch(JSON.stringify({api,env}), /quick-zebra|clerk\.accounts\.dev|sk_live_[A-Za-z0-9]+/);
+  assert(Object.keys(env).every(k=>k.startsWith('VITE_')));
+});
