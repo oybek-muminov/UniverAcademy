@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/worker.mjs';
-import { lookupPrivateStartNavigation } from '../src/private-start-lookup.mjs';
+import { lookupPrivateStartNavigation, lookupValidatedStart } from '../src/private-start-lookup.mjs';
 
 const SECRET = 'synthetic_private_webhook_secret';
 const env = { TELEGRAM_WEBHOOK_SECRET: SECRET, AUTH_SIGN_IN_URL: 'https://quick-zebra-3590.accounts.dev/sign-in' };
@@ -139,4 +139,114 @@ test('production entry remains the accepted static greeting and cannot acquire a
   assert.equal(body.reply_markup.inline_keyboard[0][0].web_app.url, env.AUTH_SIGN_IN_URL);
   assert.equal('session' in body, false); assert.equal('linked' in body, false);
   assert.deepEqual(reads, ['TELEGRAM_WEBHOOK_SECRET', 'AUTH_SIGN_IN_URL']);
+});
+
+// Ordinary function doubles inherit Function.prototype.call; Workers RPC
+// properties are callable remote paths. This double detects nested method
+// access without claiming to reproduce the actual Workers transport/lifecycle.
+function rpcStyleBinding(respond) {
+  const calls = [], nestedReads = [];
+  const binding = { lookupTelegramStart: new Proxy(function () {}, {
+    get(target, key, receiver) {
+      if (['call', 'apply', 'bind'].includes(key)) {
+        nestedReads.push(key);
+        throw new Error('NESTED_RPC_METHOD_FORBIDDEN');
+      }
+      return Reflect.get(target, key, receiver);
+    },
+    apply(_target, receiver, args) {
+      assert.equal(receiver, binding);
+      calls.push(args);
+      return respond(...args);
+    },
+  }) };
+  return { binding, calls, nestedReads };
+}
+for (const status of ['linked', 'needs_clerk', 'disabled']) {
+  test(`RPC-style ${status} invokes the method directly with one exact argument`, async () => {
+    const h = rpcStyleBinding(async () => ({ status }));
+    assert.deepEqual(await lookupPrivateStartNavigation(request(), env, h.binding), { status });
+    assert.deepEqual(h.calls, [[{ update_id: 1, telegram_user_id: 42 }]]);
+    assert.deepEqual(h.nestedReads, []);
+  });
+}
+test('RPC-style rejection is sanitized after one direct call with no retry or fallback', async () => {
+  const h = rpcStyleBinding(async () => { throw new Error(SECRET); });
+  await assert.rejects(lookupPrivateStartNavigation(request(), env, h.binding),
+    e => e.code === 'NAVIGATION_LOOKUP_UNAVAILABLE' && e.status === 503 && !e.message.includes(SECRET));
+  assert.deepEqual(h.calls, [[{ update_id: 1, telegram_user_id: 42 }]]);
+  assert.deepEqual(h.nestedReads, []);
+});
+test('parallel RPC-style calls retain each validated input and result', async () => {
+  const h = rpcStyleBinding(async input => ({ status: input.update_id === 1 ? 'linked' : 'needs_clerk' }));
+  const second = update({ update_id: 2 });
+  second.message.from.id = 43; second.message.chat.id = 43;
+  assert.deepEqual(await Promise.all([
+    lookupPrivateStartNavigation(request(), env, h.binding),
+    lookupPrivateStartNavigation(request(second), env, h.binding),
+  ]), [{ status: 'linked' }, { status: 'needs_clerk' }]);
+  assert.equal(h.calls.length, 2);
+  assert.deepEqual([...h.calls].sort((a, b) => a[0].update_id - b[0].update_id), [
+    [{ update_id: 1, telegram_user_id: 42 }],
+    [{ update_id: 2, telegram_user_id: 43 }],
+  ]);
+  assert.deepEqual(h.nestedReads, []);
+});
+
+for (const status of ['linked', 'needs_clerk', 'disabled']) {
+  test(`RPC transport disposer permits ${status} and is invoked once`, async () => {
+    let disposed = 0;
+    const reply = { status, [Symbol.dispose]() { assert.equal(this, reply); disposed++; } };
+    const h = rpcStyleBinding(async () => reply);
+    const result = await lookupPrivateStartNavigation(request(), env, h.binding);
+    assert.deepEqual(result, { status });
+    assert.deepEqual(Reflect.ownKeys(result), ['status']);
+    assert.equal(disposed, 1); assert.equal(h.calls.length, 1);
+    assert.deepEqual(h.nestedReads, []);
+  });
+}
+for (const reply of [
+  { status: 'linked', [Symbol.dispose]() {}, extra: true },
+  { status: 'linked', [Symbol.dispose]() {}, [Symbol('extra')]: true },
+  { status: 'linked', [Symbol.dispose]: true },
+  { status: 'linked', get [Symbol.dispose]() { throw new Error(SECRET); } },
+  { status: 'unknown', [Symbol.dispose]() {} },
+]) {
+  test('RPC transport disposer does not permit malformed results or arbitrary keys', async () => {
+    const h = rpcStyleBinding(async () => reply);
+    await assert.rejects(lookupPrivateStartNavigation(request(), env, h.binding),
+      e => e.status === 503 && e.code === 'NAVIGATION_LOOKUP_UNAVAILABLE' && !e.message.includes(SECRET));
+    assert.equal(h.calls.length, 1); assert.deepEqual(h.nestedReads, []);
+  });
+}
+test('RPC disposer failure is sanitized without a second lookup or navigation fallback', async () => {
+  let disposed = 0;
+  const h = rpcStyleBinding(async () => ({ status: 'linked', [Symbol.dispose]() { disposed++; throw new Error(SECRET); } }));
+  await assert.rejects(lookupPrivateStartNavigation(request(), env, h.binding),
+    e => e.status === 503 && e.code === 'NAVIGATION_LOOKUP_UNAVAILABLE' && !e.message.includes(SECRET));
+  assert.equal(disposed, 1); assert.equal(h.calls.length, 1);
+});
+test('RPC cancellation rejection is sanitized and never retried', async () => {
+  const h = rpcStyleBinding(async () => { throw new DOMException(SECRET, 'AbortError'); });
+  await assert.rejects(lookupPrivateStartNavigation(request(), env, h.binding),
+    e => e.status === 503 && e.code === 'NAVIGATION_LOOKUP_UNAVAILABLE' && !e.message.includes(SECRET));
+  assert.equal(h.calls.length, 1); assert.deepEqual(h.nestedReads, []);
+});
+test('RPC deadline clears the timer and ignores a late result without retry', async () => {
+  const originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
+  let fire, resolveLate, entered, lateReads = 0, disposed = 0;
+  const started = new Promise(resolve => { entered = resolve; });
+  const timer = Symbol('lookup timer'), cleared = [];
+  globalThis.setTimeout = (callback, milliseconds) => { assert.equal(milliseconds, 5000); fire = callback; return timer; };
+  globalThis.clearTimeout = value => { cleared.push(value); };
+  try {
+    const h = rpcStyleBinding(() => { entered(); return new Promise(resolve => { resolveLate = resolve; }); });
+    const pending = lookupValidatedStart({ update_id: 1, telegram_user_id: 42 }, h.binding);
+    await started; fire();
+    await assert.rejects(pending, e => e.status === 503 && e.code === 'NAVIGATION_LOOKUP_UNAVAILABLE');
+    assert.deepEqual(cleared, [timer]); assert.equal(h.calls.length, 1);
+    resolveLate({ get status() { lateReads++; return 'linked'; }, [Symbol.dispose]() { disposed++; } });
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(lateReads, 0); assert.equal(disposed, 1); assert.equal(h.calls.length, 1);
+  } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
 });

@@ -232,6 +232,7 @@ test('internal numeric lookup fields are snapshotted once before the asynchronou
 test('new Wrangler entry is explicitly dynamic, with no invented URLs/binding target or implicit deployment', async () => {
   const config = JSON.parse(await readFile(new URL('../wrangler.json', import.meta.url), 'utf8'));
   assert.deepEqual(config, { name: 'univeracademy-bot', main: 'src/returning-worker.mjs',
-    compatibility_date: '2026-11-11', keep_vars: true });
-  assert(!('vars' in config)); assert(!('services' in config));
+    compatibility_date: '2026-11-11', keep_vars: true,
+    services: [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' }] });
+  assert(!('vars' in config));
 });

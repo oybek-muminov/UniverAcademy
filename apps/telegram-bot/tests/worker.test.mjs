@@ -242,7 +242,8 @@ test('actual hanging body is bounded and returns no action', { timeout: 15000 },
 });
 test('legacy greeting remains a fixture; deployment explicitly selects lookup-first entry with no token/storage requirement', async () => {
   const config = JSON.parse(await readFile(new URL('../wrangler.json', import.meta.url), 'utf8'));
-  assert.deepEqual(config, { name: 'univeracademy-bot', main: 'src/returning-worker.mjs', compatibility_date: '2026-11-11', keep_vars: true });
+  assert.deepEqual(config, { name: 'univeracademy-bot', main: 'src/returning-worker.mjs', compatibility_date: '2026-11-11', keep_vars: true,
+    services: [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' }] });
   const source = await readFile(new URL('../src/worker.mjs', import.meta.url), 'utf8');
   assert.ok(source.startsWith('// Stateless launcher; duplicate greetings permitted; delivery unconfirmed; no identity or business state changes.'));
 });
