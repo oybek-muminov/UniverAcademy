@@ -17,6 +17,7 @@ test('production prebuilt uses same-window OAuth and no alternate Telegram sign-
 
 test('known auth failures show only allowlisted static diagnostics; arbitrary errors stay private', async () => {
   for (const [error, expected] of [
+    [new StudentFailure('auth', 'SESSION_REVOKED'), 'SESSION_REVOKED'],
     [new StudentFailure('auth', 'CLERK_TOKEN_INVALID'), 'CLERK_TOKEN_INVALID'],
     [new StudentFailure('temporary', 'SERVICE_UNAVAILABLE'), 'SERVICE_UNAVAILABLE'],
     [new StudentFailure('auth', 'private-arbitrary-value'), 'Tasdiq kelmadi'],

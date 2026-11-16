@@ -44,6 +44,7 @@ const messages: Record<string, string> = {
   PROFILE_MISMATCH: 'Hisob mosligi tasdiqlanmadi. Yangidan kirib ko‘ring.',
   FRESH_LAUNCH_REQUIRED: 'Kirishni yangidan tasdiqlang. Oldingi tasdiq takror yuborilmadi.',
   TELEGRAM_LINK_REQUIRED: 'Qo‘shimcha tasdiqlash kerak. Kirish usulini qayta tanlang.',
+  SESSION_REVOKED: 'Kabinet sessiyasi tugagan. Telegram botida /start orqali yangidan oching (SESSION_REVOKED).',
   CLERK_SESSION_REVOKED: 'Qo‘shimcha tasdiqlash kerak. Kirish usulini qayta tanlang.',
 };
 export function createSignInController(options: {
