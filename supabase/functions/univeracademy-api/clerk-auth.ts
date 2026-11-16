@@ -38,6 +38,11 @@ export function checkClerkProof(proof:ClerkProof,now:number):void{
     !Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(proof.notBefore)||!Number.isSafeInteger(proof.expiresAt)||
     proof.notBefore>now||now>=proof.expiresAt)fail("CLERK_TOKEN_INVALID",401);
 }
+// Fixed server-only categories, never payloads, identities, tokens or raw errors.
+// Observability is non-authoritative: a throwing log sink cannot change denial.
+function verificationDenied(reason:string):void{
+  try{console.warn("UA_CLERK_VERIFICATION_DENIED",reason);}catch{/* retain original authorization result */}
+}
 export function createClerkVerifier(config:ClerkVerifierConfiguration){
   if(!config||!origin(config.issuer)||!Array.isArray(config.authorizedParties)||!config.authorizedParties.length||
       config.authorizedParties.some(p=>!origin(p))||typeof config.trustedKeys!=="function"||typeof config.now!=="function"||
@@ -54,8 +59,21 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
         ...(config.audience.kind==="required"?{audience:config.audience.value}:{}),
         requiredClaims:["iss","sub","sid","iat","nbf","exp","azp","jti","v"],clockTolerance:0,currentDate:new Date(now)});
     }catch(error){
-      if(error instanceof errors.JWKSTimeout||error instanceof errors.JWKSInvalid||error instanceof errors.JWKInvalid)fail("SERVICE_UNAVAILABLE",503);
-      if(error instanceof errors.JOSEError)fail("CLERK_TOKEN_INVALID",401);
+      if(error instanceof errors.JWKSTimeout||error instanceof errors.JWKSInvalid||error instanceof errors.JWKInvalid){
+        verificationDenied("KEY_SERVICE_UNAVAILABLE");fail("SERVICE_UNAVAILABLE",503);
+      }
+      if(error instanceof errors.JOSEError){
+        let reason="JWT_INVALID";
+        if(error instanceof errors.JWTExpired)reason="JWT_EXPIRED";
+        else if(error instanceof errors.JWSSignatureVerificationFailed)reason="SIGNATURE_INVALID";
+        else if(error instanceof errors.JWKSNoMatchingKey)reason="KEY_NO_MATCH";
+        else if(error instanceof errors.JWTClaimValidationFailed){
+          const claims:Record<string,string>={iss:"CLAIM_ISS",sub:"CLAIM_SUB",sid:"CLAIM_SID",iat:"CLAIM_IAT",nbf:"CLAIM_NBF",exp:"CLAIM_EXP",azp:"CLAIM_AZP",jti:"CLAIM_JTI",v:"CLAIM_V",aud:"CLAIM_AUD"};
+          reason=Object.hasOwn(claims,error.claim)?claims[error.claim]:"CLAIM_INVALID";
+        }
+        verificationDenied(reason);fail("CLERK_TOKEN_INVALID",401);
+      }
+      verificationDenied("VERIFIER_UNAVAILABLE");
       fail("SERVICE_UNAVAILABLE",503);
     }
     const p=verified.payload;
@@ -63,7 +81,17 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
        !seconds(p.iat)||!seconds(p.nbf)||!seconds(p.exp)||p.exp<=p.iat||p.nbf>=p.exp||p.iat*1000>now||
        p.v!==2||(config.audience.kind==="clerk_default_no_audience"&&p.aud!==undefined)||
        typeof p.azp!=="string"||!config.authorizedParties.includes(p.azp)||typeof p.jti!=="string"||!p.jti||
-       (p.sts!==undefined&&p.sts!=="active")||p.act!==undefined)fail("CLERK_TOKEN_INVALID",401);
+       (p.sts!==undefined&&p.sts!=="active")||p.act!==undefined){
+      const reason=typeof verified.protectedHeader.kid!=="string"||!verified.protectedHeader.kid?"HEADER_KEY_MISSING"
+        :!user(p.sub)||!session(p.sid)?"IDENTITY_SHAPE"
+        :!seconds(p.iat)||!seconds(p.nbf)||!seconds(p.exp)||p.exp<=p.iat||p.nbf>=p.exp||p.iat*1000>now?"TIMESTAMP_INVALID"
+        :p.v!==2?"VERSION_INVALID"
+        :config.audience.kind==="clerk_default_no_audience"&&p.aud!==undefined?"AUDIENCE_UNEXPECTED"
+        :typeof p.azp!=="string"||!config.authorizedParties.includes(p.azp)?"AUTHORIZED_PARTY_INVALID"
+        :typeof p.jti!=="string"||!p.jti?"TOKEN_ID_INVALID"
+        :p.sts!==undefined&&p.sts!=="active"?"SESSION_STATUS_INVALID":"ACTOR_UNEXPECTED";
+      verificationDenied(reason);fail("CLERK_TOKEN_INVALID",401);
+    }
     // Preserve case-sensitive external IDs. Token/organization roles and emails
     // are deliberately absent from the verified proof and cannot grant authority.
     return Object.freeze({kind:"clerk_verified",issuer:config.issuer,userId:p.sub,sessionId:p.sid,

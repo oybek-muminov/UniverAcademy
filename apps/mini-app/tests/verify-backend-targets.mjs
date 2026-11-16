@@ -512,6 +512,10 @@ for (const file of requestCompatibility) {
   assert.deepEqual(selected.get(file.path), file.preimage, 'REQUEST_COMPATIBILITY_PREIMAGE_MISMATCH');
   selected.set(file.path, file.result);
 }
+// Static verifier diagnostics only; base adfd4ab, public authorization results unchanged.
+const verifierDiagnostic = {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "preimage": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 6833, "sha256": "092ba3179c74b6c96d96d28bc215dc44bca2f5e11026b22598bd82819b4bc527"}, "result": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 8694, "sha256": "eef291f2a3450008c5a23cebd1c5ea0f7bf808c9195af270c229dfc01342fcd6"}};
+assert.deepEqual(selected.get(verifierDiagnostic.path), verifierDiagnostic.preimage, "VERIFIER_DIAGNOSTIC_PREIMAGE_MISMATCH");
+selected.set(verifierDiagnostic.path, verifierDiagnostic.result);
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {
