@@ -37,7 +37,7 @@ test('request resource is inert until first checkout, caps checkout at one, and 
   const closing=r.close();assert.equal(r.close(),closing);await closing;assert.equal(f.clients[0].ends,1);await assert.rejects(r.pool.connect(),denied);
 });
 for(const options of [undefined,{}, {connectionString:''},{connectionString:'postgres://user@host:5432/db'},
-  {connectionString:'postgres://u:p@host/db'},{connectionString:'postgres://u:p@host:5432/db?sslmode=disable'},
+  {connectionString:'postgres://u:p@host/db'},{connectionString:'postgres://u:p@host:5432/db?sslmode=disable&sslmode=disable'},
   {...postgres,ssl:false},{...postgres,Client:()=>{}},{...postgres,connectionTimeoutMillis:0},Object.create(postgres)])
 test('invalid or overridden private PostgreSQL options reject before construction '+JSON.stringify(options),()=>{
   const f=fake();assert.throws(()=>createCloudflarePostgres(f.Client,options),denied);assert.equal(f.clients.length,0);
@@ -258,4 +258,10 @@ test('new modules are factories without listener/global fetch/default deployment
     const source=await readFile(new URL('../../runtime/'+path+'.mjs',import.meta.url),'utf8');
     assert.doesNotMatch(source,/from ["']node:|clerk-sdk-bindings|globalThis\.fetch\s*=|export default|\.listen\(/);
   }
+});
+
+test('native Hyperdrive URL is preserved unchanged at driver boundary',async()=>{
+ const f=fake(),options={connectionString:postgres.connectionString+'?sslmode=disable'},r=createCloudflarePostgres(f.Client,options);
+ assert.equal(f.clients.length,0);const lease=await r.pool.connect();
+ assert.equal(f.clients[0].options.connectionString,options.connectionString);lease.release();await r.close();
 });
