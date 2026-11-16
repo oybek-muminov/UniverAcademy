@@ -513,7 +513,7 @@ for (const file of requestCompatibility) {
   selected.set(file.path, file.result);
 }
 // Static verifier diagnostics only; base adfd4ab, public authorization results unchanged.
-const verifierDiagnostic = {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "preimage": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 6833, "sha256": "092ba3179c74b6c96d96d28bc215dc44bca2f5e11026b22598bd82819b4bc527"}, "result": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 8694, "sha256": "eef291f2a3450008c5a23cebd1c5ea0f7bf808c9195af270c229dfc01342fcd6"}};
+const verifierDiagnostic = {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "preimage": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 6833, "sha256": "092ba3179c74b6c96d96d28bc215dc44bca2f5e11026b22598bd82819b4bc527"}, "result": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 9223, "sha256": "32d302c953ea183b7327c10c2d172ca04c775f33179def1f8917e13741db3469"}};
 assert.deepEqual(selected.get(verifierDiagnostic.path), verifierDiagnostic.preimage, "VERIFIER_DIAGNOSTIC_PREIMAGE_MISMATCH");
 selected.set(verifierDiagnostic.path, verifierDiagnostic.result);
 for (const file of selected.values()) {

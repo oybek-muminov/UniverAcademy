@@ -18,6 +18,16 @@ test('verifier logs fixed rejection categories without changing proof, status or
     await assert.rejects(verify(await f.sign({ claims })), e => e.status === 401 && e.code === 'CLERK_TOKEN_INVALID');
     assert.deepEqual(events.pop(), ['UA_CLERK_VERIFICATION_DENIED', reason]);
   }
+  for (const [claims, reason] of [
+    [{ jti: undefined }, 'CLAIM_JTI_V2'],
+    [{ jti: undefined, v: 1 }, 'CLAIM_JTI_VERSION_OTHER'],
+    [{ jti: undefined, v: '2' }, 'CLAIM_JTI_VERSION_OTHER'],
+    [{ jti: undefined, v: null }, 'CLAIM_JTI_VERSION_OTHER'],
+    [{ jti: undefined, v: undefined }, 'CLAIM_V'],
+  ]) {
+    await assert.rejects(verify(await f.sign({ claims })), e => e.status === 401);
+    assert.deepEqual(events.pop(), ['UA_CLERK_VERIFICATION_DENIED', reason]);
+  }
   const malicious = new errors.JWTClaimValidationFailed('private-error-message', { sub: 'private-person' }, 'private-claim', 'check_failed');
   const bad = createClerkVerifier({ ...f.verifier, trustedKeys: async () => { throw malicious; } });
   await assert.rejects(bad(token), e => e.status === 401);

@@ -70,6 +70,12 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
         else if(error instanceof errors.JWTClaimValidationFailed){
           const claims:Record<string,string>={iss:"CLAIM_ISS",sub:"CLAIM_SUB",sid:"CLAIM_SID",iat:"CLAIM_IAT",nbf:"CLAIM_NBF",exp:"CLAIM_EXP",azp:"CLAIM_AZP",jti:"CLAIM_JTI",v:"CLAIM_V",aud:"CLAIM_AUD"};
           reason=Object.hasOwn(claims,error.claim)?claims[error.claim]:"CLAIM_INVALID";
+          // jwtVerify checks the signature before claim validation. Inspect only the
+          // version discriminator for diagnostics, never accept this payload.
+          if(error.claim==="jti"&&error.reason==="missing"){
+            const version=error.payload&&typeof error.payload==="object"?Object.getOwnPropertyDescriptor(error.payload,"v"):undefined;
+            reason=version&&Object.hasOwn(version,"value")&&version.value===2?"CLAIM_JTI_V2":version?"CLAIM_JTI_VERSION_OTHER":"CLAIM_JTI_VERSION_MISSING";
+          }
         }
         verificationDenied(reason);fail("CLERK_TOKEN_INVALID",401);
       }
