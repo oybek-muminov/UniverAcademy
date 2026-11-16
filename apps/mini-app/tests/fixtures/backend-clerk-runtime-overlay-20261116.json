@@ -1,0 +1,190 @@
+{
+  "format_version": 1,
+  "base_manifest_sha256": "3fa06b7fdd5dcd8b129776a2679ccea98c3aa84807c73902eecb3e1356dc2ce8",
+  "application_base_commit": "e2d310b6a640c858f6f3432c8fad7db8fee3a719",
+  "source_commit": "b1a0481b73864ee6fca5f28cb82cb08d39d0f628",
+  "files": [
+    {
+      "path": "runtime/clerk-worker-bindings.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "runtime/clerk-worker-bindings.mjs",
+        "bytes": 6933,
+        "sha256": "31d44b3103a4fb5426fe113a71c620a25a8367dcaacf15e7ebd9b982ad9ad88c"
+      },
+      "preimage": {
+        "path": "runtime/clerk-worker-bindings.mjs",
+        "bytes": 6933,
+        "sha256": "31d44b3103a4fb5426fe113a71c620a25a8367dcaacf15e7ebd9b982ad9ad88c"
+      },
+      "result": {
+        "path": "runtime/clerk-worker-bindings.mjs",
+        "bytes": 7090,
+        "sha256": "312b04575d075e56fd24abd8af595229ecd313e8bac9f6116979d6a11e18b452"
+      }
+    },
+    {
+      "path": "runtime/cloudflare-api.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "runtime/cloudflare-api.mjs",
+        "bytes": 4957,
+        "sha256": "1cc68417cf8467aca34f5e0d3a3709fe2ddd5310a009c51a1db380f02de8e96a"
+      },
+      "preimage": {
+        "path": "runtime/cloudflare-api.mjs",
+        "bytes": 4957,
+        "sha256": "1cc68417cf8467aca34f5e0d3a3709fe2ddd5310a009c51a1db380f02de8e96a"
+      },
+      "result": {
+        "path": "runtime/cloudflare-api.mjs",
+        "bytes": 4958,
+        "sha256": "d98825f44a16c564f4995bf1a24d4e250d6e5e42ddb437f14a92d28fd0b16567"
+      }
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "runtime/cloudflare-entry.mjs",
+        "bytes": 7075,
+        "sha256": "33e2016b19abe64623b3d9994706895f70158df41e0d9295b50e47d608cd5737"
+      },
+      "preimage": {
+        "path": "runtime/cloudflare-entry.mjs",
+        "bytes": 7075,
+        "sha256": "33e2016b19abe64623b3d9994706895f70158df41e0d9295b50e47d608cd5737"
+      },
+      "result": {
+        "path": "runtime/cloudflare-entry.mjs",
+        "bytes": 6961,
+        "sha256": "67fc2e604657951880224bac6a93f412fd2d4bec56c69ba7055c2dacf7be873d"
+      }
+    },
+    {
+      "path": "runtime/cloudflare-postgres.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "runtime/cloudflare-postgres.mjs",
+        "bytes": 4340,
+        "sha256": "377ecdb75cc2c79654747407ad4644832c71a0c0c5536456b5eeb8ae927a89a8"
+      },
+      "preimage": {
+        "path": "runtime/cloudflare-postgres.mjs",
+        "bytes": 4340,
+        "sha256": "377ecdb75cc2c79654747407ad4644832c71a0c0c5536456b5eeb8ae927a89a8"
+      },
+      "result": {
+        "path": "runtime/cloudflare-postgres.mjs",
+        "bytes": 4215,
+        "sha256": "da9626dd8ee00270b7861205b0f2dc15e9656b7c2b2aafe44491f5f6991506be"
+      }
+    },
+    {
+      "path": "runtime/cloudflare-telegram-directory.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "runtime/cloudflare-telegram-directory.mjs",
+        "bytes": 4719,
+        "sha256": "10cf4faa60c2a2105f1076a56ff5dbcb76d5e08251b08375b298f46c949b416e"
+      },
+      "preimage": {
+        "path": "runtime/cloudflare-telegram-directory.mjs",
+        "bytes": 5689,
+        "sha256": "4541bf6ab3b185defd8042c4cac620b52ae83172f8f64710fac7bc08ddd6df5e"
+      },
+      "result": {
+        "path": "runtime/cloudflare-telegram-directory.mjs",
+        "bytes": 5561,
+        "sha256": "92e5448542df89c77fd07f5493cfb73d0ab5f7624b3d3761a6e03fb5f80a0c75"
+      }
+    },
+    {
+      "path": "runtime/hyperdrive-connection-string.mjs",
+      "mode": "100644",
+      "historical_preimage": null,
+      "preimage": null,
+      "result": {
+        "path": "runtime/hyperdrive-connection-string.mjs",
+        "bytes": 850,
+        "sha256": "3e4c1ad846b520c582b40ad45cf9d39f8c0d88169c141fc70dbe3cca2c0b3c77"
+      }
+    },
+    {
+      "path": "tests/cloudflare/api-postgres.test.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "tests/cloudflare/api-postgres.test.mjs",
+        "bytes": 26817,
+        "sha256": "11f7b05be24daca3e395db2e6ec730f1c246d6e8c947cc4698e8175624be15f5"
+      },
+      "preimage": {
+        "path": "tests/cloudflare/api-postgres.test.mjs",
+        "bytes": 26817,
+        "sha256": "11f7b05be24daca3e395db2e6ec730f1c246d6e8c947cc4698e8175624be15f5"
+      },
+      "result": {
+        "path": "tests/cloudflare/api-postgres.test.mjs",
+        "bytes": 27235,
+        "sha256": "cf40377e78e6f980a93e397e81a57dcd3a7fdda5bc0743bb74e6d117a67dc248"
+      }
+    },
+    {
+      "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+        "bytes": 20727,
+        "sha256": "514687b02f84b0247bd65fade4d62445f4e82e6d87c91d1ed529621423078360"
+      },
+      "preimage": {
+        "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+        "bytes": 20727,
+        "sha256": "514687b02f84b0247bd65fade4d62445f4e82e6d87c91d1ed529621423078360"
+      },
+      "result": {
+        "path": "tests/cloudflare/clerk-worker-bindings.test.mjs",
+        "bytes": 20850,
+        "sha256": "16f58744a7531813a35524468d696439b56ae46f2ba01a6c7e463f617024ec2a"
+      }
+    },
+    {
+      "path": "tests/cloudflare/entry.test.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "tests/cloudflare/entry.test.mjs",
+        "bytes": 20738,
+        "sha256": "a11f5f06a9121b7a2e8c6f79d88ac25a2eecfefc5eefaff4a6be436cd60a39a0"
+      },
+      "preimage": {
+        "path": "tests/cloudflare/entry.test.mjs",
+        "bytes": 20738,
+        "sha256": "a11f5f06a9121b7a2e8c6f79d88ac25a2eecfefc5eefaff4a6be436cd60a39a0"
+      },
+      "result": {
+        "path": "tests/cloudflare/entry.test.mjs",
+        "bytes": 21068,
+        "sha256": "211c5757f0ec2c9e1d7ea5f31b91061e93ca4573518cec9bdf687ddb6889ca85"
+      }
+    },
+    {
+      "path": "tests/cloudflare/telegram-wiring.test.mjs",
+      "mode": "100644",
+      "historical_preimage": {
+        "path": "tests/cloudflare/telegram-wiring.test.mjs",
+        "bytes": 20048,
+        "sha256": "a56f44a0e4d17870a3adb2143ee58d46a85abee5961bfdc65934bca070b145be"
+      },
+      "preimage": {
+        "path": "tests/cloudflare/telegram-wiring.test.mjs",
+        "bytes": 20048,
+        "sha256": "a56f44a0e4d17870a3adb2143ee58d46a85abee5961bfdc65934bca070b145be"
+      },
+      "result": {
+        "path": "tests/cloudflare/telegram-wiring.test.mjs",
+        "bytes": 20847,
+        "sha256": "cefd57f5fc61bf1ae07cc3db8c956caa45c2aad01dc15752d6f3a8d043ec32a8"
+      }
+    }
+  ]
+}

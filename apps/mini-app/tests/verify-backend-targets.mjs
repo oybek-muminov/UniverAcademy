@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync, lstatSync } from 'node:fs';
 import { posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -423,8 +423,54 @@ const historicalAttemptsRaw = readTarget('apps/mini-app/tests/fixtures/attempts-
 assert.equal(historicalAttemptsRaw.length, 9616, 'HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH');
 assert.equal(sha256(historicalAttemptsRaw), 'b4bc54e39fef6799b6ff83a4be3c474471afd2e4c76e888767e999064a4d9e20',
   'HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH');
-for (const file of runtime.files) {
+// Preserve the historical authority. This reviewed extension records both its
+// old pin and the actual main preimage; it never applies a historical patch.
+const CURRENT_RUNTIME_OVERLAY_SHA256 = 'b74bc8cd91daf50660d41b748e605a3e538c746662986bf747072e1151026f92';
+const currentRuntimeRaw = readTarget('apps/mini-app/tests/fixtures/backend-clerk-runtime-overlay-20261116.json');
+assert.equal(sha256(currentRuntimeRaw), CURRENT_RUNTIME_OVERLAY_SHA256, 'CURRENT_RUNTIME_OVERLAY_MISMATCH');
+const currentRuntime = JSON.parse(currentRuntimeRaw);
+assert.deepEqual(Object.keys(currentRuntime), ['format_version', 'base_manifest_sha256', 'application_base_commit', 'source_commit', 'files'], 'CURRENT_RUNTIME_OVERLAY_SHAPE_MISMATCH');
+assert.equal(currentRuntime.format_version, 1, 'CURRENT_RUNTIME_OVERLAY_VERSION_MISMATCH');
+assert.equal(currentRuntime.base_manifest_sha256, ACTIVE_MANIFEST_SHA256, 'CURRENT_RUNTIME_OVERLAY_BASE_MISMATCH');
+assert.equal(currentRuntime.application_base_commit, 'e2d310b6a640c858f6f3432c8fad7db8fee3a719', 'CURRENT_RUNTIME_OVERLAY_MAIN_MISMATCH');
+assert.equal(currentRuntime.source_commit, 'b1a0481b73864ee6fca5f28cb82cb08d39d0f628', 'CURRENT_RUNTIME_OVERLAY_SOURCE_MISMATCH');
+const currentRuntimePaths = [
+  'runtime/clerk-worker-bindings.mjs',
+  'runtime/cloudflare-api.mjs',
+  'runtime/cloudflare-entry.mjs',
+  'runtime/cloudflare-postgres.mjs',
+  'runtime/cloudflare-telegram-directory.mjs',
+  'runtime/hyperdrive-connection-string.mjs',
+  'tests/cloudflare/api-postgres.test.mjs',
+  'tests/cloudflare/clerk-worker-bindings.test.mjs',
+  'tests/cloudflare/entry.test.mjs',
+  'tests/cloudflare/telegram-wiring.test.mjs'
+];
+assert(Array.isArray(currentRuntime.files), 'CURRENT_RUNTIME_OVERLAY_SHAPE_MISMATCH');
+assert.deepEqual(currentRuntime.files.map(file => file.path), currentRuntimePaths, 'CURRENT_RUNTIME_OVERLAY_PATH_SET_MISMATCH');
+const selected = new Map(runtime.files.map(file => [file.path, file]));
+for (const file of currentRuntime.files) {
+  assert.deepEqual(Object.keys(file), ['path', 'mode', 'historical_preimage', 'preimage', 'result'], 'CURRENT_RUNTIME_OVERLAY_SHAPE_MISMATCH');
+  assert(canonicalPath(file.path), 'CURRENT_RUNTIME_OVERLAY_PATH_MISMATCH');
+  assert.equal(file.mode, '100644', 'CURRENT_RUNTIME_OVERLAY_MODE_MISMATCH');
+  assert.deepEqual(file.historical_preimage, selected.get(file.path) ?? null, 'CURRENT_RUNTIME_OVERLAY_HISTORY_MISMATCH: ' + file.path);
+  const mainPreimage = file.path === 'runtime/cloudflare-telegram-directory.mjs'
+    ? { path: file.path, bytes: 5689, sha256: '4541bf6ab3b185defd8042c4cac620b52ae83172f8f64710fac7bc08ddd6df5e' }
+    : file.historical_preimage;
+  assert.deepEqual(file.preimage, mainPreimage, 'CURRENT_RUNTIME_OVERLAY_PREIMAGE_MISMATCH: ' + file.path);
+  assert.deepEqual(Object.keys(file.result), ['path', 'bytes', 'sha256'], 'CURRENT_RUNTIME_OVERLAY_RESULT_SHAPE_MISMATCH');
+  assert.equal(file.result.path, file.path, 'CURRENT_RUNTIME_OVERLAY_RESULT_PATH_MISMATCH');
+  assert(Number.isSafeInteger(file.result.bytes) && file.result.bytes >= 0, 'CURRENT_RUNTIME_OVERLAY_RESULT_SIZE_MISMATCH');
+  assert(typeof file.result.sha256 === 'string' && /^[a-f0-9]{64}$/.test(file.result.sha256), 'CURRENT_RUNTIME_OVERLAY_RESULT_HASH_MISMATCH');
+  selected.set(file.path, file.result);
+}
+assert.equal(selected.size, runtime.files.length + 1, 'CURRENT_RUNTIME_TARGET_COUNT_MISMATCH');
+for (const file of selected.values()) {
   const bytes = readTarget(file.path);
+  if (currentRuntimePaths.includes(file.path)) {
+    const info = lstatSync(resolve(repo, file.path));
+    assert(info.isFile() && (info.mode & 0o111) === 0, 'CURRENT_RUNTIME_MODE_MISMATCH: ' + file.path);
+  }
   assert.equal(bytes.length, file.bytes, `BACKEND_TARGET_SIZE_MISMATCH: ${file.path}`);
   assert.equal(sha256(bytes), file.sha256, `BACKEND_TARGET_HASH_MISMATCH: ${file.path}`);
 }

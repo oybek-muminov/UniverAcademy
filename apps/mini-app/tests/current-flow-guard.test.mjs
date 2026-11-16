@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, lstatSync, symlinkSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, lstatSync, symlinkSync, mkdirSync, mkdtempSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
 const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
+const currentRuntime = 'apps/mini-app/tests/fixtures/backend-clerk-runtime-overlay-20261116.json';
 const previousContentBase = 'apps/mini-app/tests/fixtures/backend-accepted-fixtures-14f0b074-manifest.json';
 const previousAssembly = 'apps/mini-app/tests/fixtures/backend-telegram-return-assembly-manifest.json';
 const previousClean = 'apps/mini-app/tests/fixtures/backend-d54d19c-clean-manifest.json';
@@ -26,6 +27,9 @@ assert.equal(previousAssemblyRaw.length, 25929);
 assert.equal(sha(previousAssemblyRaw), '6bba769c22d8fbe2463957542f66b17f6b879586c614a13fdd93b92fb40ec882');
 
 const manifest = JSON.parse(readFileSync(join(source, current), 'utf8'));
+const currentRuntimeRaw = readFileSync(join(source, currentRuntime));
+assert.equal(sha(currentRuntimeRaw), 'b74bc8cd91daf50660d41b748e605a3e538c746662986bf747072e1151026f92');
+const currentRuntimeManifest = JSON.parse(currentRuntimeRaw);
 const previousCleanRaw = readFileSync(join(source, previousClean));
 assert.equal(previousCleanRaw.length, 19964);
 assert.equal(sha(previousCleanRaw), 'e3a6e0c368b957cd243fe9b2dedc7786d34d451d76737cd8542fbb6b198d0fd4');
@@ -33,7 +37,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts]]);
+const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -41,12 +45,12 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, current, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
       const bytes = readFileSync(join(source, name));
-      before.set(name, sha(bytes)); writeFileSync(path, bytes);
+      writeFileSync(path, bytes); before.set(name, { hash: sha(bytes), executable: lstatSync(path).mode & 0o111 });
     }
     mutate?.(root);
     if (rebindDigest) {
@@ -55,7 +59,8 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
       writeFileSync(join(root, guard), original.replace(literal, "const ACTIVE_MANIFEST_SHA256 = '" + sha(readFileSync(join(root, current))) + "';"));
     }
     const changed = inputs.filter(name => !existsSync(join(root, name)) || lstatSync(join(root, name)).isSymbolicLink() ||
-      sha(readFileSync(join(root, name))) !== before.get(name));
+      sha(readFileSync(join(root, name))) !== before.get(name).hash ||
+      (lstatSync(join(root, name)).mode & 0o111) !== before.get(name).executable);
     assert.equal(changed.length, rebindDigest ? 2 : expected ? 1 : 0, 'CONTROL_MUST_CHANGE_ONLY_ITS_DELIBERATE_TARGET');
     const result = spawnSync(process.execPath, [guard], { cwd: root, encoding: 'utf8' });
     assert.equal(result.status, expected ? 1 : 0, result.stderr);
@@ -64,7 +69,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
       const suffix = expected.split(': ')[1];
       const target = rebindDigest ? current : expected === 'ENOENT' ? changed[0] :
         expected.startsWith('OWNER_CLIENT_') ? 'apps/mini-app/src/owner-client/' + suffix :
-        expected.startsWith('BACKEND_TARGET_') ? suffix : manifestErrors.get(expected);
+        expected.startsWith('BACKEND_TARGET_') || expected.startsWith('CURRENT_RUNTIME_MODE_') ? suffix : manifestErrors.get(expected);
       assert.deepEqual(changed.slice().sort(), rebindDigest ? [guard, target].sort() : [target], 'DIAGNOSTIC_MUST_IDENTIFY_THE_DELIBERATE_TARGET');
       if (rebindDigest) assert(!result.stderr.includes('AssertionError [ERR_ASSERTION]: RUNTIME_MANIFEST_MISMATCH'), 'METADATA_PROBE_MUST_REACH_VALIDATION');
       if (expected === 'ENOENT') assert(result.stderr.includes(target), result.stderr);
@@ -521,3 +526,38 @@ const listenerCases=[
 for(const part of ['preimage','result'])for(const key of ['mode','bytes','sha256'])
  listenerCases.push([part+' '+key,v=>{const x=v.content_overlays[1][part];x[key]=key==='mode'?'100755':key==='bytes'?x.bytes-1:'0'.repeat(64);},key==='mode'?'MODE':part.toUpperCase()]);
 for(const [label,mutate,code] of listenerCases)test('listener content metadata rejects '+label,()=>check(root=>mutateCurrentManifest(root,mutate),'CONTENT_OVERLAY_'+code+'_MISMATCH',{rebindDigest:true}));
+
+test('Clerk runtime overlay distinguishes frozen directory history from actual main preimage', () => {
+  const directory = currentRuntimeManifest.files.find(file => file.path === 'runtime/cloudflare-telegram-directory.mjs');
+  assert.equal(directory.historical_preimage.bytes, 4719);
+  assert.equal(directory.historical_preimage.sha256, '10cf4faa60c2a2105f1076a56ff5dbcb76d5e08251b08375b298f46c949b416e');
+  assert.deepEqual(directory.preimage, { path: directory.path, bytes: 5689,
+    sha256: '4541bf6ab3b185defd8042c4cac620b52ae83172f8f64710fac7bc08ddd6df5e' });
+  assert.equal(directory.result.bytes, 5561);
+  const helper = currentRuntimeManifest.files.find(file => file.path === 'runtime/hyperdrive-connection-string.mjs');
+  assert.equal(helper.preimage, null);
+  assert.equal(helper.historical_preimage, null);
+  assert.equal(helper.result.bytes, 850);
+});
+test('current runtime overlay is required in the scratch harness', () => check(root => {
+  rmSync(join(root, currentRuntime));
+}, 'ENOENT'));
+test('current runtime overlay tampering fails closed', () => check(root => {
+  appendFileSync(join(root, currentRuntime), '\n');
+}, 'CURRENT_RUNTIME_OVERLAY_MISMATCH'));
+for (const file of currentRuntimeManifest.files) test('current runtime exact hash remains required: ' + file.path, () => check(root => {
+  const path = join(root, file.path), bytes = readFileSync(path); bytes[0] ^= 1; writeFileSync(path, bytes);
+}, 'BACKEND_TARGET_HASH_MISMATCH: ' + file.path));
+const requiredHelper = 'runtime/hyperdrive-connection-string.mjs';
+test('required Hyperdrive helper cannot be omitted', () => check(root => {
+  rmSync(join(root, requiredHelper));
+}, 'ENOENT'));
+test('required Hyperdrive helper size is pinned', () => check(root => {
+  appendFileSync(join(root, requiredHelper), '\n');
+}, 'BACKEND_TARGET_SIZE_MISMATCH: ' + requiredHelper));
+test('required Hyperdrive helper Git executable bit is rejected', () => check(root => {
+  chmodSync(join(root, requiredHelper), 0o755);
+}, 'CURRENT_RUNTIME_MODE_MISMATCH: ' + requiredHelper));
+test('required Hyperdrive helper cannot escape the scratch root through a symlink', () => check(root => {
+  rmSync(join(root, requiredHelper)); symlinkSync(join(source, requiredHelper), join(root, requiredHelper));
+}, 'BACKEND_TARGET_PATH_ESCAPE: ' + requiredHelper));

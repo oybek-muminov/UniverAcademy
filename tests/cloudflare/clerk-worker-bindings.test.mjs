@@ -20,7 +20,7 @@ test('construction is inert, uses only injected Web transport, and returns requi
   assert.deepEqual(await f.bindings.getSession(sid),{id:sid,userId:uid,status:'active',expireAt:now+60000,abandonAt:now+30000,actor:null});
   assert.deepEqual(await f.bindings.getUser(uid),{...user(),firstName:null,lastName:null});assert.equal(globalThis.fetch,native);
   assert.deepEqual(f.requests.map(r=>r.url),['https://api.clerk.com/v1/sessions/'+sid,'https://api.clerk.com/v1/users/'+uid]);
-  for(const r of f.requests){assert.equal(r.method,'GET');assert.equal(r.redirect,'error');assert.equal(r.credentials,'omit');assert.equal(r.cache,'no-store');assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(r.headers.get('authorization'),'Bearer '+secretKey);assert.equal(r.headers.get('cookie'),null);}
+  for(const r of f.requests){assert.equal(r.method,'GET');assert.equal(r.redirect,'manual');assert.equal(r.credentials,'omit');assert.equal(r.cache,'no-store');assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(r.headers.get('authorization'),'Bearer '+secretKey);assert.equal(r.headers.get('cookie'),null);}
   f.bindings.close();
 });
 for(const change of [{issuer:'http://clerk.invalid'},{issuer:issuer+'/'},{secretKey:''},{secretKey:'bad\nsecret'},
@@ -55,7 +55,7 @@ for(const status of [404,401,429,500])test('provider status '+status+' is saniti
   try{await assert.rejects(f.bindings.getSession(sid),e=>e.status===(status===404?404:503)&&!e.message.includes('must-not-echo'));assert.equal(f.requests.length,1);}finally{f.bindings.close();}
 });
 for(const [label,respond]of [
-  ['redirect',()=>new Response(null,{status:302,headers:{location:'https://other.invalid'}})],
+  ...[301,302,303,307,308].map(status=>['redirect '+status,()=>new Response(null,{status,headers:{location:'https://other.invalid'}})]),
   ['foreign URL',()=>{const r=json(session());Object.defineProperty(r,'url',{value:'https://other.invalid'});return r;}],
   ['MIME',()=>new Response('{}',{headers:{'content-type':'text/plain'}})],
   ['broken JSON',()=>new Response('{',{headers:{'content-type':'application/json'}})],
@@ -65,7 +65,7 @@ for(const [label,respond]of [
   ['actual limit',()=>json({...session(),extra:'x'.repeat(70000)})],
   ['transport exception',()=>{throw Error('must-not-echo-private-provider');}],
 ])test(label+' denies before model authorization',async()=>{
-  const f=fixture({respond});try{await assert.rejects(f.bindings.getSession(sid),denied);}finally{f.bindings.close();}
+  const f=fixture({respond});try{await assert.rejects(f.bindings.getSession(sid),denied);assert.equal(f.requests.length,1);assert.equal(f.requests[0].redirect,'manual');}finally{f.bindings.close();}
 });
 test('rejected response headers and over-limit streams dispose their body, without continuing reads',async()=>{
   for(const badHeader of [true,false]){
