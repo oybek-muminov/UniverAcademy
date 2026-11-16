@@ -15,7 +15,7 @@ try {
     const values = { VITE_MINI_APP_ORIGIN: 'https://app.invalid', VITE_API_ORIGIN: 'https://api.example.test',
       VITE_STUDENT_CONTRACT_SHA256: STUDENT_CONTRACT_SHA256,
       VITE_TELEGRAM_SDK_ENABLED: 'true', VITE_AUTH_ENTRY: common ? 'common' : '',
-      VITE_CLERK_PUBLISHABLE_KEY: '', VITE_CLERK_FRONTEND_ORIGIN: '' };
+      VITE_CLERK_SDK_ENABLED: '', VITE_CLERK_PUBLISHABLE_KEY: '', VITE_CLERK_FRONTEND_ORIGIN: '' };
     const saved = Object.fromEntries(Object.keys(values).map(k => [k, process.env[k]]));
     const builds = [];
     try {

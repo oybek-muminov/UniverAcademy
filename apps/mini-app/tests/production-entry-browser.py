@@ -111,43 +111,11 @@ with sync_playwright() as p:
                 if route.request.url == 'https://telegram.org/js/telegram-web-app.js?64' and spec['configured']:
                     assert 'referer' not in route.request.all_headers()
                     sdk.append(True)
-                    # Fake SDK surface; no real SDK bytes, bot or launch are used.
-                    route.fulfill(content_type='application/javascript', body='''
-window.syntheticSdkReadyCalls = 0;
-window.Telegram = { WebApp: { initData: 'synthetic-built-main-launch', ready() { window.syntheticSdkReadyCalls++; },
-get initDataUnsafe() { throw new Error('UNSAFE_IDENTITY_READ'); } } };
-''')
-                elif target.scheme == 'https' and target.netloc == 'api.example.test' and spec['configured']:
-                    method, path = route.request.method, target.path
-                    api.append({'method': method, 'path': path, 'auth': 'authorization' in route.request.headers})
-                    if method == 'OPTIONS':
-                        route.fulfill(status=204, headers={'access-control-allow-origin': 'https://app.invalid',
-                            'access-control-allow-methods': 'GET,POST,PATCH,PUT',
-                            'access-control-allow-headers': 'Authorization,Content-Type,Idempotency-Key'})
-                        return
-                    profile = {'person_id': '00000000-0000-4000-8000-000000000008', 'first_name': 'Suniy',
-                        'last_name': 'Main', 'roles': ['student'], 'registration_complete': True,
-                        'active_group_id': None, 'qadam_id': '0000000001'}
-                    if path == '/api/v1/auth/telegram':
-                        assert not api[-1]['auth']
-                        assert route.request.post_data_json == {'init_data': 'synthetic-built-main-launch'}
-                        from datetime import datetime, timezone, timedelta
-                        value = {'token_type': 'Bearer', 'access_token': 'synthetic-built-access',
-                            'refresh_token': 'synthetic-built-refresh', 'profile': profile,
-                            'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat(),
-                            'refresh_expires_at': (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()}
-                    elif path == '/api/v1/me':
-                        assert api[-1]['auth']; value = profile
-                    elif path == '/api/v1/exams':
-                        assert api[-1]['auth']; value = []
-                    elif path == '/api/v1/auth/logout':
-                        assert not api[-1]['auth']
-                        assert route.request.post_data_json == {'refresh_token': 'synthetic-built-refresh'}
-                        value = {'ok': True}
-                    else:
-                        raise AssertionError('UNEXPECTED_BUILT_MAIN_API_REQUEST')
-                    route.fulfill(status=200, content_type='application/json', body=json.dumps({'data': value}),
-                        headers={'access-control-allow-origin': 'https://app.invalid'})
+                    # A closed auth entry must never read a Telegram identity.
+                    route.fulfill(content_type='application/javascript', body='')
+                elif target.scheme == 'https' and target.netloc == 'api.example.test':
+                    api.append({'method': route.request.method, 'path': target.path})
+                    route.abort()
                 elif target.scheme == 'https' and target.netloc == 'app.invalid':
                     response = route.fetch(url=spec['baseUrl'] + target.path, timeout=5000)
                     route.fulfill(response=response)
@@ -155,22 +123,16 @@ get initDataUnsafe() { throw new Error('UNSAFE_IDENTITY_READ'); } } };
                     blocked.append(route.request.url); route.abort()
             page.route('**/*', built_route)
             page.goto('https://app.invalid' + spec.get('path', '/'))
-            if spec['configured']:
-                expect(page.get_by_role('heading', name='Hozircha test yo‘q', exact=True)).to_be_visible()
-                assert page.evaluate('syntheticSdkReadyCalls') == 1
-                assert [call['path'] for call in api if call['method'] != 'OPTIONS'] == [
-                    '/api/v1/auth/telegram', '/api/v1/me', '/api/v1/exams']
-                page.get_by_role('button', name='Chiqish', exact=True).click()
-                expect(page.get_by_text('Server sessiya yopilganini tasdiqladi.', exact=False)).to_be_visible()
-            else:
-                expect(page.get_by_text('Kabinetga ulanish hali tayyor emas.', exact=False)).to_be_visible()
-                assert not api
+            # Neither blank auth selection nor incomplete Clerk configuration
+            # may fall back to the old Telegram-only authentication endpoint.
+            expect(page.get_by_text('Kabinetga ulanish hali tayyor emas.', exact=False)).to_be_visible()
+            assert not api
             assert page.locator('.demo-tools,.demo-badge,.student-line').count() == 0
             assert len(sdk) == (1 if spec['configured'] else 0)
             assert not blocked and not errors, (blocked, errors)
-            results.append({'scenario': ('common-optional-telegram-owner-login-logout' if spec.get('common') else 'configured-main-production-owner-login-logout')
-                if spec['configured'] else ('common-empty-config-no-sdk' if spec.get('common') else 'empty-config-default-main'),
-                'status': 'PASS', 'syntheticSdkLoads': len(sdk), 'interceptedApiRequests': len(api), 'externalApiRequests': 0})
+            results.append({'scenario': ('common-incomplete-clerk-config-closed' if spec.get('common') else 'missing-auth-selection-closed'),
+                'configuredTelegramSdk': spec['configured'], 'status': 'PASS',
+                'syntheticSdkLoads': len(sdk), 'interceptedApiRequests': len(api), 'externalApiRequests': 0})
             context.close()
     finally:
         browser.close()

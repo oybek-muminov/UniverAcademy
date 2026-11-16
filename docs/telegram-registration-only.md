@@ -18,7 +18,9 @@ enforce its policies.
   identity/session write. It needs no database binding or secret.
 - `wrangler.api.registration-only.jsonc` is a candidate configuration for
   `univeracademy-api`. Public workers.dev and preview URLs are disabled. No
-  routes are declared. The public API is deliberately not configured.
+  public auth settings are supplied by this historical candidate. The current
+  production transition adds api.univeracademy.uz as an explicit custom domain;
+  routing does not supply the missing full API settings or secrets.
 - After separately approved deployment, the bot must bind
   `TELEGRAM_START_LOOKUP` to service `univeracademy-api`, named entrypoint
   `TelegramAccountDirectory`. Binding to `default` is incorrect.
@@ -31,8 +33,11 @@ No upload, deployment, binding change or database change is authorized by this
 document. Obtain approval for the exact target and content before publishing.
 Verify the Cloudflare account and current Worker state first. Do not deploy this
 candidate over a functioning full API: its public API/database settings are
-deliberately absent and `keep_vars` is false. Secrets, if any, require a separate
-inventory; do not assume `keep_vars` clears them.
+deliberately absent. The production transition now sets `keep_vars` to true
+to preserve separately reviewed dashboard variables on main auto-deploys.
+The explicit Hyperdrive binding is retained. This does not configure the full
+API, preserve omitted resource bindings, or create any missing secrets. Secrets
+require a separate name/type inventory; do not assume `keep_vars` clears them.
 
 Use reviewed pinned Wrangler 4.160.1 tooling for packaging, not an unpinned npx
 download. The main branch does not yet contain that tooling package.

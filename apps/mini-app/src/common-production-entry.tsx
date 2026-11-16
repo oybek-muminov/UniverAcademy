@@ -5,8 +5,6 @@ import { ClerkProvider, ClerkLoaded, ClerkLoading, ClerkFailed, HandleSSOCallbac
 import { PrebuiltReadyEntry } from './clerk-prebuilt-entry.tsx';
 import { readCommonEntryConfig } from './common-production-runtime.ts';
 import type { CommonEntryConfig } from './common-production-runtime.ts';
-import { mountTelegramEntry } from './production-entry.tsx';
-import { createProductionConnection } from './production-connection.ts';
 
 function Status({ text }: { text: string }) {
   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1><p role="status">{text}</p></section></main>;
@@ -65,8 +63,8 @@ export function CommonClerkEntry({ config, scope }: { config: CommonEntryConfig;
 export function mountCommonProductionEntry(element: HTMLElement, options: {
   env: Readonly<Record<string, unknown>>; pageOrigin: string; scope: unknown;
 }) {
-  if (location.pathname === '/telegram' && options.env.VITE_TELEGRAM_SDK_ENABLED === 'true')
-    return mountTelegramEntry(element, { ...options, createConnection: createProductionConnection });
+  // Clerk-first production has no Telegram-only login route. Signed launch
+  // data is used only by the reviewed Clerk linking/resume flow below.
   // Configuration is checked before any SDK component or script is loaded.
   let config: CommonEntryConfig;
   try { config = readCommonEntryConfig(options.env, options.pageOrigin); }

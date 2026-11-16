@@ -49,7 +49,9 @@ Use apps/mini-app as build root, Node 24.x and its unchanged package lock.
 The existing npm run build command is tsc --noEmit && vite build; output is dist.
 The assets-only wrangler.jsonc proposal names univeracademy-mini, serves ./dist,
 uses single-page-application fallback, workers_dev=true and preview_urls=false.
-It contains no Worker script, account/route, API binding, credential or auth rule.
+It contains no Worker script, API binding, credential or auth rule. The reviewed
+production transition pins the custom domain mini.univeracademy.uz in routes;
+workers.dev remains enabled. Host routing alone does not establish readiness.
 SPA navigation must serve /, /sign-in and /auth/callback; it does not authenticate.
 
 Clerk entry requires VITE_AUTH_ENTRY=common and VITE_CLERK_SDK_ENABLED=true.
@@ -60,9 +62,10 @@ VITE_MINI_APP_ORIGIN, VITE_API_ORIGIN, VITE_CLERK_PUBLISHABLE_KEY and
 VITE_CLERK_FRONTEND_ORIGIN must come from the final verified deployment/instance.
 These Vite values are public build-time inputs, not Worker runtime secrets.
 
-https://app.univeracademy.uz and https://api.univeracademy.uz remain proposed
-origins, not verified serving endpoints. No Production Clerk instance is ready.
-Do not infer a valid key, Frontend API origin or JWT issuer from a domain name;
+The production transition targets https://mini.univeracademy.uz and
+https://api.univeracademy.uz. Clerk production domain/DNS/SSL have been separately
+verified; the API secrets, deployment configuration and real Telegram acceptance
+remain distinct gates. Do not infer a key or JWT issuer merely from a domain name;
 retired quick-zebra values must not be reused. Pin key/host/issuer, callback,
 CORS/authorizedParties and explicit audience policy to one real instance.
 
