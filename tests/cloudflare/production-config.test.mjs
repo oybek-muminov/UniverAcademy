@@ -1,0 +1,28 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { readClerkProductionAuthSettings } from '../../supabase/functions/univeracademy-api/clerk-provider.ts';
+import { checkSessionPolicy } from '../../supabase/functions/univeracademy-api/student-state.ts';
+const raw = readFileSync(new URL('../../wrangler.api.registration-only.jsonc',import.meta.url),'utf8');
+const config = JSON.parse(raw.replace(/^\s*\/\/.*$/gm,''));
+test('API production configuration pins exact origins and supported policy shapes', () => {
+  assert.equal(config.vars.UA_API_ORIGIN,'https://api.univeracademy.uz');
+  assert.deepEqual(JSON.parse(config.vars.UA_ALLOWED_ORIGINS),['https://mini.univeracademy.uz']);
+  const clerk=readClerkProductionAuthSettings(config.vars);
+  assert.equal(clerk.issuer,'https://clerk.univeracademy.uz');
+  assert.deepEqual(clerk.authorizedParties,['https://mini.univeracademy.uz']);
+  assert.deepEqual(clerk.audience,{kind:'clerk_default_no_audience'});
+  const session=JSON.parse(config.vars.UA_SESSION_POLICY);
+  assert.doesNotThrow(()=>checkSessionPolicy(session));
+  assert.equal(session.newLogin,'revoke_previous');
+  assert.equal(session.initDataMaxAgeSeconds,300);
+  assert.equal(session.futureSkewSeconds,0);
+});
+test('API source configuration never provides private secrets or stale temporary mode', () => {
+  assert.deepEqual(Object.keys(config.vars).sort(),['UA_ALLOWED_ORIGINS','UA_API_ORIGIN','UA_CLERK_PROVIDER_SETTINGS','UA_SESSION_POLICY','UA_TELEGRAM_LOOKUP_TIMEOUT_MS']);
+  assert.equal(config.keep_vars,true);
+  assert.equal(config.workers_dev,false);
+  assert.equal(config.preview_urls,false);
+  assert.deepEqual(config.hyperdrive,[{binding:'HYPERDRIVE',id:'075d873d9cdd4ad48a027b5e5a6f7acf'}]);
+  assert.doesNotMatch(raw,/quick-zebra|clerk\.accounts\.dev|sk_live_[A-Za-z0-9]+/);
+});

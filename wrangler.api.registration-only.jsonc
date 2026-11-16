@@ -14,12 +14,19 @@
   "hyperdrive": [
     {"binding": "HYPERDRIVE", "id": "075d873d9cdd4ad48a027b5e5a6f7acf"}
   ],
-  "vars": {"UA_TELEGRAM_LOOKUP_TIMEOUT_MS": "3000"}
+  "vars": {
+    "UA_API_ORIGIN": "https://api.univeracademy.uz",
+    "UA_ALLOWED_ORIGINS": "[\"https://mini.univeracademy.uz\"]",
+    "UA_SESSION_POLICY": "{\"initDataMaxAgeSeconds\":300,\"futureSkewSeconds\":0,\"accessTtlMs\":900000,\"familyTtlMs\":86400000,\"logoutTombstoneMs\":86400000,\"identityCollisionAttempts\":4,\"newLogin\":\"revoke_previous\"}",
+    "UA_CLERK_PROVIDER_SETTINGS": "{\"issuer\":\"https://clerk.univeracademy.uz\",\"authorizedParties\":[\"https://mini.univeracademy.uz\"],\"audience\":{\"kind\":\"clerk_default_no_audience\"},\"jwksCacheMs\":60000,\"jwksCooldownMs\":5000,\"timeoutMs\":3000,\"maxJwksBytes\":65536}",
+    "UA_TELEGRAM_LOOKUP_TIMEOUT_MS": "3000"
+  }
   // Existing production build target. Reuses the existing Hyperdrive resource.
   // Preserve separately reviewed dashboard vars during main auto-deploys.
   // keep_vars does not replace explicit resource bindings or provision secrets.
   // Omitting UA_TELEGRAM_START_MODE selects the reviewed database default.
-  // Full Clerk HTTP configuration and activation remain separate gates.
+  // Public Clerk-first settings are pinned; secrets remain platform-only.
+  // Publication requires independently reviewed activation and real-account gates.
   // Bot service binding: TELEGRAM_START_LOOKUP -> univeracademy-api,
   // named entrypoint TelegramAccountDirectory (not default).
 }

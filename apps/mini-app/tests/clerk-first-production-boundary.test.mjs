@@ -32,7 +32,8 @@ test('main deploy preserves reviewed vars and explicit API/bot resource bindings
   assert.equal(api.keep_vars, true);
   assert.equal(api.name, 'univeracademy-api');
   assert.deepEqual(api.hyperdrive, [{ binding: 'HYPERDRIVE', id: '075d873d9cdd4ad48a027b5e5a6f7acf' }]);
-  assert.deepEqual(api.vars, { UA_TELEGRAM_LOOKUP_TIMEOUT_MS: '3000' });
+  assert.deepEqual(Object.keys(api.vars).sort(), ['UA_ALLOWED_ORIGINS', 'UA_API_ORIGIN', 'UA_CLERK_PROVIDER_SETTINGS', 'UA_SESSION_POLICY', 'UA_TELEGRAM_LOOKUP_TIMEOUT_MS']);
+  assert.equal(api.vars.UA_TELEGRAM_LOOKUP_TIMEOUT_MS, '3000');
   assert.equal(api.workers_dev, false);
   assert.equal(api.preview_urls, false);
   assert.deepEqual(api.routes, [{ pattern: 'api.univeracademy.uz', custom_domain: true }]);

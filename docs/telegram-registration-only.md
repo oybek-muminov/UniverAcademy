@@ -17,10 +17,10 @@ enforce its policies.
 - This mode performs no Hyperdrive access, PostgreSQL query, Clerk request, or
   identity/session write. It needs no database binding or secret.
 - `wrangler.api.registration-only.jsonc` is a candidate configuration for
-  `univeracademy-api`. Public workers.dev and preview URLs are disabled. No
-  public auth settings are supplied by this historical candidate. The current
-  production transition adds api.univeracademy.uz as an explicit custom domain;
-  routing does not supply the missing full API settings or secrets.
+  `univeracademy-api`. Public workers.dev and preview URLs are disabled. The current
+  production transition retains this build-target filename while pinning
+  api.univeracademy.uz and explicit Clerk-first public settings. No temporary
+  start mode is set. Private secrets and real-account acceptance remain gates.
 - After separately approved deployment, the bot must bind
   `TELEGRAM_START_LOOKUP` to service `univeracademy-api`, named entrypoint
   `TelegramAccountDirectory`. Binding to `default` is incorrect.
@@ -32,8 +32,8 @@ enforce its policies.
 No upload, deployment, binding change or database change is authorized by this
 document. Obtain approval for the exact target and content before publishing.
 Verify the Cloudflare account and current Worker state first. Do not deploy this
-candidate over a functioning full API: its public API/database settings are
-deliberately absent. The production transition now sets `keep_vars` to true
+candidate over a functioning full API without comparing its pinned public
+settings and explicit resource bindings to the deployed inventory. The production transition now sets `keep_vars` to true
 to preserve separately reviewed dashboard variables on main auto-deploys.
 The explicit Hyperdrive binding is retained. This does not configure the full
 API, preserve omitted resource bindings, or create any missing secrets. Secrets
