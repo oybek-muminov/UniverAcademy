@@ -19,10 +19,9 @@ test('verifier logs fixed rejection categories without changing proof, status or
     assert.deepEqual(events.pop(), ['UA_CLERK_VERIFICATION_DENIED', reason]);
   }
   for (const [claims, reason] of [
-    [{ jti: undefined }, 'CLAIM_JTI_V2'],
-    [{ jti: undefined, v: 1 }, 'CLAIM_JTI_VERSION_OTHER'],
-    [{ jti: undefined, v: '2' }, 'CLAIM_JTI_VERSION_OTHER'],
-    [{ jti: undefined, v: null }, 'CLAIM_JTI_VERSION_OTHER'],
+    [{ jti: undefined, v: 1 }, 'VERSION_INVALID'],
+    [{ jti: undefined, v: '2' }, 'VERSION_INVALID'],
+    [{ jti: undefined, v: null }, 'VERSION_INVALID'],
     [{ jti: undefined, v: undefined }, 'CLAIM_V'],
   ]) {
     await assert.rejects(verify(await f.sign({ claims })), e => e.status === 401);

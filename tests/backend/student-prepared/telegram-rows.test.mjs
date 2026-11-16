@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {createClerkVerifier,clerkReplayIdentity} from '../../../supabase/functions/univeracademy-api/clerk-auth.ts';
 import {TelegramReturnRows} from '../../../supabase/functions/univeracademy-api/storage/telegram-return-rows.ts';
 import {botKey} from '../http-fixture.ts';
 import assert from 'node:assert/strict';
@@ -370,4 +371,17 @@ test('forged public resume signature cannot perform DB reads or select a person'
 test('disabled mapping lookup stays disabled with no auth/session data returned',async()=>{
  const f=await returnFixture({linked:true});f.pool.data.identities[key(who)].enabled=false;const before=structuredClone(f.pool.data);
  assert.equal(await f.service().start.lookupTelegramStart({update_id:9007199254740991,telegram_user_id:tg}),'disabled');assert.deepEqual(f.pool.data,before);assert.equal(f.pool.events.some(tgWrites),false);
+});
+
+test('same missing-jti signed JWT can link after exchange without bypassing Telegram replay', {skip:!jose}, async()=>{
+ const f=await returnFixture(),pair=await jose.generateKeyPair('RS256',{modulusLength:2048});f.verifier.trustedKeys=()=>pair.publicKey;
+ const token=await new jose.SignJWT({sid:who.sessionId,azp:'https://mini.profile.invalid',v:2}).setProtectedHeader({alg:'RS256',kid:'synthetic'}).setIssuer(who.issuer).setSubject(who.userId).setIssuedAt(Math.floor(clock/1000)).setNotBefore(Math.floor(clock/1000)).setExpirationTime(Math.floor(clock/1000)+20).sign(pair.privateKey);
+ const proof=await createClerkVerifier(f.verifier)(token),digest=await proofHash(clerkReplayIdentity(proof));
+ // Existing committed exchange marker. Link does not mint/consume a second app
+ // session; it independently verifies the same JWT and signed Telegram launch.
+ f.pool.data.replays[digest]={personId:ids.person,at:clock};const beforeReplays=structuredClone(f.pool.data.replays),raw=await launch();
+ const send=()=>f.handler(new Request('https://api.profile.invalid/api/v1/auth/telegram/link',{method:'POST',headers:{authorization:'Bearer '+token},body:JSON.stringify({init_data:raw})}));
+ assert.equal((await send()).status,200);assert.deepEqual(f.pool.data.replays,beforeReplays);assert.equal(f.pool.events.some(forbidden),false);
+ const before=structuredClone(f.pool.data);assert.equal((await send()).status,200);assert.deepEqual(f.pool.data,before);
+ const resumed=await f.resume(raw);assert.equal(resumed.status,409);assert.equal(resumed.error.code,'INIT_DATA_REPLAY');
 });

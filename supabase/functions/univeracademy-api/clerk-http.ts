@@ -1,5 +1,5 @@
 import {ApiFault,fail} from "./fault.ts";
-import {createClerkVerifier,checkClerkProof,requireLiveClerk,requireLiveClerkProfile,clerkDisplayNames,clerkIdentityKey,clerkSessionKey} from "./clerk-auth.ts";
+import {createClerkVerifier,checkClerkProof,clerkReplayIdentity,requireLiveClerk,requireLiveClerkProfile,clerkDisplayNames,clerkIdentityKey,clerkSessionKey} from "./clerk-auth.ts";
 import type {ClerkIdentity,ClerkProof,ClerkVerifierConfiguration,ClerkLiveness,ClerkDisplayNames} from "./clerk-auth.ts";
 import {createStudentHttpHandler} from "./student-http.ts";
 import {createStaffHttpHandler} from "./staff-http.ts";
@@ -102,7 +102,7 @@ export async function exchangeClerkSession(tx:ClerkTransaction,proof:ClerkProof,
   // mappings remain existing mappings and can never enter provisioning.
   const creating=!Object.hasOwn(state.identities,clerkIdentityKey(id));
   const checked=await verifyCurrentClerk(tx,proof,deps,creating),{providerExpires}=checked;
-  const digest=await proofHash(JSON.stringify([proof.issuer,proof.userId,proof.sessionId,proof.tokenId]));
+  const digest=await proofHash(clerkReplayIdentity(proof));
   // All provider/clock/digest awaits precede account creation and supersession.
   const now=checkCurrentTime(tx,proof,deps,providerExpires,checked.now);
   const person=ensureClerkStudent(state,id,policy,tx.newPersonId,checked.names),personId=person.profile.person_id,key=clerkSessionKey(id);

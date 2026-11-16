@@ -516,6 +516,78 @@ for (const file of requestCompatibility) {
 const verifierDiagnostic = {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "preimage": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 6833, "sha256": "092ba3179c74b6c96d96d28bc215dc44bca2f5e11026b22598bd82819b4bc527"}, "result": {"path": "supabase/functions/univeracademy-api/clerk-auth.ts", "bytes": 9223, "sha256": "32d302c953ea183b7327c10c2d172ca04c775f33179def1f8917e13741db3469"}};
 assert.deepEqual(selected.get(verifierDiagnostic.path), verifierDiagnostic.preimage, "VERIFIER_DIAGNOSTIC_PREIMAGE_MISMATCH");
 selected.set(verifierDiagnostic.path, verifierDiagnostic.result);
+// Missing-jti v2 replay compatibility; exact preimages from d769d89.
+const signedInputReplayCompatibility = [
+  {
+    "path": "supabase/functions/univeracademy-api/clerk-auth.ts",
+    "preimage": {
+      "path": "supabase/functions/univeracademy-api/clerk-auth.ts",
+      "bytes": 9223,
+      "sha256": "32d302c953ea183b7327c10c2d172ca04c775f33179def1f8917e13741db3469"
+    },
+    "result": {
+      "path": "supabase/functions/univeracademy-api/clerk-auth.ts",
+      "bytes": 10429,
+      "sha256": "d4094c6ac1081ee6054a630419b412ebc8c042946a56bf816ad5b8fb34df7815"
+    }
+  },
+  {
+    "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+    "preimage": {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "bytes": 17702,
+      "sha256": "bb8aff00ce0b6967351c3f6c41245add4db7215d970699d4c983db1dc0185024"
+    },
+    "result": {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "bytes": 17675,
+      "sha256": "51b9949081969232ece555fbdf225ad51e83673aa0e658e0af708965954b2238"
+    }
+  },
+  {
+    "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+    "preimage": {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+      "bytes": 27800,
+      "sha256": "3c7e160bf776791d294e2aa7a639cff6817d2f9a094d401b8f66679fddbf4a98"
+    },
+    "result": {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+      "bytes": 27773,
+      "sha256": "1ac8f769434f35b792f84c674c7635f551b660aa427b79152d6a8f733261b95e"
+    }
+  },
+  {
+    "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+    "preimage": {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "bytes": 40057,
+      "sha256": "7e026a22434fa559dcd6801bb4507f844f99cfb4658c6c7f89e4513b7bdfe09a"
+    },
+    "result": {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "bytes": 41749,
+      "sha256": "1f1fe2a04ef2607a571537237ed887247bc35af0194222ddc86058c5a0723848"
+    }
+  },
+  {
+    "path": "tests/clerk-auth/domain-http.test.mjs",
+    "preimage": {
+      "path": "tests/clerk-auth/domain-http.test.mjs",
+      "bytes": 13849,
+      "sha256": "24b8aef28ab138f65fecde222945ad8769635555c64925aeac16bf8886a18678"
+    },
+    "result": {
+      "path": "tests/clerk-auth/domain-http.test.mjs",
+      "bytes": 14391,
+      "sha256": "039d06bebc6642148bf83cc699a9e832fbbe6b613c20a6ead8832afbee870411"
+    }
+  }
+];
+for (const file of signedInputReplayCompatibility) {
+  assert.deepEqual(selected.get(file.path), file.preimage, "SIGNED_INPUT_REPLAY_PREIMAGE_MISMATCH");
+  selected.set(file.path, file.result);
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

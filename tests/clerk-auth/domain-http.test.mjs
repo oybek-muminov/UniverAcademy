@@ -134,3 +134,12 @@ test("already-calculated nullable statistical bonus remains exact and separate a
   const result=await f.call("GET",`/attempts/${p.attempt.id}/result`,undefined,login.json.data.access_token);assert.deepEqual(result.json.data,resultBefore.json.data);
   const history=await f.call("GET",`/exams/${p.assignment.id}/history`,undefined,login.json.data.access_token);assert.deepEqual(history.json.data.attempts[0].score,resultBefore.json.data);
 });
+
+test('missing-jti signed-input replay identity persists through the scoped SQL adapter and restart',async t=>{
+  const f=await fixture(t),token=await f.sign({claims:{jti:undefined}});
+  const first=await f.call('POST','/auth/clerk',{},token);assert.equal(first.status,200);
+  const before=f.raw();f.restart();
+  assert.equal((await f.call('POST','/auth/clerk',{},token)).json.error.code,'CLERK_TOKEN_REPLAY');
+  assert.equal(f.raw(),before);
+  assert.equal((await f.call('GET','/me',undefined,first.json.data.access_token)).status,200);
+});

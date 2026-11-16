@@ -3,7 +3,7 @@ import {fail} from "./fault.ts";
 
 export type ClerkIdentity={issuer:string;userId:string;sessionId:string};
 export type ClerkDisplayNames=Readonly<{firstName:string|null;lastName:string|null}>;
-export type ClerkProof=Readonly<ClerkIdentity&{kind:"clerk_verified";notBefore:number;expiresAt:number;authorizedParty:string;tokenId:string}>;
+export type ClerkProof=Readonly<ClerkIdentity&{kind:"clerk_verified";notBefore:number;expiresAt:number;authorizedParty:string;tokenId:string;tokenIdKind?:"signed_input_sha256_v1"}>;
 export type ClerkVerifierConfiguration={issuer:string;authorizedParties:readonly string[];
   audience:{kind:"required";value:string}|{kind:"clerk_default_no_audience"};
   trustedKeys:JWTVerifyGetKey;now:()=>number};
@@ -33,6 +33,14 @@ function origin(v:unknown):boolean{
 }
 export function clerkIdentityKey(identity:Pick<ClerkIdentity,"issuer"|"userId">):string{return JSON.stringify([identity.issuer,identity.userId]);}
 export function clerkSessionKey(identity:ClerkIdentity):string{return JSON.stringify([identity.issuer,identity.userId,identity.sessionId]);}
+// Keep the deployed jti tuple byte-for-byte stable. Missing-jti fingerprints
+// occupy a different tuple arity, so no provider jti can collide with that space.
+export function clerkReplayIdentity(proof:ClerkProof):string{
+  if(typeof proof.tokenId!=="string"||!proof.tokenId)fail("CLERK_TOKEN_INVALID",401);
+  if(proof.tokenIdKind===undefined)return JSON.stringify([proof.issuer,proof.userId,proof.sessionId,proof.tokenId]);
+  if(proof.tokenIdKind!=="signed_input_sha256_v1"||!/^[0-9a-f]{64}$/.test(proof.tokenId))fail("CLERK_TOKEN_INVALID",401);
+  return JSON.stringify([proof.issuer,proof.userId,proof.sessionId,"signed_input_sha256_v1",proof.tokenId]);
+}
 export function checkClerkProof(proof:ClerkProof,now:number):void{
   if(proof.kind!=="clerk_verified"||!origin(proof.issuer)||!user(proof.userId)||!session(proof.sessionId)||
     !Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(proof.notBefore)||!Number.isSafeInteger(proof.expiresAt)||
@@ -57,7 +65,7 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
     try{
       verified=await jwtVerify(token,config.trustedKeys,{issuer:config.issuer,algorithms:["RS256"],
         ...(config.audience.kind==="required"?{audience:config.audience.value}:{}),
-        requiredClaims:["iss","sub","sid","iat","nbf","exp","azp","jti","v"],clockTolerance:0,currentDate:new Date(now)});
+        requiredClaims:["iss","sub","sid","iat","nbf","exp","azp","v"],clockTolerance:0,currentDate:new Date(now)});
     }catch(error){
       if(error instanceof errors.JWKSTimeout||error instanceof errors.JWKSInvalid||error instanceof errors.JWKInvalid){
         verificationDenied("KEY_SERVICE_UNAVAILABLE");fail("SERVICE_UNAVAILABLE",503);
@@ -70,12 +78,7 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
         else if(error instanceof errors.JWTClaimValidationFailed){
           const claims:Record<string,string>={iss:"CLAIM_ISS",sub:"CLAIM_SUB",sid:"CLAIM_SID",iat:"CLAIM_IAT",nbf:"CLAIM_NBF",exp:"CLAIM_EXP",azp:"CLAIM_AZP",jti:"CLAIM_JTI",v:"CLAIM_V",aud:"CLAIM_AUD"};
           reason=Object.hasOwn(claims,error.claim)?claims[error.claim]:"CLAIM_INVALID";
-          // jwtVerify checks the signature before claim validation. Inspect only the
-          // version discriminator for diagnostics, never accept this payload.
-          if(error.claim==="jti"&&error.reason==="missing"){
-            const version=error.payload&&typeof error.payload==="object"?Object.getOwnPropertyDescriptor(error.payload,"v"):undefined;
-            reason=version&&Object.hasOwn(version,"value")&&version.value===2?"CLAIM_JTI_V2":version?"CLAIM_JTI_VERSION_OTHER":"CLAIM_JTI_VERSION_MISSING";
-          }
+
         }
         verificationDenied(reason);fail("CLERK_TOKEN_INVALID",401);
       }
@@ -86,7 +89,7 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
     if(typeof verified.protectedHeader.kid!=="string"||!verified.protectedHeader.kid||!user(p.sub)||!session(p.sid)||
        !seconds(p.iat)||!seconds(p.nbf)||!seconds(p.exp)||p.exp<=p.iat||p.nbf>=p.exp||p.iat*1000>now||
        p.v!==2||(config.audience.kind==="clerk_default_no_audience"&&p.aud!==undefined)||
-       typeof p.azp!=="string"||!config.authorizedParties.includes(p.azp)||typeof p.jti!=="string"||!p.jti||
+       typeof p.azp!=="string"||!config.authorizedParties.includes(p.azp)||(Object.hasOwn(p,"jti")&&(typeof p.jti!=="string"||!p.jti))||
        (p.sts!==undefined&&p.sts!=="active")||p.act!==undefined){
       const reason=typeof verified.protectedHeader.kid!=="string"||!verified.protectedHeader.kid?"HEADER_KEY_MISSING"
         :!user(p.sub)||!session(p.sid)?"IDENTITY_SHAPE"
@@ -94,14 +97,32 @@ export function createClerkVerifier(config:ClerkVerifierConfiguration){
         :p.v!==2?"VERSION_INVALID"
         :config.audience.kind==="clerk_default_no_audience"&&p.aud!==undefined?"AUDIENCE_UNEXPECTED"
         :typeof p.azp!=="string"||!config.authorizedParties.includes(p.azp)?"AUTHORIZED_PARTY_INVALID"
-        :typeof p.jti!=="string"||!p.jti?"TOKEN_ID_INVALID"
+        :Object.hasOwn(p,"jti")&&(typeof p.jti!=="string"||!p.jti)?"TOKEN_ID_INVALID"
         :p.sts!==undefined&&p.sts!=="active"?"SESSION_STATUS_INVALID":"ACTOR_UNEXPECTED";
       verificationDenied(reason);fail("CLERK_TOKEN_INVALID",401);
     }
+    let tokenId:string,tokenIdKind:"signed_input_sha256_v1"|undefined;
+    if(Object.hasOwn(p,"jti"))tokenId=p.jti as string;
+    else{
+      // Only after signature AND every v2/issuer/party/time/status check passed.
+      // Hash signed header.payload, not the malleable signature encoding. A
+      // different valid encoding of the same signature keeps one replay key.
+      const signingInput=token.slice(0,token.lastIndexOf("."));
+      try{
+        const hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(signingInput));
+        tokenId=Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,"0")).join("");
+      }catch{fail("SERVICE_UNAVAILABLE",503);}
+      tokenIdKind="signed_input_sha256_v1";
+    }
     // Preserve case-sensitive external IDs. Token/organization roles and emails
     // are deliberately absent from the verified proof and cannot grant authority.
-    return Object.freeze({kind:"clerk_verified",issuer:config.issuer,userId:p.sub,sessionId:p.sid,
-      notBefore:Math.max(p.iat,p.nbf)*1000,expiresAt:p.exp*1000,authorizedParty:p.azp,tokenId:p.jti});
+    const proof:ClerkProof=Object.freeze({kind:"clerk_verified",issuer:config.issuer,userId:p.sub,sessionId:p.sid,
+      notBefore:Math.max(p.iat,p.nbf)*1000,expiresAt:p.exp*1000,authorizedParty:p.azp,tokenId,...(tokenIdKind?{tokenIdKind}:{})});
+    if(tokenIdKind){
+      const afterHash=config.now();if(!Number.isSafeInteger(afterHash)||afterHash<now)fail("SERVICE_UNAVAILABLE",503);
+      checkClerkProof(proof,afterHash);
+    }
+    return proof;
   };
 }
 async function readLiveClerk<T>(identity:ClerkIdentity,now:number,read:ClerkLiveness,

@@ -1,5 +1,5 @@
 import {fail} from "../fault.ts";
-import {checkClerkProof,requireLiveClerk,clerkIdentityKey,clerkSessionKey} from "../clerk-auth.ts";
+import {checkClerkProof,clerkReplayIdentity,requireLiveClerk,clerkIdentityKey,clerkSessionKey} from "../clerk-auth.ts";
 import type {ClerkIdentity,ClerkProof,ClerkLiveness} from "../clerk-auth.ts";
 import type {ClerkCandidateState} from "../clerk-http.ts";
 import type {Person,StudentState} from "../student-state.ts";
@@ -110,7 +110,7 @@ export class ClerkScopedAuthStore{
       const providerExpires=await requireLiveClerk(who,now,this.liveness),afterRead=await clock(client);
       if(afterRead<now)throw new StorageUnavailable("not_committed");now=afterRead;checkClerkProof(proof,now);if(now>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
       const rows=new ClerkAuthRows(),scope:Scope={client,personId,identity:who,existing:mapped.rows.length===1,now},state=await rows.load(scope),before=structuredClone(state);
-      const replay=await proofHash(JSON.stringify([proof.issuer,proof.userId,proof.sessionId,proof.tokenId]));
+      const replay=await proofHash(clerkReplayIdentity(proof));
       const readyAt=await clock(client);if(readyAt<now)throw new StorageUnavailable("not_committed");now=readyAt;scope.now=now;
       checkClerkProof(proof,now);if(now>=providerExpires)fail("CLERK_SESSION_REVOKED",401);
       if(state.consumedTokens[replay])fail("CLERK_TOKEN_REPLAY",409);if(consumeBeforeWork)state.consumedTokens[replay]=true;scope.exchangeDigest=replay;
