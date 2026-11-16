@@ -588,6 +588,22 @@ for (const file of signedInputReplayCompatibility) {
   assert.deepEqual(selected.get(file.path), file.preimage, "SIGNED_INPUT_REPLAY_PREIMAGE_MISMATCH");
   selected.set(file.path, file.result);
 }
+// Bounded database failure diagnostics; historical source metadata remains immutable.
+const databaseDiagnostic = {
+  "path": "runtime/cloudflare-postgres.mjs",
+  "preimage": {
+    "path": "runtime/cloudflare-postgres.mjs",
+    "bytes": 4215,
+    "sha256": "da9626dd8ee00270b7861205b0f2dc15e9656b7c2b2aafe44491f5f6991506be"
+  },
+  "result": {
+    "path": "runtime/cloudflare-postgres.mjs",
+    "bytes": 5149,
+    "sha256": "2fb78b3e9640b8be40db99b8a27ec5f4c06f14962dc52c99feb19529b71ee75c"
+  }
+};
+assert.deepEqual(selected.get(databaseDiagnostic.path), databaseDiagnostic.preimage, "DATABASE_DIAGNOSTIC_PREIMAGE_MISMATCH");
+selected.set(databaseDiagnostic.path, databaseDiagnostic.result);
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

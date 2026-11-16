@@ -4,6 +4,18 @@ import {transactionPoolPort} from "../supabase/functions/univeracademy-api/stora
 
 export const POSTGRES_DRIVER_MINIMUM="8.16.3";
 const unavailable=()=>new StorageUnavailable("not_committed");
+// Server-only, bounded diagnostics. Never emit messages, SQL, connection data or
+// arbitrary error properties. A broken log sink cannot change failure behavior.
+function diagnostic(phase,error){
+  try{
+    const code=error&&Object.getOwnPropertyDescriptor(error,"code");
+    const value=code&&Object.hasOwn(code,"value")?code.value:undefined;
+    const known={ECONNRESET:"CONNECTION_RESET",ECONNREFUSED:"CONNECTION_REFUSED",ETIMEDOUT:"TIMEOUT",
+      "53300":"CONNECTION_LIMIT","57P01":"ADMIN_SHUTDOWN","08006":"CONNECTION_FAILURE","08001":"CONNECTION_FAILED"};
+    const reason=typeof value==="string"&&Object.hasOwn(known,value)?known[value]:"OTHER";
+    console.warn("UA_DATABASE_FAILURE",phase,reason);
+  }catch{} // No raw exception and no diagnostic failure escapes.
+}
 
 // Prepared Hyperdrive binding data only. No environment/secret loading or direct
 // origin TLS policy is selected here. Hyperdrive caching OFF and verified origin
@@ -39,7 +51,7 @@ export function createCloudflarePostgres(Client,options,{signal}={}){
       const ending=driver.end();
       if(!(ending instanceof Promise))throw unavailable();
       return ending;
-    }).then(()=>undefined,()=>{throw unavailable();});
+    }).then(()=>undefined,error=>{diagnostic("CLOSE",error);throw unavailable();});
   }
   const abort=()=>{void close().catch(()=>{});};
   signal?.addEventListener("abort",abort,{once:true});if(signal?.aborted)abort();
@@ -58,13 +70,13 @@ export function createCloudflarePostgres(Client,options,{signal}={}){
         noAmbientPg(); // No await or queued path between this guard and new Client.
         driver=new Client(config);
         if(typeof driver?.connect!=="function"||typeof driver.query!=="function"||typeof driver.end!=="function"||typeof driver.on!=="function")throw unavailable();
-        driver.on("error",()=>{void close().catch(()=>{});}); // Retained through close.
+        driver.on("error",error=>{diagnostic("DRIVER_ERROR",error);void close().catch(()=>{});}); // Retained through close.
       }
-      if(!connected){await cancellable(()=>driver.connect());connected=true;}
+      if(!connected){try{await cancellable(()=>driver.connect());}catch(error){diagnostic("CONNECT",error);throw error;}connected=true;}
       if(blocked())throw unavailable();leased=true;let released=false;
       return {async query(statement){
         if(released||blocked())throw unavailable();
-        try{return await cancellable(()=>driver.query(statement));}catch{throw unavailable();}
+        try{return await cancellable(()=>driver.query(statement));}catch(error){diagnostic("QUERY",error);throw unavailable();}
       },release(discard=false){
         if(released)return;released=true;leased=false;
         if(discard)void close().catch(()=>{});
