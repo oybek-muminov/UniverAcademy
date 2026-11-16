@@ -1,4 +1,5 @@
 import { StudentFlow } from './flow.ts';
+import { StudentFailure } from './transport.ts';
 import type { StudentPort } from './flow.ts';
 
 // Provider evidence is distinct from the Backend-owned opaque app session.
@@ -24,6 +25,11 @@ function registrationName(value: string): string | null {
 type Step = 'choose' | 'sending' | 'code' | 'verifying' | 'authorizing' | 'ready' | 'browser_required';
 export type SignInSnapshot = Readonly<{ step: Step; busy: boolean; maskedEmail: string; notice: string; flow: StudentFlow | null }>;
 const messages: Record<string, string> = {
+  CLERK_TOKEN_INVALID: 'Kirish tasdig‘i serverda qabul qilinmadi (CLERK_TOKEN_INVALID).',
+  CLERK_IDENTITY_REVOKED: 'Hisob bog‘lanishi faol emas (CLERK_IDENTITY_REVOKED).',
+  CLERK_SESSION_SUPERSEDED: 'Bu sessiya boshqa kirish bilan almashtirilgan (CLERK_SESSION_SUPERSEDED).',
+  SERVICE_UNAVAILABLE: 'Kirish xizmati vaqtincha javob bermadi (SERVICE_UNAVAILABLE).',
+  IDENTITY_LINK_CONFLICT: 'Telegram boshqa hisobga bog‘langan (IDENTITY_LINK_CONFLICT).',
   INVALID_EMAIL: 'Email manzilini tekshiring.',
   INVALID_CODE: 'Kod mos kelmadi. Qayta tekshiring.',
   CODE_EXPIRED: 'Kod muddati tugagan. Yangi kod so‘rang.',
@@ -105,7 +111,8 @@ export function createSignInController(options: {
     const task = (async () => { await action(generation); })().catch(error => {
       if (disposed || generation !== epoch) return;
       void retire().catch(() => {}); // Rejected bootstrap cannot retain an app proof.
-      const code = error instanceof EntryFailure ? error.code : 'UNCONFIRMED';
+      const code = error instanceof EntryFailure || (error instanceof StudentFailure && Object.hasOwn(messages, error.code))
+        ? error.code : 'UNCONFIRMED';
       const expired = code === 'CODE_EXPIRED';
       if (expired) { challenge = null; email = ''; }
       const nextStep = expired || (failureStep === 'code' && !challenge) ? 'choose' : failureStep;

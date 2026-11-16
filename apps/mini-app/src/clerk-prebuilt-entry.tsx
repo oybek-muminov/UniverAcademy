@@ -23,7 +23,7 @@ export function PrebuiltReadyEntry({ config, scope, signIn, signUp }: {
     get signIn() { return latest.current.signIn; }, get signUp() { return latest.current.signUp; },
     session: () => latest.current.clerk.session ?? null,
     signOut: sessionId => latest.current.clerk.signOut({ sessionId }),
-    openPopup: () => window.open('about:blank', '_blank', 'popup,width=480,height=700'), callbackUrl: config.callbackUrl,
+    openPopup: () => null, callbackUrl: config.callbackUrl,
   }, webview ? 'telegram_webview' : 'browser', fetch, { launch }));
   const [gate] = useState(() => createPrebuiltSessionGate(runtime, () => latest.current.clerk.session));
   const state = useSyncExternalStore(runtime.subscribe, runtime.snapshot);
@@ -56,8 +56,7 @@ export function PrebuiltReadyEntry({ config, scope, signIn, signUp }: {
         <button className="primary" onClick={() => void act(() => gate.enter())}>Tasdiqlangan hisob bilan davom etish</button></section>
       : webview && !launch ? <section className="card"><h1>Brauzerda davom etish kerak</h1>
         <p>Bu Telegram oynasida Google bilan kirish va tashqi brauzerdan qaytish hali ulanmagan.</p></section>
-      : <SignIn routing="hash" withSignUp oauthFlow="popup" forceRedirectUrl={config.signInUrl}
-        signUpForceRedirectUrl={config.signInUrl} fallback={<p role="status">Kirish oynasi tayyorlanmoqda…</p>} />}
-    {config.telegramEnabled && <p><a href="https://t.me/univeracademybot">Telegram orqali kirish — ixtiyoriy</a></p>}
+      : <SignIn routing="hash" withSignUp oauthFlow="redirect" forceRedirectUrl={config.callbackUrl}
+        signUpForceRedirectUrl={config.callbackUrl} fallback={<p role="status">Kirish oynasi tayyorlanmoqda…</p>} />}
   </main>;
 }

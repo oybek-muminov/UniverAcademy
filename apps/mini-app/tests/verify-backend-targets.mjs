@@ -465,6 +465,53 @@ for (const file of currentRuntime.files) {
   selected.set(file.path, file.result);
 }
 assert.equal(selected.size, runtime.files.length + 1, 'CURRENT_RUNTIME_TARGET_COUNT_MISMATCH');
+// Reviewed production Workers compatibility correction, source commit
+// 47ffc1f34c5c965be3c23d188f900a2c78a2ba8c. Historical manifests stay immutable.
+const requestCompatibility = [
+  {
+    "path": "runtime/vercel-node.mjs",
+    "preimage": {
+      "path": "runtime/vercel-node.mjs",
+      "bytes": 4161,
+      "sha256": "eb95ef50e999b44403f20fa2bdd51923443f1ef6038f60c7588bda1820537171"
+    },
+    "result": {
+      "path": "runtime/vercel-node.mjs",
+      "bytes": 4325,
+      "sha256": "102eee2fa25f2e8ae76b3c106325bbbcfb2a17c9132aae56cad3eb8c8e8f09e5"
+    }
+  },
+  {
+    "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+    "preimage": {
+      "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+      "bytes": 10205,
+      "sha256": "e14fd79fa83a5a874ef2d6c338cb210bbd44e9ca1b5bc8024f40933c4a8ee20a"
+    },
+    "result": {
+      "path": "supabase/functions/univeracademy-api/clerk-provider.ts",
+      "bytes": 10364,
+      "sha256": "3fdf646c74429f75f40c20c66805055227860643ba09d5501f9825b8eb769bd4"
+    }
+  },
+  {
+    "path": "tests/clerk-auth/provider-adapter.test.mjs",
+    "preimage": {
+      "path": "tests/clerk-auth/provider-adapter.test.mjs",
+      "bytes": 22068,
+      "sha256": "4d65fc4d972aa82ed85f86dcf6392eba3e67243399e792e538a53f54cf4a30ea"
+    },
+    "result": {
+      "path": "tests/clerk-auth/provider-adapter.test.mjs",
+      "bytes": 22379,
+      "sha256": "3877fa15c70e5288c22477f443492e3c099ecfc840e1fbfa5222650e0138a11b"
+    }
+  }
+];
+for (const file of requestCompatibility) {
+  assert.deepEqual(selected.get(file.path), file.preimage, 'REQUEST_COMPATIBILITY_PREIMAGE_MISMATCH');
+  selected.set(file.path, file.result);
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

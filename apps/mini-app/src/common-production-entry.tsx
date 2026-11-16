@@ -20,21 +20,26 @@ export function CallbackNotice({ config }: { config: CommonEntryConfig }) {
   const [callbackSession, setCallbackSession] = useState<string | null>(null), [callbackNotice, setCallbackNotice] = useState('');
   const [settled, setSettled] = useState(false), cancelled = useRef(false);
   const cleanUrl = () => history.replaceState(null, '', config.callbackUrl);
+  // A prebuilt email/redirect flow may arrive with an already active session,
+  // without a new OAuth callback operation. This only settles the notice.
+  useEffect(() => {
+    if (!cancelled.current && !callbackSession && session?.status === 'active' && !session.currentTask)
+      setCallbackSession(session.id);
+  }, [callbackSession, session]);
   useEffect(() => {
     if (cancelled.current || !callbackSession || session?.id !== callbackSession) return;
     if (session.status !== 'active' || session.currentTask) {
       setSettled(true); setCallbackNotice('Qo‘shimcha tasdiqlash kerak.');
       history.replaceState(null, '', config.callbackUrl); return;
     }
-    setSettled(true); setCallbackNotice('Google javobi qabul qilindi. Asosiy kirish oynasiga qayting.');
+    setSettled(true); setCallbackNotice('Kirish tasdiqlandi. Kabinetni ochish uchun bu oynani yoping va Telegram botida /start orqali yangidan oching.');
     // This document never opens an app session, even after an SDK callback.
-    // Only the initiating main-window operation may exchange its proof. A
-    // separate explicit sign-in remains available at the fixed sign-in URL.
+    // OAuth navigation discards the original RAM-only Telegram proof. Require
+    // a fresh bot launch instead of exchanging an unbound browser session.
     history.replaceState(null, '', config.callbackUrl);
   }, [callbackSession, session, config.callbackUrl]);
   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1>
     <p role="status">{callbackNotice || 'Google javobi tekshirilmoqda…'}</p>
-    <a href={config.signInUrl}>Kirish oynasiga qaytish</a>
       {!settled && <button className="text-button" onClick={() => {
         cancelled.current = true; setSettled(true); setCallbackSession(null);
         setCallbackNotice('Kirish bekor qilindi. Yangidan kirishni boshlashingiz mumkin.'); cleanUrl();

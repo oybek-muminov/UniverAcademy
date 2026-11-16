@@ -71,8 +71,8 @@ with sync_playwright() as p:
                 expect(page.get_by_role('button', name='Tasdiqlangan hisob bilan davom etish')).to_be_visible()
                 assert not audit and state()['proofReads'] == 0
                 props = state()['mounts'][0]
-                assert props['routing'] == 'hash' and props['withSignUp'] is True and props['oauthFlow'] == 'popup'
-                assert props['forceRedirectUrl'] == props['signUpForceRedirectUrl'] == 'https://app.example.test/sign-in'
+                assert props['routing'] == 'hash' and props['withSignUp'] is True and props['oauthFlow'] == 'redirect'
+                assert props['forceRedirectUrl'] == props['signUpForceRedirectUrl'] == 'https://app.example.test/auth/callback'
                 assert 'appearance' not in props and 'unsafeMetadata' not in props
             assert page.get_by_label('Email', exact=True).count() == 0  # no custom fallback
             proof(0)

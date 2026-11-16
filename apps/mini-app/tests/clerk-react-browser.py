@@ -56,8 +56,8 @@ with sync_playwright() as p:
                 page.wait_for_function('__UA_REACT_TEST_AUDIT__().session === "sess_CallbackFixture"')
                 expect(page.get_by_role('status')).to_have_text('Kirish bekor qilindi. Yangidan kirishni boshlashingiz mumkin.')
             else:
-                expect(page.get_by_role('status')).to_have_text('Google javobi qabul qilindi. Asosiy kirish oynasiga qayting.')
-            expect(page.get_by_role('link', name='Kirish oynasiga qaytish')).to_have_attribute('href', 'https://app.example.test/sign-in')
+                expect(page.get_by_role('status')).to_have_text('Kirish tasdiqlandi. Kabinetni ochish uchun bu oynani yoping va Telegram botida /start orqali yangidan oching.')
+            assert page.get_by_role('link', name='Kirish oynasiga qaytish').count() == 0
             assert page.url == 'https://app.example.test/auth/callback'
             assert not audit and page.evaluate('__UA_REACT_TEST_AUDIT__().proofReads') == 0
             assert page.get_by_role('button', name='Tasdiqlangan hisob bilan davom etish').count() == 0
