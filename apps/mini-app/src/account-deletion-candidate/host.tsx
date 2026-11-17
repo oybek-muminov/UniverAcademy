@@ -6,6 +6,7 @@ import {createDeletionController,browserDeletionReceiptStore} from './controller
 import type {DeletionPort,Scope} from './controller.ts';
 import {createRecoveryIndex,withRecoveryIndex} from './recovery.ts';
 import {SavedDeletionRecoveryLink} from './recovery-link.tsx';
+import {DeletionUnavailableDialog} from './unavailable-dialog.tsx';
 import {AccountDeletionPanel} from './panel.tsx';
 export type AccountDeletionBinding={personId:string;port:DeletionPort;isCurrent():boolean;clearMatching():void};
 type Props={binding:AccountDeletionBinding|null;enabled:boolean;cabinetDisplayId?:string;children:(actions:{onDeleteAccount:()=>void;deletionBusy:boolean})=>ReactNode};
@@ -34,9 +35,16 @@ function ReadyHost({binding,enabled,scope,children,cabinetDisplayId}:{binding:Ac
   const busy=['verifying','submitting','pending','status_unavailable','completed'].includes(state.phase);
   return <>{children({onDeleteAccount:()=>controller.request(),deletionBusy:busy})}<AccountDeletionPanel controller={controller} cabinetDisplayId={cabinetDisplayId} hideRequestButton/>{['pending','status_unavailable'].includes(state.phase)?<a href="/account-deletion-status">O‘chirish natijasini alohida tekshirish</a>:<SavedDeletionRecoveryLink/>}</>;
 }
+function UnavailableHost({enabled,children}:{enabled:boolean;children:Props['children']}) {
+  const [notice,setNotice]=useState('');
+  return <>{children({onDeleteAccount:()=>setNotice(!enabled?'Hisobni o‘chirish hali yoqilmagan.':'Hisobni o‘chirish uchun Clerk hisobingizga qayta kirishingiz kerak.'),deletionBusy:false})}
+    {notice&&<DeletionUnavailableDialog message={notice} onClose={()=>setNotice('')}/>}
+    <SavedDeletionRecoveryLink/>
+  </>;
+}
 export function AccountDeletionHost({binding,enabled,children,cabinetDisplayId}:Props){
-  const{session}=useSession();const[notice,setNotice]=useState('');
+  const{session}=useSession();
   const scope=useMemo(()=>binding&&session?.status==='active'&&!session.currentTask?{personId:binding.personId,clerkUserId:session.user.id,clerkSessionId:session.id}:null,[binding,session?.id,session?.user.id,session?.status,session?.currentTask]);
-  if(!enabled||!binding||!scope)return <>{children({onDeleteAccount:()=>setNotice(!enabled?'Hisobni o‘chirish hali yoqilmagan.':'Hisobni o‘chirish uchun Clerk hisobingizga qayta kirishingiz kerak.'),deletionBusy:false})}{notice&&<p role="status">{notice}</p>}<SavedDeletionRecoveryLink/></>;
+  if(!enabled||!binding||!scope)return <UnavailableHost key={String(enabled)} enabled={enabled}>{children}</UnavailableHost>;
   return <ReadyHost key={JSON.stringify(scope)} binding={binding} enabled={enabled} scope={scope} cabinetDisplayId={cabinetDisplayId}>{children}</ReadyHost>;
 }

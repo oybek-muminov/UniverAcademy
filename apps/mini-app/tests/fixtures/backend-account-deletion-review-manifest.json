@@ -61,8 +61,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/account-deletion-candidate/host.tsx",
-        "bytes": 4335,
-        "sha256": "5b28182ef53884eb5e46e3155dcadb7afc8542cd715f5fad32f480d13d663fa8"
+        "bytes": 4654,
+        "sha256": "bd6b35c5e21ba478bbcfbec2aa0459400d443c09d921a421fa8e3457c4809974"
       }
     },
     {
@@ -126,6 +126,15 @@
         "path": "apps/mini-app/src/account-deletion-candidate/recovery.ts",
         "bytes": 6788,
         "sha256": "75ae30a68df0546976b309bf79eca628e57b963ffdb2fd4f393919d15e8098ae"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/unavailable-dialog.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/unavailable-dialog.tsx",
+        "bytes": 850,
+        "sha256": "c2802e0602cf773e9c92e9a9af7f0b2d0a52ce90c8106dc9507a21f135d8bbe7"
       }
     },
     {
@@ -307,6 +316,15 @@
         "path": "apps/mini-app/tests/account-deletion-recovery.test.mjs",
         "bytes": 11441,
         "sha256": "e14298831fe68d24281686e82a33eb2af3a2c4bc10cfc09ed6b27f55eb77ff7f"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/account-deletion-unavailable-dialog.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/account-deletion-unavailable-dialog.test.mjs",
+        "bytes": 3545,
+        "sha256": "f7401a9a9b320a578ca75aaf6f108558ccc5ddd7cb12f7ad703ac4890c3b7f9c"
       }
     },
     {
