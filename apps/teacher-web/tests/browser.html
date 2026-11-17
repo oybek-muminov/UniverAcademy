@@ -1,0 +1,23 @@
+<!doctype html><html lang="uz"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../src/style.css"><title>LOCAL FIXTURE ONLY — Teacher UI</title><body><div id="app"></div><script type="module">
+import { TeacherCabinet } from '../src/cabinet.mjs';
+import { renderCabinet } from '../src/view.mjs';
+const root = document.getElementById('app');
+const app = new TeacherCabinet({
+  async load() { return { kind: 'ready', personId: 'fixture-only', name: 'Dilshod Karimov', access: {teacher:true,approved:true,enabled:true}, subjects: ['Fizika'], groups: [{id:'fixture-group',title:'Fizika · 1-guruh'}], tests: [{id:'fixture-test',title:'Kinematika'}] }; },
+  async openStudent() {}, async signOut() {}
+}, state => renderCabinet(root,state,{select:tab=>app.select(tab), refresh:()=>app.refresh(), student:()=>app.leave('student'), signout:()=>app.leave('signout')}));
+await app.refresh();
+if (location.search.includes('check')) {
+  const assert = (value, message) => { if(!value) throw Error(message); };
+  assert(root.textContent.includes('Dilshod Karimov'),'profile');
+  root.querySelector('[data-focus-key="groups"]').click(); assert(root.textContent.includes('Fizika · 1-guruh'),'group');
+  root.querySelector('[data-focus-key="tests"]').click(); assert(root.textContent.includes('Kinematika'),'test');
+  root.querySelector('[data-focus-key="overview"]').click();
+  const state = {...app.state,name:'<img src=x onerror=alert(1)>'};
+  renderCabinet(root,state,{select(){},refresh(){},student(){},signout(){}});
+  assert(!root.querySelector('img'),'XSS');
+  assert(root.textContent.includes('<img src=x'),'text escaping');
+  renderCabinet(root,{kind:'forbidden'},{}); assert(!root.textContent.includes('Kinematika'),'cleared');
+  document.body.dataset.testResult='PASS';
+}
+</script></body></html>

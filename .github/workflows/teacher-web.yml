@@ -1,0 +1,22 @@
+name: Teacher browser groundwork
+on:
+  pull_request:
+    paths: ['apps/teacher-web/**', '.github/workflows/teacher-web.yml']
+  push:
+    branches: [main]
+    paths: ['apps/teacher-web/**', '.github/workflows/teacher-web.yml']
+permissions:
+  contents: read
+jobs:
+  teacher-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.15.0'
+      - run: npm --prefix apps/teacher-web test
+      - run: npm --prefix apps/teacher-web run build
