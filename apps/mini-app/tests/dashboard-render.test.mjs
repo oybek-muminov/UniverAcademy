@@ -16,13 +16,15 @@ test('cabinet header and dashboard render accessible controls without placeholde
   assert.match(html,/Namuna O‘quvchi/);
   assert.match(html,/>Dashboard<\/button>/);
   assert.doesNotMatch(html,/Salom,|Tez kunda|Har bir qadam/);
-  const panel=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onBack(){},onLogout:async()=>{},onDeleteAccount(){}}));
+  const panel=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onLogout:async()=>{},onDeleteAccount(){}}));
   assert.match(panel,/dashboard-first-name/);
+  assert.doesNotMatch(panel,/Kabinetga qaytish/);
+  assert.match(panel,/account-action-row/);
   assert.match(panel,/>Chiqish<\/button>/);
   assert.match(panel,/class="danger-button">Hisobni o‘chirish/);
-  const disabled=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onBack(){}}));
+  const disabled=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false}));
   assert.match(disabled,/class="danger-button" disabled=""/);
-  const pending=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onBack(){},deletionBusy:true,onDeleteAccount(){}}));
+  const pending=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,deletionBusy:true,onDeleteAccount(){}}));
   assert.match(pending,/class="danger-button" disabled=""/);
  } finally {await server.close();}
 });

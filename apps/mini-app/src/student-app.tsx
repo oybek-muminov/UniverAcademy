@@ -65,7 +65,7 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls,
   return <main className={`shell${testing ? ' test-shell' : ''}`}>
     {!testing && <><header className="brand"><span className="brand-mark" aria-hidden="true">U</span>
       <span className="account-name">{[s.student?.firstName, s.student?.lastName].filter(Boolean).join(' ') || 'UniverAcademy'}<small>O‘quvchi kabineti</small></span>
-      {s.student && <button className="dashboard-button" aria-pressed={dashboard} disabled={s.busy || deletionBusy} onClick={() => setDashboardPerson(dashboard ? null : s.student!.person)}>Dashboard</button>}{mode !== 'telegram' && <span className="demo-badge">Lokal namuna</span>}</header>
+      {s.student && <button className="dashboard-button" aria-pressed={dashboard} disabled={s.busy || deletionBusy} onClick={() => { if (dashboard) { setDashboardPerson(null); void flow.showExams(); } else setDashboardPerson(s.student!.person); }}>{dashboard ? 'Testlar' : 'Dashboard'}</button>}{mode !== 'telegram' && <span className="demo-badge">Lokal namuna</span>}</header>
     {mode !== 'telegram' && <p className="sample-notice">{mode === 'local_fixture' ? 'Mahalliy sintetik sinov. Haqiqiy o‘quvchi yoki Telegram hisobidan foydalanmang.' : 'Bu sinov interfeysi. Telegram va haqiqiy test xizmatiga ulanmagan. Sahifa yangilansa namuna boshidan boshlanadi.'}</p>}
     <section className="page-heading">
       <h1 ref={focusTarget} tabIndex={-1}>{dashboard ? 'Dashboard' : title}</h1></section></>}
@@ -74,7 +74,7 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls,
       onClick={() => void (s.screen === 'exams' ? flow.showExams() : flow.reconcile())}>Holatni qayta tekshirish</button>}
 
     {dashboard && s.student && <AccountDashboard key={s.student.person} student={s.student} flow={flow} busy={s.busy}
-      onBack={() => setDashboardPerson(null)} onLogout={onLogout} onDeleteAccount={onDeleteAccount} deletionBusy={deletionBusy} />}
+      onLogout={onLogout} onDeleteAccount={onDeleteAccount} deletionBusy={deletionBusy} />}
     {!dashboard && <>
     {s.screen === 'welcome' && <section className="card welcome">
       <div className="orbit" aria-hidden="true">↗</div><h2>Birinchi qadam — bilimni sinash</h2>

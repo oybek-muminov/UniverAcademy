@@ -33,7 +33,7 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
   useEffect(()=>{void runtime.resume();return()=>runtime.dispose()},[runtime]);
   useEffect(()=>runtime.observe(),[runtime,session?.id,session?.status,session?.currentTask,session?.user.id]);
   const active=session?.status==='active'&&!session.currentTask;
-  if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
+  if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1>
     {state.notice&&<p role="status">{state.notice}</p>}
     {state.phase==='choose'?(active?<>

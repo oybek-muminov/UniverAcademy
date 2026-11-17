@@ -3,8 +3,8 @@ import type { StudentFlow, Student } from './flow.ts';
 import './dashboard.css';
 import { saveDashboardProfile } from './dashboard-profile.ts';
 
-export function AccountDashboard({ student, flow, busy, onBack, onLogout, onDeleteAccount, deletionBusy = false }: {
-  student: Student; flow: StudentFlow; busy: boolean; onBack: () => void;
+export function AccountDashboard({ student, flow, busy, onLogout, onDeleteAccount, deletionBusy = false }: {
+  student: Student; flow: StudentFlow; busy: boolean;
   onLogout?: () => Promise<void>; onDeleteAccount?: () => void; deletionBusy?: boolean;
 }) {
   const [message, setMessage] = useState('');
@@ -27,7 +27,6 @@ export function AccountDashboard({ student, flow, busy, onBack, onLogout, onDele
     finally { logoutLock.current = false; setLoggingOut(false); }
   }
   return <section className="account-dashboard" aria-label="Hisob boshqaruvi">
-    <button className="text-button" disabled={locked} onClick={onBack}>← Kabinetga qaytish</button>
     <form className="card" onSubmit={event => { event.preventDefault(); if (!locked) void save(event.currentTarget); }}>
       <h2>Shaxsiy ma’lumotlar</h2>
       <p className="account-id">ID: {student.displayId}</p>
@@ -39,13 +38,11 @@ export function AccountDashboard({ student, flow, busy, onBack, onLogout, onDele
     </form>
     {message && <p className="notice" role="status">{message}</p>}
     <section className="card account-actions" aria-label="Hisob amallari">
-      <button className="secondary" disabled={locked || !onLogout} onClick={() => void logout()}>{loggingOut ? 'Chiqilmoqda…' : 'Chiqish'}</button>
-      <div className="account-danger">
-        <h2>Hisobni o‘chirish</h2>
-        <p>Hisob va unga bog‘liq ma’lumotlarni o‘chirishdan oldin sizdan alohida tasdiq so‘raladi.</p>
+      <div className="account-action-row">
+        <button className="secondary" disabled={locked || !onLogout} onClick={() => void logout()}>{loggingOut ? 'Chiqilmoqda…' : 'Chiqish'}</button>
         <button className="danger-button" disabled={locked || !onDeleteAccount} onClick={onDeleteAccount}>Hisobni o‘chirish</button>
-        {!onDeleteAccount && <small>Hisobni o‘chirish hozircha ulanmagan.</small>}
       </div>
+      {!onDeleteAccount && <small>Hisobni o‘chirish hozircha ulanmagan.</small>}
     </section>
   </section>;
 }

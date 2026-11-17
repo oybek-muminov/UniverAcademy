@@ -34,8 +34,17 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/account-dashboard.tsx",
-        "bytes": 3112,
-        "sha256": "b390ccf3f63a098cf72a02f575ed6878573e8bcae807dfdce608930c5721aaaf"
+        "bytes": 2838,
+        "sha256": "db222da1615315d0fd9fe62c9270ddb97490c189b22e3c6979e9506182df984b"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/confirmation.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/confirmation.ts",
+        "bytes": 285,
+        "sha256": "6821c783f542bee669c9cc4f54e7c597b8a9e70bbb3dd26de4fa9b5536dd5a93"
       }
     },
     {
@@ -52,8 +61,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/account-deletion-candidate/host.tsx",
-        "bytes": 4142,
-        "sha256": "568341e5266ec1f8c3c3112ecee34cb63308adcbf030b8bcba961f907b124666"
+        "bytes": 4335,
+        "sha256": "5b28182ef53884eb5e46e3155dcadb7afc8542cd715f5fad32f480d13d663fa8"
       }
     },
     {
@@ -70,8 +79,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/account-deletion-candidate/panel.tsx",
-        "bytes": 1719,
-        "sha256": "a8c3dd24fcf5926799faa0513856cda57cf9b449a727d44808ba21580eaac8bc"
+        "bytes": 3299,
+        "sha256": "4b189cc13a4c33d882d9bc1943e3fc5ae62d8482e96f16c9f56285b7cbb52e91"
       }
     },
     {
@@ -79,8 +88,17 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/account-deletion-candidate/recovery-entry.tsx",
-        "bytes": 4390,
-        "sha256": "b94a8524f8a28de5c6be64d80ce238fea64574bc152a53afcc9fcd181930909f"
+        "bytes": 4993,
+        "sha256": "679d9f7fce6521e0df4cd5f8318539050b4fb7e6e1ada6425abba83b3cfc654c"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery-link.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/recovery-link.tsx",
+        "bytes": 1275,
+        "sha256": "84454b17c41b914c90d44ee7df686bda398aebb03450dcf78c48df60cfa24739"
       }
     },
     {
@@ -106,8 +124,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/account-deletion-candidate/recovery.ts",
-        "bytes": 5149,
-        "sha256": "6545f6e6fc68961a9a91b3756e196d6b7bd182dbe6853009711c77e9b08993ce"
+        "bytes": 6788,
+        "sha256": "75ae30a68df0546976b309bf79eca628e57b963ffdb2fd4f393919d15e8098ae"
       }
     },
     {
@@ -132,8 +150,8 @@
       },
       "result": {
         "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
-        "bytes": 5210,
-        "sha256": "5036bc9f4f6609dd76d102a0bc3dacce2721b7e71a22668a28631d8a878cb3c8"
+        "bytes": 5271,
+        "sha256": "5c8f3ab5a4bc4efadadf788a61c1c429e0227f32d88fdd701d528c1fb13c48f7"
       }
     },
     {
@@ -163,8 +181,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/dashboard.css",
-        "bytes": 1014,
-        "sha256": "e307a457a74a7a930cbeda009fb345f8b274a7776a381bb7d7a23fb486e668e8"
+        "bytes": 1431,
+        "sha256": "73434fa6a907f624fdebacc177b0b233b5268029bca9a8cf4cb5469bd3bc0b21"
       }
     },
     {
@@ -224,8 +242,8 @@
       },
       "result": {
         "path": "apps/mini-app/src/student-app.tsx",
-        "bytes": 16549,
-        "sha256": "577808440e257e3aa47340b5443db2e55b4429cecd083cdcf649f33a33f2ca65"
+        "bytes": 16596,
+        "sha256": "28a1bb45801aa25e91b9eb6b0b54396207c3667e54fc90d96c64455a89212550"
       }
     },
     {
@@ -233,8 +251,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
-        "bytes": 4206,
-        "sha256": "17847df52a35b46ef1c5342c7ff70e124c2897a0e568a396516a06b1273f4e2d"
+        "bytes": 4267,
+        "sha256": "72ed0f894b82d231bc7fc2055563db1df5d8b448fb9c6f222c5852ffe8118598"
       }
     },
     {
@@ -256,6 +274,15 @@
       }
     },
     {
+      "path": "apps/mini-app/tests/account-deletion-confirmation.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/account-deletion-confirmation.test.mjs",
+        "bytes": 3679,
+        "sha256": "e420c5562d341627d0e77f02f563a8469e1fc2f16d8501ae1c6d341f81a9e8e8"
+      }
+    },
+    {
       "path": "apps/mini-app/tests/account-deletion-host.test.mjs",
       "preimage": null,
       "result": {
@@ -265,12 +292,30 @@
       }
     },
     {
+      "path": "apps/mini-app/tests/account-deletion-recovery-visibility.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/account-deletion-recovery-visibility.test.mjs",
+        "bytes": 6728,
+        "sha256": "58235d65e4c462b4b6af334a70056ac01f7048733aa356a9d8fe3536c14a941f"
+      }
+    },
+    {
       "path": "apps/mini-app/tests/account-deletion-recovery.test.mjs",
       "preimage": null,
       "result": {
         "path": "apps/mini-app/tests/account-deletion-recovery.test.mjs",
         "bytes": 11441,
         "sha256": "e14298831fe68d24281686e82a33eb2af3a2c4bc10cfc09ed6b27f55eb77ff7f"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/dashboard-navigation.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/dashboard-navigation.test.mjs",
+        "bytes": 1639,
+        "sha256": "7c0f01c63d8650f2d46e583a571956625e79c5f24ab9510a42ab2f203586c558"
       }
     },
     {
@@ -287,8 +332,8 @@
       "preimage": null,
       "result": {
         "path": "apps/mini-app/tests/dashboard-render.test.mjs",
-        "bytes": 1773,
-        "sha256": "64408649d6e41cd9837d8e726db6a59b7c54331a2df161d0965f0f66df75816b"
+        "bytes": 1834,
+        "sha256": "25186a74c4fa64bbcc332e3c756954f725f53d77a612ed8119bce94ef9bd1281"
       }
     },
     {

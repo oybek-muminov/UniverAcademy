@@ -5,10 +5,11 @@ import {reverificationError} from '@clerk/shared/authorization-errors';
 import {createDeletionController,browserDeletionReceiptStore} from './controller.ts';
 import type {DeletionPort,Scope} from './controller.ts';
 import {createRecoveryIndex,withRecoveryIndex} from './recovery.ts';
+import {SavedDeletionRecoveryLink} from './recovery-link.tsx';
 import {AccountDeletionPanel} from './panel.tsx';
 export type AccountDeletionBinding={personId:string;port:DeletionPort;isCurrent():boolean;clearMatching():void};
-type Props={binding:AccountDeletionBinding|null;enabled:boolean;children:(actions:{onDeleteAccount:()=>void;deletionBusy:boolean})=>ReactNode};
-function ReadyHost({binding,enabled,scope,children}:{binding:AccountDeletionBinding;enabled:boolean;scope:Scope;children:Props['children']}){
+type Props={binding:AccountDeletionBinding|null;enabled:boolean;cabinetDisplayId?:string;children:(actions:{onDeleteAccount:()=>void;deletionBusy:boolean})=>ReactNode};
+function ReadyHost({binding,enabled,scope,children,cabinetDisplayId}:{binding:AccountDeletionBinding;enabled:boolean;scope:Scope;cabinetDisplayId?:string;children:Props['children']}){
   const clerk=useClerk();const latest=useRef(clerk);latest.current=clerk;
   const currentScope=()=>{const session=latest.current.session;return binding.isCurrent()&&session?.status==='active'&&!session.currentTask?{personId:binding.personId,clerkUserId:session.user.id,clerkSessionId:session.id}:null};
   const verify=useReverification(async()=>{
@@ -31,11 +32,11 @@ function ReadyHost({binding,enabled,scope,children}:{binding:AccountDeletionBind
   useEffect(()=>()=>controller.dispose(),[controller]);
   const state=useSyncExternalStore(controller.subscribe,controller.snapshot);
   const busy=['verifying','submitting','pending','status_unavailable','completed'].includes(state.phase);
-  return <>{children({onDeleteAccount:()=>controller.request(),deletionBusy:busy})}<AccountDeletionPanel controller={controller} hideRequestButton/>{['pending','status_unavailable'].includes(state.phase)&&<a href="/account-deletion-status">O‘chirish natijasini alohida tekshirish</a>}</>;
+  return <>{children({onDeleteAccount:()=>controller.request(),deletionBusy:busy})}<AccountDeletionPanel controller={controller} cabinetDisplayId={cabinetDisplayId} hideRequestButton/>{['pending','status_unavailable'].includes(state.phase)?<a href="/account-deletion-status">O‘chirish natijasini alohida tekshirish</a>:<SavedDeletionRecoveryLink/>}</>;
 }
-export function AccountDeletionHost({binding,enabled,children}:Props){
+export function AccountDeletionHost({binding,enabled,children,cabinetDisplayId}:Props){
   const{session}=useSession();const[notice,setNotice]=useState('');
   const scope=useMemo(()=>binding&&session?.status==='active'&&!session.currentTask?{personId:binding.personId,clerkUserId:session.user.id,clerkSessionId:session.id}:null,[binding,session?.id,session?.user.id,session?.status,session?.currentTask]);
-  if(!enabled||!binding||!scope)return <>{children({onDeleteAccount:()=>setNotice(!enabled?'Hisobni o‘chirish hali yoqilmagan.':'Hisobni o‘chirish uchun Clerk hisobingizga qayta kirishingiz kerak.'),deletionBusy:false})}{notice&&<p role="status">{notice}</p>}<a href="/account-deletion-status">Saqlangan o‘chirish natijasini tekshirish</a></>;
-  return <ReadyHost key={JSON.stringify(scope)} binding={binding} enabled={enabled} scope={scope}>{children}</ReadyHost>;
+  if(!enabled||!binding||!scope)return <>{children({onDeleteAccount:()=>setNotice(!enabled?'Hisobni o‘chirish hali yoqilmagan.':'Hisobni o‘chirish uchun Clerk hisobingizga qayta kirishingiz kerak.'),deletionBusy:false})}{notice&&<p role="status">{notice}</p>}<SavedDeletionRecoveryLink/></>;
+  return <ReadyHost key={JSON.stringify(scope)} binding={binding} enabled={enabled} scope={scope} cabinetDisplayId={cabinetDisplayId}>{children}</ReadyHost>;
 }

@@ -687,7 +687,7 @@ for (const file of livenessOnly) {
   selected.set(file.path,file.result);
 }
 // New local deletion review overlay; historic manifests stay byte-identical.
-const ACCOUNT_DELETION_OVERLAY_SHA256 = 'd822f5cce17e759aef199a45eabfce63638027442501c17d96924cc935999301';
+const ACCOUNT_DELETION_OVERLAY_SHA256 = '416cc23833be4c4d32c81bd937d9e47c426ee48a81c31f8d8349963a3439482a';
 const deletionRaw=readTarget('apps/mini-app/tests/fixtures/backend-account-deletion-review-manifest.json');
 assert.equal(sha256(deletionRaw),ACCOUNT_DELETION_OVERLAY_SHA256,'ACCOUNT_DELETION_OVERLAY_MISMATCH');
 const deletion=JSON.parse(deletionRaw);
