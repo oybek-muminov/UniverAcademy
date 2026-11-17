@@ -27,10 +27,10 @@ jobs:
       - run: node --test tests/storage-auth/*.test.mjs tests/persistent-http/*.test.mjs tests/enrollment/identity-staff.test.mjs tests/first-test/*.test.mjs tests/vercel-node/*.test.mjs
       - run: node --test apps/mini-app/tests/path-containment.test.mjs
       - run: npm ci --prefix tests/account-deletion/tooling --no-audit --no-fund
+      - run: npm ci --ignore-scripts --prefix apps/mini-app --no-audit --no-fund
       - run: node --test tests/account-deletion/*.test.mjs tests/telegram-entry/*.test.mjs apps/mini-app/tests/account-deletion-*.test.mjs apps/mini-app/tests/telegram-atomic-*.test.mjs
       - run: node tests/account-deletion/run-native.mjs
       - run: node tests/telegram-entry/run-native.mjs
-      - run: npm ci --ignore-scripts --prefix apps/mini-app --no-audit --no-fund
       - run: node --test apps/mini-app/tests/dashboard-*.test.mjs
       - run: npm --prefix apps/mini-app run build
         env:
