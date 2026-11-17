@@ -686,6 +686,26 @@ for (const file of livenessOnly) {
   assert.deepEqual(selected.get(file.path),file.preimage,"LIVENESS_PREIMAGE_MISMATCH");
   selected.set(file.path,file.result);
 }
+// New local deletion review overlay; historic manifests stay byte-identical.
+const ACCOUNT_DELETION_OVERLAY_SHA256 = 'd822f5cce17e759aef199a45eabfce63638027442501c17d96924cc935999301';
+const deletionRaw=readTarget('apps/mini-app/tests/fixtures/backend-account-deletion-review-manifest.json');
+assert.equal(sha256(deletionRaw),ACCOUNT_DELETION_OVERLAY_SHA256,'ACCOUNT_DELETION_OVERLAY_MISMATCH');
+const deletion=JSON.parse(deletionRaw);
+assert.deepEqual(Object.keys(deletion),['format_version','base_commit','status','files'],'ACCOUNT_DELETION_OVERLAY_SHAPE');
+assert.equal(deletion.format_version,1);assert.equal(deletion.base_commit,'3d4afd1a55918775eb3cbd2da7a004e19d37a6b8');
+assert.equal(deletion.status,'local-review-only-not-deployed');
+// UI/package files were outside historical backend selection. Explicit main-base
+// preimages prevent mislabelling existing source as new files.
+const deletionUnselectedBase=new Map([["apps/mini-app/src/main.tsx",{"path":"apps/mini-app/src/main.tsx","bytes":1389,"sha256":"89ac1460094946e542b3180d284de0171897b88736df452fabae44d06169ecd7"}],["apps/mini-app/package.json",{"path":"apps/mini-app/package.json","bytes":2157,"sha256":"f0b7bcb55d77cf18e7c4dfbc8ba0a21e5fe3d730ec22e6aa8fdcbcaf78c459d4"}],["apps/mini-app/package-lock.json",{"path":"apps/mini-app/package-lock.json","bytes":42432,"sha256":"e0d11ceeccc2325066fa02d61e7b6ecffde79f7e675b0080facc4675f87bf059"}],["apps/mini-app/src/clerk-prebuilt-entry.tsx",{"path":"apps/mini-app/src/clerk-prebuilt-entry.tsx","bytes":4585,"sha256":"ceefb5b9cb50510c59e412c845d3d41cc9e075a74d411df9b8e248353937747b"}],["apps/mini-app/src/common-production-runtime.ts",{"path":"apps/mini-app/src/common-production-runtime.ts","bytes":4845,"sha256":"18c63a91f65eda34f7ac0542af5b852a1fb4c1f80dd69f7fb55fdb3c0b97c48b"}],["apps/mini-app/src/owner-port.ts",{"path":"apps/mini-app/src/owner-port.ts","bytes":9765,"sha256":"886b331e0a4602d2a4fb1589556e879cc6a0d7e3f87a6650fb7e321e080f5d1a"}],["apps/mini-app/src/production-connection.ts",{"path":"apps/mini-app/src/production-connection.ts","bytes":2459,"sha256":"fae2470b79995be98e4ed96ac5457a2dd141466127d559bf8a96e0780f378265"}],["apps/mini-app/src/student-app.tsx",{"path":"apps/mini-app/src/student-app.tsx","bytes":16118,"sha256":"25b833df7e1ac277ff5a712e20dc61b731d0e4c21f637da403daf7c534dbdd08"}],["apps/mini-app/src/clerk-app-session.ts",{"path":"apps/mini-app/src/clerk-app-session.ts","bytes":3375,"sha256":"60cd7c19c8f78730d42554d1bb1ac13259e6a1b73abb54d7a509b56ddb92fcce"}]]);
+const deletionSeen=new Set();
+for(const file of deletion.files){
+ assert.deepEqual(Object.keys(file),['path','preimage','result']);
+ assert(canonicalPath(file.path)&&!deletionSeen.has(file.path),'ACCOUNT_DELETION_PATH_INVALID');deletionSeen.add(file.path);
+ assert.deepEqual(file.preimage,selected.get(file.path)??deletionUnselectedBase.get(file.path)??null,'ACCOUNT_DELETION_PREIMAGE_MISMATCH: '+file.path);
+ assert.deepEqual(Object.keys(file.result),['path','bytes','sha256']);assert.equal(file.result.path,file.path);
+ assert(Number.isSafeInteger(file.result.bytes)&&file.result.bytes>=0&&/^[a-f0-9]{64}$/.test(file.result.sha256));
+ selected.set(file.path,file.result);
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

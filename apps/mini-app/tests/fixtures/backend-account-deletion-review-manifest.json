@@ -1,0 +1,668 @@
+{
+  "format_version": 1,
+  "base_commit": "3d4afd1a55918775eb3cbd2da7a004e19d37a6b8",
+  "status": "local-review-only-not-deployed",
+  "files": [
+    {
+      "path": "apps/mini-app/package-lock.json",
+      "preimage": {
+        "path": "apps/mini-app/package-lock.json",
+        "bytes": 42432,
+        "sha256": "e0d11ceeccc2325066fa02d61e7b6ecffde79f7e675b0080facc4675f87bf059"
+      },
+      "result": {
+        "path": "apps/mini-app/package-lock.json",
+        "bytes": 42467,
+        "sha256": "05c6ae947e87c83412e7814b4de6c29a7dd43ae5612eb417c2523abba64052e7"
+      }
+    },
+    {
+      "path": "apps/mini-app/package.json",
+      "preimage": {
+        "path": "apps/mini-app/package.json",
+        "bytes": 2157,
+        "sha256": "f0b7bcb55d77cf18e7c4dfbc8ba0a21e5fe3d730ec22e6aa8fdcbcaf78c459d4"
+      },
+      "result": {
+        "path": "apps/mini-app/package.json",
+        "bytes": 2188,
+        "sha256": "f170763dbde1552436403d9ac984fa8149ae3f978aeae798472cb301f3a898ee"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-dashboard.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-dashboard.tsx",
+        "bytes": 3112,
+        "sha256": "b390ccf3f63a098cf72a02f575ed6878573e8bcae807dfdce608930c5721aaaf"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/controller.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/controller.ts",
+        "bytes": 9330,
+        "sha256": "8aff74fb59f2dd18a9d8ff604b0d48b8e7cac94c7d77b23f9dca09ff32d45653"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/host.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/host.tsx",
+        "bytes": 4142,
+        "sha256": "568341e5266ec1f8c3c3112ecee34cb63308adcbf030b8bcba961f907b124666"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/http-port.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/http-port.ts",
+        "bytes": 3425,
+        "sha256": "4f7c3ad5db4d1324867c17c9349ad2cc977bc14b6f83bc126cf2ec98df06a554"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/panel.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/panel.tsx",
+        "bytes": 1719,
+        "sha256": "a8c3dd24fcf5926799faa0513856cda57cf9b449a727d44808ba21580eaac8bc"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery-entry.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/recovery-entry.tsx",
+        "bytes": 4390,
+        "sha256": "b94a8524f8a28de5c6be64d80ce238fea64574bc152a53afcc9fcd181930909f"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery-panel.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/recovery-panel.tsx",
+        "bytes": 997,
+        "sha256": "313615998ae9d8d08c729aff4ed48ff6c46ac9c628fd8a583608e373b73101a5"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery-status-port.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/recovery-status-port.ts",
+        "bytes": 1695,
+        "sha256": "7af07565392a9a84f32bd06ae150aedaf7a86bbc9e94af6e9ea1401e3d9e56ea"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/account-deletion-candidate/recovery.ts",
+        "bytes": 5149,
+        "sha256": "6545f6e6fc68961a9a91b3756e196d6b7bd182dbe6853009711c77e9b08993ce"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/clerk-app-session.ts",
+      "preimage": {
+        "path": "apps/mini-app/src/clerk-app-session.ts",
+        "bytes": 3375,
+        "sha256": "60cd7c19c8f78730d42554d1bb1ac13259e6a1b73abb54d7a509b56ddb92fcce"
+      },
+      "result": {
+        "path": "apps/mini-app/src/clerk-app-session.ts",
+        "bytes": 3845,
+        "sha256": "f03dceeb58d334806e4ca9db6fed18e61d3998cf396ff16b35a1f90bb295e6ec"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+      "preimage": {
+        "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+        "bytes": 4585,
+        "sha256": "ceefb5b9cb50510c59e412c845d3d41cc9e075a74d411df9b8e248353937747b"
+      },
+      "result": {
+        "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+        "bytes": 5210,
+        "sha256": "5036bc9f4f6609dd76d102a0bc3dacce2721b7e71a22668a28631d8a878cb3c8"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/common-production-runtime.ts",
+      "preimage": {
+        "path": "apps/mini-app/src/common-production-runtime.ts",
+        "bytes": 4845,
+        "sha256": "18c63a91f65eda34f7ac0542af5b852a1fb4c1f80dd69f7fb55fdb3c0b97c48b"
+      },
+      "result": {
+        "path": "apps/mini-app/src/common-production-runtime.ts",
+        "bytes": 5011,
+        "sha256": "2870e2e008743ba593a055978557c9a09801ae27a4d40c5a0cff7e79f5ee20b4"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/dashboard-profile.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/dashboard-profile.ts",
+        "bytes": 723,
+        "sha256": "b79e4652f41c9b3ade1df1e80337fd09d912af30dc20e3fb247c89096e3a970f"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/dashboard.css",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/dashboard.css",
+        "bytes": 1014,
+        "sha256": "e307a457a74a7a930cbeda009fb345f8b274a7776a381bb7d7a23fb486e668e8"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/main.tsx",
+      "preimage": {
+        "path": "apps/mini-app/src/main.tsx",
+        "bytes": 1389,
+        "sha256": "89ac1460094946e542b3180d284de0171897b88736df452fabae44d06169ecd7"
+      },
+      "result": {
+        "path": "apps/mini-app/src/main.tsx",
+        "bytes": 1688,
+        "sha256": "375990e00169cbd9efab22702fd5028b376fc7fdd5b3d6e5dbd26251b5533ca0"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/owner-client/telegram-atomic-client.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/owner-client/telegram-atomic-client.ts",
+        "bytes": 7008,
+        "sha256": "dc123694120fa65583773077e3db50cacee43e2d509175cec26f3634d9a2c37f"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/owner-port.ts",
+      "preimage": {
+        "path": "apps/mini-app/src/owner-port.ts",
+        "bytes": 9765,
+        "sha256": "886b331e0a4602d2a4fb1589556e879cc6a0d7e3f87a6650fb7e321e080f5d1a"
+      },
+      "result": {
+        "path": "apps/mini-app/src/owner-port.ts",
+        "bytes": 12187,
+        "sha256": "649606b1cf87d7c32d49e178b80616e7b1db09d5940134866157f8f1de1a3e96"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/production-connection.ts",
+      "preimage": {
+        "path": "apps/mini-app/src/production-connection.ts",
+        "bytes": 2459,
+        "sha256": "fae2470b79995be98e4ed96ac5457a2dd141466127d559bf8a96e0780f378265"
+      },
+      "result": {
+        "path": "apps/mini-app/src/production-connection.ts",
+        "bytes": 2478,
+        "sha256": "ab8b6fe3ec4344116b45573d49d997146fe7f785bdd449cd2722feede87c4165"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/student-app.tsx",
+      "preimage": {
+        "path": "apps/mini-app/src/student-app.tsx",
+        "bytes": 16118,
+        "sha256": "25b833df7e1ac277ff5a712e20dc61b731d0e4c21f637da403daf7c534dbdd08"
+      },
+      "result": {
+        "path": "apps/mini-app/src/student-app.tsx",
+        "bytes": 16549,
+        "sha256": "577808440e257e3aa47340b5443db2e55b4429cecd083cdcf649f33a33f2ca65"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
+        "bytes": 4206,
+        "sha256": "17847df52a35b46ef1c5342c7ff70e124c2897a0e568a396516a06b1273f4e2d"
+      }
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-runtime.ts",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/src/telegram-atomic-runtime.ts",
+        "bytes": 5190,
+        "sha256": "dc7b958468aeab5ccb3064ee953d4bc7b51106bf8486a45ab60f0a65180047fe"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/account-deletion-candidate.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/account-deletion-candidate.test.mjs",
+        "bytes": 12843,
+        "sha256": "df6eb5ec69863be5667e35a0f7e3166e60c0b4b4ac9637c2702849653a0f1d8a"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/account-deletion-host.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/account-deletion-host.test.mjs",
+        "bytes": 3569,
+        "sha256": "c5dc47c6c6d7777b63685440da27f44743b804c18776dc8f196eb073dc395dc4"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/account-deletion-recovery.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/account-deletion-recovery.test.mjs",
+        "bytes": 11441,
+        "sha256": "e14298831fe68d24281686e82a33eb2af3a2c4bc10cfc09ed6b27f55eb77ff7f"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/dashboard-profile.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/dashboard-profile.test.mjs",
+        "bytes": 2387,
+        "sha256": "d9a8f817f1e75bfe54f52114bbaa11f9fd74812b8f1ff1ca831e6c5a69444dca"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/dashboard-render.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/dashboard-render.test.mjs",
+        "bytes": 1773,
+        "sha256": "64408649d6e41cd9837d8e726db6a59b7c54331a2df161d0965f0f66df75816b"
+      }
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-atomic-runtime.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "apps/mini-app/tests/telegram-atomic-runtime.test.mjs",
+        "bytes": 8600,
+        "sha256": "f40f76070030785e54d00572903423856dfa281325998423197ec64cb328d638"
+      }
+    },
+    {
+      "path": "contracts/account-deletion.review.openapi.json",
+      "preimage": null,
+      "result": {
+        "path": "contracts/account-deletion.review.openapi.json",
+        "bytes": 5891,
+        "sha256": "b2135db0e6e4850f548a249c57b886db4b3f295467b67275fefca1cf673fab9e"
+      }
+    },
+    {
+      "path": "contracts/telegram-atomic-entry.review.openapi.json",
+      "preimage": null,
+      "result": {
+        "path": "contracts/telegram-atomic-entry.review.openapi.json",
+        "bytes": 3386,
+        "sha256": "092bd6f1d2ff2aa9f16e4c79251545556a065d1ca89a6b871ed6bb23c2d78553"
+      }
+    },
+    {
+      "path": "packages/api-client/telegram-atomic-client.ts",
+      "preimage": null,
+      "result": {
+        "path": "packages/api-client/telegram-atomic-client.ts",
+        "bytes": 7008,
+        "sha256": "dc123694120fa65583773077e3db50cacee43e2d509175cec26f3634d9a2c37f"
+      }
+    },
+    {
+      "path": "runtime/account-deletion-api.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/account-deletion-api.mjs",
+        "bytes": 6553,
+        "sha256": "76a298afc709740084bc397c68af2aa256ae6d280a5d95682f1228b4ceb8713b"
+      }
+    },
+    {
+      "path": "runtime/account-deletion-http.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/account-deletion-http.mjs",
+        "bytes": 3612,
+        "sha256": "c1d96cd0e35cd72aa6e0bdabe736986440fcf8961e3ec3f00de83fccaaae9ff1"
+      }
+    },
+    {
+      "path": "runtime/account-deletion-provider.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/account-deletion-provider.mjs",
+        "bytes": 4301,
+        "sha256": "a622c5615eac18bac8ae21d88f72b6d366f3fef802c337afd437fc0a6c42e5f6"
+      }
+    },
+    {
+      "path": "runtime/account-deletion-recovery-worker.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/account-deletion-recovery-worker.mjs",
+        "bytes": 4394,
+        "sha256": "6012242cb9b704d6239098d1258f1cf66466158d808c51e926f0e5a244c0383d"
+      }
+    },
+    {
+      "path": "runtime/account-deletion-verifier.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/account-deletion-verifier.mjs",
+        "bytes": 1412,
+        "sha256": "164883aaee3a2e9fd45b3eb43955db8019cc9756595d9d4880d136afe523f6b0"
+      }
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "preimage": {
+        "path": "runtime/cloudflare-entry.mjs",
+        "bytes": 7403,
+        "sha256": "86fc848067651db8a0ef2aa73a63202b6e61692aad44b3e78efa73681d720a1d"
+      },
+      "result": {
+        "path": "runtime/cloudflare-entry.mjs",
+        "bytes": 9015,
+        "sha256": "15fcdf2eca7de31f801a22ea224bedf918bd340b748305f0d91c7788b701ce06"
+      }
+    },
+    {
+      "path": "runtime/telegram-clerk-entry-api.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/telegram-clerk-entry-api.mjs",
+        "bytes": 6657,
+        "sha256": "5e0d94e0f7555ae84a66ee0891e31f48ed5185add3b800690df31cb6360280d9"
+      }
+    },
+    {
+      "path": "runtime/telegram-clerk-entry-http.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/telegram-clerk-entry-http.mjs",
+        "bytes": 3966,
+        "sha256": "ec8e70c2aa081ef23bf9c986f53e563a90576c7c9dfd292ab735ba320f28c904"
+      }
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/account-deletion.ts",
+      "preimage": null,
+      "result": {
+        "path": "supabase/functions/univeracademy-api/account-deletion.ts",
+        "bytes": 4937,
+        "sha256": "201124d2f4c1df90f5f74bc883f90ccd8ff50d53f3a827b29d44ec6f218f5003"
+      }
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/account-deletion-rows.ts",
+      "preimage": null,
+      "result": {
+        "path": "supabase/functions/univeracademy-api/storage/account-deletion-rows.ts",
+        "bytes": 6735,
+        "sha256": "c02689edbf66299b8e8f440d47a60c04048395e386813d88736eb15d64848c72"
+      }
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-clerk-entry-rows.ts",
+      "preimage": null,
+      "result": {
+        "path": "supabase/functions/univeracademy-api/storage/telegram-clerk-entry-rows.ts",
+        "bytes": 7982,
+        "sha256": "df6973acc9f579dff12fc2144838d7e000b63f2f491c01de674967a55ddba891"
+      }
+    },
+    {
+      "path": "supabase/proposals/account-deletion-rebuild.review.sql",
+      "preimage": null,
+      "result": {
+        "path": "supabase/proposals/account-deletion-rebuild.review.sql",
+        "bytes": 20358,
+        "sha256": "dc5990746282b49c441cef16d04905c50c5bcd5d4f417b4031ddafc1d4ec9be9"
+      }
+    },
+    {
+      "path": "tests/account-deletion/contract.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/contract.test.mjs",
+        "bytes": 1520,
+        "sha256": "73d773f98772cab661ce8ee45197de35aa5c3d036f7b35300d29dd54c0235897"
+      }
+    },
+    {
+      "path": "tests/account-deletion/coordinator.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/coordinator.test.mjs",
+        "bytes": 6272,
+        "sha256": "a4b759ceede26a9bb175842fee1f84d8b4965f4bc3b6e58d67cdbf854a03370d"
+      }
+    },
+    {
+      "path": "tests/account-deletion/http.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/http.test.mjs",
+        "bytes": 2093,
+        "sha256": "48665462f923c5a1b44fc2522e46177bc391970a7050e3233a0cf48b292156d6"
+      }
+    },
+    {
+      "path": "tests/account-deletion/provider-readiness.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/provider-readiness.test.mjs",
+        "bytes": 3997,
+        "sha256": "d565b19267a772a6d6a2f34a5fe9add8040184faefd35c66f1057831b1de7a91"
+      }
+    },
+    {
+      "path": "tests/account-deletion/recovery-worker.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/recovery-worker.test.mjs",
+        "bytes": 5509,
+        "sha256": "123ee27e1ad86e0cd31fb9e7c2e86c7d8760d63f4c8eda88841b926dd621c1fd"
+      }
+    },
+    {
+      "path": "tests/account-deletion/request-composition.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/request-composition.test.mjs",
+        "bytes": 5801,
+        "sha256": "cfa8300fc2af12db0b82fb6f940e79cbc380fae91df78683308af3c0993b8a50"
+      }
+    },
+    {
+      "path": "tests/account-deletion/rows.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/rows.test.mjs",
+        "bytes": 4098,
+        "sha256": "1fc1052926fa0aeee7e9ece7dbf9184a3f41876468ca3d0f51e84e8838e020ce"
+      }
+    },
+    {
+      "path": "tests/account-deletion/run-native.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/run-native.mjs",
+        "bytes": 1318,
+        "sha256": "3946a844198721f31837bae70f31ae190d317c3e11397117cf103ce068d5fce0"
+      }
+    },
+    {
+      "path": "tests/account-deletion/schema-catalog.json",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/schema-catalog.json",
+        "bytes": 32427,
+        "sha256": "3077c9593e0e4368ef5925f3d4f3af6560a94cbc4e471f41ee2c58386727133e"
+      }
+    },
+    {
+      "path": "tests/account-deletion/schema-fixture.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/schema-fixture.mjs",
+        "bytes": 6899,
+        "sha256": "6cfc0a99041bc2ea9d9cc1481bbb8793fe3e90797fd1e2ee049335b107fd31eb"
+      }
+    },
+    {
+      "path": "tests/account-deletion/schema-lifecycle.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/schema-lifecycle.test.mjs",
+        "bytes": 10103,
+        "sha256": "3943b579194a48475f075409ea1f7eb52ab6a4725057aadd23dcac2d22e3570e"
+      }
+    },
+    {
+      "path": "tests/account-deletion/schema-native-races.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/schema-native-races.test.mjs",
+        "bytes": 4033,
+        "sha256": "208f3e8b455a52edc20070bb74a8e7096d0946ba5234e3cfaa989bfc45b2643c"
+      }
+    },
+    {
+      "path": "tests/account-deletion/tooling/package-lock.json",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/tooling/package-lock.json",
+        "bytes": 11691,
+        "sha256": "1f7aab4b3d2c8616d98b952f0fded1569816193181958f36201a4f7d81aa8ddb"
+      }
+    },
+    {
+      "path": "tests/account-deletion/tooling/package.json",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/tooling/package.json",
+        "bytes": 159,
+        "sha256": "dd237ebeb386957005b296a08e6f467004d600d1ea793dc968d6271b08fc9061"
+      }
+    },
+    {
+      "path": "tests/account-deletion/verifier.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/account-deletion/verifier.test.mjs",
+        "bytes": 1745,
+        "sha256": "bc7b8829a0a1196711bf05c1dcd626433176f82aeedda6236ab72487c8c7e29a"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/atomic.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/atomic.test.mjs",
+        "bytes": 5069,
+        "sha256": "a70a9fbe3574b5cdc288260da1720813870ba989566f52d0e1ff3749db83bd06"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/client.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/client.test.mjs",
+        "bytes": 6579,
+        "sha256": "20284c4fcb2e6eabb0bc2affa04b672dc3a3fa0445964d580954da980b81367a"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/composition.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/composition.test.mjs",
+        "bytes": 7163,
+        "sha256": "55206ff772dd1cba6188a7b9538508767290daf184e381b2d531537c7fbf8364"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/contract.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/contract.test.mjs",
+        "bytes": 1025,
+        "sha256": "37cc6cd7680b148512b5c8239e3b273d9c0a3b9c86b89c630f73a25625bd6777"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/http.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/http.test.mjs",
+        "bytes": 2870,
+        "sha256": "b98a80c664e6e8fd611705d891550cc97333b8ec6a7e62b0a2fa329c5126dfd7"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/native-atomic.test.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/native-atomic.test.mjs",
+        "bytes": 8065,
+        "sha256": "5a51bb8c17126d9888882e9daec7aa677a6da490b932fae1676ab12ff986a5ca"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/native-fixture.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/native-fixture.mjs",
+        "bytes": 6268,
+        "sha256": "3b5c59fa94323048735286b42d747fb3d81f5b0ddc950336417dd0c1b62ab85c"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/production-auth-extended-catalog.json",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/production-auth-extended-catalog.json",
+        "bytes": 128884,
+        "sha256": "fa2b50121c892bbefe9eced6225445d1bb0b7546c5c3d04c327f5ebbe9f2852b"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/run-native.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/run-native.mjs",
+        "bytes": 1300,
+        "sha256": "66c4eb9fa850681624a3f23a5031fdcf164d30d8e5e32ec48fd02e05ca0954fd"
+      }
+    },
+    {
+      "path": "tests/telegram-entry/statement-fixture.mjs",
+      "preimage": null,
+      "result": {
+        "path": "tests/telegram-entry/statement-fixture.mjs",
+        "bytes": 8519,
+        "sha256": "78b96c6c67bec56a7717fadd3713581dcf017535f43da1da218894d8d620ce03"
+      }
+    }
+  ]
+}

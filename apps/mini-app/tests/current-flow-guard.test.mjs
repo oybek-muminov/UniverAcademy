@@ -10,6 +10,8 @@ import { spawnSync } from 'node:child_process';
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
 const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
+const deletionOverlay='apps/mini-app/tests/fixtures/backend-account-deletion-review-manifest.json';
+const deletionManifest=JSON.parse(readFileSync(join(source,deletionOverlay),'utf8'));
 const currentRuntime = 'apps/mini-app/tests/fixtures/backend-clerk-runtime-overlay-20261116.json';
 const previousContentBase = 'apps/mini-app/tests/fixtures/backend-accepted-fixtures-14f0b074-manifest.json';
 const previousAssembly = 'apps/mini-app/tests/fixtures/backend-telegram-return-assembly-manifest.json';
@@ -37,7 +39,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime]]);
+const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -45,7 +47,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -561,3 +563,13 @@ test('required Hyperdrive helper Git executable bit is rejected', () => check(ro
 test('required Hyperdrive helper cannot escape the scratch root through a symlink', () => check(root => {
   rmSync(join(root, requiredHelper)); symlinkSync(join(source, requiredHelper), join(root, requiredHelper));
 }, 'BACKEND_TARGET_PATH_ESCAPE: ' + requiredHelper));
+
+test('account deletion overlay tampering is rejected',()=>check(root=>{
+ const path=join(root,deletionOverlay);appendFileSync(path,' ');
+},'ACCOUNT_DELETION_OVERLAY_MISMATCH'));
+for(const file of deletionManifest.files){
+ test('account deletion candidate source pinned: '+file.path,()=>check(root=>{appendFileSync(join(root,file.path),' ');},'BACKEND_TARGET_SIZE_MISMATCH: '+file.path));
+}
+test('public recovery host entry bytes are pinned',()=>check(root=>{
+ appendFileSync(join(root,'apps/mini-app/src/main.tsx'),' ');
+},'BACKEND_TARGET_SIZE_MISMATCH: apps/mini-app/src/main.tsx'));

@@ -1,3 +1,5 @@
+import {AccountDeletionHost} from './account-deletion-candidate/host.tsx';
+import { AtomicTelegramEntry } from './telegram-atomic-entry.tsx';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { SignIn, useClerk, useSession } from '@clerk/react';
 import type { SignInFutureResource, SignUpFutureResource } from '@clerk/react/types';
@@ -11,7 +13,11 @@ import { createTelegramReturnLaunch } from './telegram-return-launch.ts';
 // Clerk supplies the form/design. No appearance overrides, custom credential
 // fields, synthetic provider or roles are installed. Telegram links use only
 // reviewed server operations; a widget/cookie/lookup never grants a cabinet.
-export function PrebuiltReadyEntry({ config, scope, signIn, signUp }: {
+export function PrebuiltReadyEntry(props: {config:CommonEntryConfig;scope:unknown;signIn:SignInFutureResource;signUp:SignUpFutureResource}) {
+  if(props.config.telegramAtomicEnabled && hasTelegramLaunchContext(props.scope))return <AtomicTelegramEntry config={props.config} scope={props.scope}/>;
+  return <LegacyPrebuiltReadyEntry {...props}/>;
+}
+function LegacyPrebuiltReadyEntry({ config, scope, signIn, signUp }: {
   config: CommonEntryConfig; scope: unknown; signIn: SignInFutureResource; signUp: SignUpFutureResource;
 }) {
   const clerk = useClerk(), { session } = useSession();
@@ -43,8 +49,8 @@ export function PrebuiltReadyEntry({ config, scope, signIn, signUp }: {
   }, [runtime, launch]);
   useEffect(() => () => gate.dispose(), [gate]);
   if (state.step === 'ready' && state.flow && (runtime.telegramOutcome() === 'resumed' || gate.matches()))
-    return <StudentApp studentFlow={state.flow} mode="telegram" onEnter={() => act(() => gate.reset())}
-      onLogout={() => act(() => gate.logout())} />;
+    return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={() => act(() => gate.reset())}
+      onLogout={() => act(() => gate.logout())} />}</AccountDeletionHost>;
   const canContinue = session?.status === 'active' && !session.currentTask;
   const blockedReturn = runtime.telegramOutcome() === 'failed';
   return <main className="shell">

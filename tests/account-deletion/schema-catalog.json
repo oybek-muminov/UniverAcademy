@@ -1,0 +1,1268 @@
+{
+  "tables": [
+    {
+      "typ": "uuid",
+      "attname": "attempt_id",
+      "relname": "answers",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "question_id",
+      "relname": "answers",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "selected_option_id",
+      "relname": "answers",
+      "attnotnull": false
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "revision",
+      "relname": "answers",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "saved_at_ms",
+      "relname": "answers",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "series_state_revision",
+      "relname": "answers",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "assignments",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "group_id",
+      "relname": "assignments",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "demo_id",
+      "relname": "assignments",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "version_id",
+      "relname": "assignments",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "revision",
+      "relname": "assignments",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "record",
+      "relname": "assignments",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "attempt_cancellations",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "attempt_id",
+      "relname": "attempt_cancellations",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "record",
+      "relname": "attempt_cancellations",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "assignment_id",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "demo_id",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "generation",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "state_revision",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "body",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "frozen_test",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "question_order",
+      "relname": "attempts",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.proof_digest",
+      "attname": "digest",
+      "relname": "clerk_exchange_replays",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "clerk_exchange_replays",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "consumed_at_ms",
+      "relname": "clerk_exchange_replays",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "family_id",
+      "relname": "clerk_family_bindings",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "issuer",
+      "relname": "clerk_family_bindings",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "subject",
+      "relname": "clerk_family_bindings",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "sid",
+      "relname": "clerk_family_bindings",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "clerk_family_bindings",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "issuer",
+      "relname": "clerk_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "subject",
+      "relname": "clerk_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "clerk_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "enabled",
+      "relname": "clerk_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "issuer",
+      "relname": "clerk_student_sessions",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "subject",
+      "relname": "clerk_student_sessions",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "sid",
+      "relname": "clerk_student_sessions",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "clerk_student_sessions",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "retired_at_ms",
+      "relname": "clerk_student_sessions",
+      "attnotnull": false
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "command_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "key",
+      "relname": "command_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "payload",
+      "relname": "command_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "attempt_id",
+      "relname": "command_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "demos",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "subject_id",
+      "relname": "demos",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "title",
+      "relname": "demos",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "version_id",
+      "relname": "draft_questions",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "draft_questions",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "position",
+      "relname": "draft_questions",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "record",
+      "relname": "draft_questions",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "demo_id",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "current_attempt_id",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "generation",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "state_revision",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "normal_attempt_used",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "official_attempt_id",
+      "relname": "exam_series",
+      "attnotnull": false
+    },
+    {
+      "typ": "text",
+      "attname": "recovery_state",
+      "relname": "exam_series",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "recovery_window",
+      "relname": "exam_series",
+      "attnotnull": false
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "grants",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "assignment_id",
+      "relname": "grants",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "rostered",
+      "relname": "grants",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "grant_epoch",
+      "relname": "grants",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "groups",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "revision",
+      "relname": "groups",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "status",
+      "relname": "groups",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.proof_digest",
+      "attname": "digest",
+      "relname": "init_data_replays",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "init_data_replays",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "consumed_at_ms",
+      "relname": "init_data_replays",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "memberships",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "affinity_group_id",
+      "relname": "memberships",
+      "attnotnull": false
+    },
+    {
+      "typ": "boolean",
+      "attname": "active",
+      "relname": "memberships",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "revision",
+      "relname": "memberships",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "epoch",
+      "relname": "memberships",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "attempt_id",
+      "relname": "ordinary_results",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "exact_result",
+      "relname": "ordinary_results",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "people",
+      "attnotnull": true
+    },
+    {
+      "typ": "bigint",
+      "attname": "telegram_id",
+      "relname": "people",
+      "attnotnull": false
+    },
+    {
+      "typ": "text",
+      "attname": "qadam_id",
+      "relname": "people",
+      "attnotnull": false
+    },
+    {
+      "typ": "boolean",
+      "attname": "enabled",
+      "relname": "people",
+      "attnotnull": true
+    },
+    {
+      "typ": "text[]",
+      "attname": "roles",
+      "relname": "people",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "profile",
+      "relname": "people",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "staff_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "approved",
+      "relname": "staff_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "manage_roster",
+      "relname": "staff_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "manage_content",
+      "relname": "staff_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "all_groups",
+      "relname": "staff_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "all_subjects",
+      "relname": "staff_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "command_key",
+      "relname": "staff_audit",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "actor_id",
+      "relname": "staff_audit",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "action",
+      "relname": "staff_audit",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "target_id",
+      "relname": "staff_audit",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "revision",
+      "relname": "staff_audit",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "at_ms",
+      "relname": "staff_audit",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "staff_group_scope",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "group_id",
+      "relname": "staff_group_scope",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "revoked_at_ms",
+      "relname": "staff_group_scope",
+      "attnotnull": false
+    },
+    {
+      "typ": "text",
+      "attname": "issuer",
+      "relname": "staff_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "provider_subject",
+      "relname": "staff_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "staff_identities",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "revoked_at_ms",
+      "relname": "staff_identities",
+      "attnotnull": false
+    },
+    {
+      "typ": "uuid",
+      "attname": "actor_id",
+      "relname": "staff_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "key",
+      "relname": "staff_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "payload",
+      "relname": "staff_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "response",
+      "relname": "staff_receipts",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "staff_subject_scope",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "subject_id",
+      "relname": "staff_subject_scope",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "revoked_at_ms",
+      "relname": "staff_subject_scope",
+      "attnotnull": false
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "statistical_bonuses",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "attempt_id",
+      "relname": "statistical_bonuses",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "record",
+      "relname": "statistical_bonuses",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.proof_digest",
+      "attname": "digest",
+      "relname": "student_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "family_id",
+      "relname": "student_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "expires_at_ms",
+      "relname": "student_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "superseded",
+      "relname": "student_access",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "student_families",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "student_families",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "expires_at_ms",
+      "relname": "student_families",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "revoked_at_ms",
+      "relname": "student_families",
+      "attnotnull": false
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "logout_retain_until_ms",
+      "relname": "student_families",
+      "attnotnull": false
+    },
+    {
+      "typ": "text",
+      "attname": "auth_provider",
+      "relname": "student_families",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.proof_digest",
+      "attname": "digest",
+      "relname": "student_refresh",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "family_id",
+      "relname": "student_refresh",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "consumed",
+      "relname": "student_refresh",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "person_id",
+      "relname": "teacher_subject_approvals",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "subject_id",
+      "relname": "teacher_subject_approvals",
+      "attnotnull": true
+    },
+    {
+      "typ": "boolean",
+      "attname": "approved",
+      "relname": "teacher_subject_approvals",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.ms_time",
+      "attname": "revoked_at_ms",
+      "relname": "teacher_subject_approvals",
+      "attnotnull": false
+    },
+    {
+      "typ": "uuid",
+      "attname": "id",
+      "relname": "test_versions",
+      "attnotnull": true
+    },
+    {
+      "typ": "uuid",
+      "attname": "demo_id",
+      "relname": "test_versions",
+      "attnotnull": true
+    },
+    {
+      "typ": "ua_private.safe_counter",
+      "attname": "revision",
+      "relname": "test_versions",
+      "attnotnull": true
+    },
+    {
+      "typ": "text",
+      "attname": "status",
+      "relname": "test_versions",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "wire",
+      "relname": "test_versions",
+      "attnotnull": true
+    },
+    {
+      "typ": "jsonb",
+      "attname": "published_snapshot",
+      "relname": "test_versions",
+      "attnotnull": false
+    }
+  ],
+  "constraints": [
+    {
+      "def": "FOREIGN KEY (attempt_id) REFERENCES ua_private.attempts(id)",
+      "tbl": "ua_private.answers",
+      "conname": "answers_attempt_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (attempt_id, question_id)",
+      "tbl": "ua_private.answers",
+      "conname": "answers_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (demo_id) REFERENCES ua_private.demos(id)",
+      "tbl": "ua_private.assignments",
+      "conname": "assignments_demo_id_fkey"
+    },
+    {
+      "def": "UNIQUE (group_id, demo_id)",
+      "tbl": "ua_private.assignments",
+      "conname": "assignments_group_id_demo_id_key"
+    },
+    {
+      "def": "FOREIGN KEY (group_id) REFERENCES ua_private.groups(id)",
+      "tbl": "ua_private.assignments",
+      "conname": "assignments_group_id_fkey"
+    },
+    {
+      "def": "UNIQUE (id, demo_id)",
+      "tbl": "ua_private.assignments",
+      "conname": "assignments_id_demo_id_key"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.assignments",
+      "conname": "assignments_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (version_id, demo_id) REFERENCES ua_private.test_versions(id, demo_id)",
+      "tbl": "ua_private.assignments",
+      "conname": "assignments_version_id_demo_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (attempt_id, person_id) REFERENCES ua_private.attempts(id, person_id)",
+      "tbl": "ua_private.attempt_cancellations",
+      "conname": "attempt_cancellations_attempt_id_person_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.attempt_cancellations",
+      "conname": "attempt_cancellations_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (attempt_id)",
+      "tbl": "ua_private.attempt_cancellations",
+      "conname": "attempt_cancellations_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (assignment_id, demo_id) REFERENCES ua_private.assignments(id, demo_id)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_assignment_id_demo_id_fkey"
+    },
+    {
+      "def": "UNIQUE (id, person_id, demo_id, generation)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_id_person_id_demo_id_generation_key"
+    },
+    {
+      "def": "UNIQUE (id, person_id, demo_id)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_id_person_id_demo_id_key"
+    },
+    {
+      "def": "UNIQUE (id, person_id)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_id_person_id_key"
+    },
+    {
+      "def": "FOREIGN KEY (person_id, demo_id) REFERENCES ua_private.exam_series(person_id, demo_id) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_person_id_demo_id_fkey"
+    },
+    {
+      "def": "UNIQUE (person_id, demo_id, generation)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_person_id_demo_id_generation_key"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.attempts",
+      "conname": "attempts_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.clerk_exchange_replays",
+      "conname": "clerk_exchange_replays_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (digest)",
+      "tbl": "ua_private.clerk_exchange_replays",
+      "conname": "clerk_exchange_replays_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (family_id, person_id) REFERENCES ua_private.student_families(id, person_id) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.clerk_family_bindings",
+      "conname": "clerk_family_bindings_family_id_person_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (issuer, subject, sid, person_id) REFERENCES ua_private.clerk_student_sessions(issuer, subject, sid, person_id) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.clerk_family_bindings",
+      "conname": "clerk_family_bindings_issuer_subject_sid_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (family_id)",
+      "tbl": "ua_private.clerk_family_bindings",
+      "conname": "clerk_family_bindings_pkey"
+    },
+    {
+      "def": "UNIQUE (issuer, subject, person_id)",
+      "tbl": "ua_private.clerk_identities",
+      "conname": "clerk_identities_issuer_subject_person_id_key"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.clerk_identities",
+      "conname": "clerk_identities_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (issuer, subject)",
+      "tbl": "ua_private.clerk_identities",
+      "conname": "clerk_identities_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (issuer, subject, person_id) REFERENCES ua_private.clerk_identities(issuer, subject, person_id)",
+      "tbl": "ua_private.clerk_student_sessions",
+      "conname": "clerk_student_sessions_issuer_subject_person_id_fkey"
+    },
+    {
+      "def": "UNIQUE (issuer, subject, sid, person_id)",
+      "tbl": "ua_private.clerk_student_sessions",
+      "conname": "clerk_student_sessions_issuer_subject_sid_person_id_key"
+    },
+    {
+      "def": "PRIMARY KEY (issuer, subject, sid)",
+      "tbl": "ua_private.clerk_student_sessions",
+      "conname": "clerk_student_sessions_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (attempt_id, person_id) REFERENCES ua_private.attempts(id, person_id)",
+      "tbl": "ua_private.command_receipts",
+      "conname": "command_receipts_attempt_id_person_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.command_receipts",
+      "conname": "command_receipts_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (key)",
+      "tbl": "ua_private.command_receipts",
+      "conname": "command_receipts_pkey"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.demos",
+      "conname": "demos_pkey"
+    },
+    {
+      "def": "PRIMARY KEY (version_id, id)",
+      "tbl": "ua_private.draft_questions",
+      "conname": "draft_questions_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (version_id) REFERENCES ua_private.test_versions(id)",
+      "tbl": "ua_private.draft_questions",
+      "conname": "draft_questions_version_id_fkey"
+    },
+    {
+      "def": "UNIQUE (version_id, \"position\") DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.draft_questions",
+      "conname": "draft_questions_version_id_position_key"
+    },
+    {
+      "def": "FOREIGN KEY (demo_id) REFERENCES ua_private.demos(id)",
+      "tbl": "ua_private.exam_series",
+      "conname": "exam_series_demo_id_fkey"
+    },
+    {
+      "def": "UNIQUE (id)",
+      "tbl": "ua_private.exam_series",
+      "conname": "exam_series_id_key"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.exam_series",
+      "conname": "exam_series_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id, demo_id)",
+      "tbl": "ua_private.exam_series",
+      "conname": "exam_series_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (current_attempt_id, person_id, demo_id, generation) REFERENCES ua_private.attempts(id, person_id, demo_id, generation) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.exam_series",
+      "conname": "series_current_attempt_fk"
+    },
+    {
+      "def": "FOREIGN KEY (official_attempt_id, person_id, demo_id) REFERENCES ua_private.attempts(id, person_id, demo_id) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.exam_series",
+      "conname": "series_official_attempt_fk"
+    },
+    {
+      "def": "FOREIGN KEY (assignment_id) REFERENCES ua_private.assignments(id)",
+      "tbl": "ua_private.grants",
+      "conname": "grants_assignment_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.memberships(person_id)",
+      "tbl": "ua_private.grants",
+      "conname": "grants_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id, assignment_id)",
+      "tbl": "ua_private.grants",
+      "conname": "grants_pkey"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.groups",
+      "conname": "groups_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.init_data_replays",
+      "conname": "init_data_replays_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (digest)",
+      "tbl": "ua_private.init_data_replays",
+      "conname": "init_data_replays_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (affinity_group_id) REFERENCES ua_private.groups(id)",
+      "tbl": "ua_private.memberships",
+      "conname": "memberships_affinity_group_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.memberships",
+      "conname": "memberships_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id)",
+      "tbl": "ua_private.memberships",
+      "conname": "memberships_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (attempt_id) REFERENCES ua_private.attempts(id)",
+      "tbl": "ua_private.ordinary_results",
+      "conname": "ordinary_results_attempt_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (attempt_id)",
+      "tbl": "ua_private.ordinary_results",
+      "conname": "ordinary_results_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (id) REFERENCES ua_private.memberships(person_id) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.people",
+      "conname": "people_membership_required"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.people",
+      "conname": "people_pkey"
+    },
+    {
+      "def": "UNIQUE (qadam_id)",
+      "tbl": "ua_private.people",
+      "conname": "people_qadam_id_key"
+    },
+    {
+      "def": "UNIQUE (telegram_id)",
+      "tbl": "ua_private.people",
+      "conname": "people_telegram_id_key"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.staff_access",
+      "conname": "staff_access_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id)",
+      "tbl": "ua_private.staff_access",
+      "conname": "staff_access_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (actor_id, command_key) REFERENCES ua_private.staff_receipts(actor_id, key) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.staff_audit",
+      "conname": "staff_audit_actor_id_command_key_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (command_key)",
+      "tbl": "ua_private.staff_audit",
+      "conname": "staff_audit_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (group_id) REFERENCES ua_private.groups(id)",
+      "tbl": "ua_private.staff_group_scope",
+      "conname": "staff_group_scope_group_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.staff_group_scope",
+      "conname": "staff_group_scope_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id, group_id)",
+      "tbl": "ua_private.staff_group_scope",
+      "conname": "staff_group_scope_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.staff_identities",
+      "conname": "staff_identities_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (issuer, provider_subject)",
+      "tbl": "ua_private.staff_identities",
+      "conname": "staff_identities_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (key) REFERENCES ua_private.staff_audit(command_key) DEFERRABLE INITIALLY DEFERRED",
+      "tbl": "ua_private.staff_receipts",
+      "conname": "staff_receipt_audit_required"
+    },
+    {
+      "def": "FOREIGN KEY (actor_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.staff_receipts",
+      "conname": "staff_receipts_actor_id_fkey"
+    },
+    {
+      "def": "UNIQUE (key)",
+      "tbl": "ua_private.staff_receipts",
+      "conname": "staff_receipts_key_key"
+    },
+    {
+      "def": "PRIMARY KEY (actor_id, key)",
+      "tbl": "ua_private.staff_receipts",
+      "conname": "staff_receipts_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.staff_subject_scope",
+      "conname": "staff_subject_scope_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id, subject_id)",
+      "tbl": "ua_private.staff_subject_scope",
+      "conname": "staff_subject_scope_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (attempt_id, person_id) REFERENCES ua_private.attempts(id, person_id)",
+      "tbl": "ua_private.statistical_bonuses",
+      "conname": "statistical_bonuses_attempt_id_person_id_fkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.statistical_bonuses",
+      "conname": "statistical_bonuses_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (attempt_id)",
+      "tbl": "ua_private.statistical_bonuses",
+      "conname": "statistical_bonuses_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (family_id) REFERENCES ua_private.student_families(id)",
+      "tbl": "ua_private.student_access",
+      "conname": "student_access_family_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (digest)",
+      "tbl": "ua_private.student_access",
+      "conname": "student_access_pkey"
+    },
+    {
+      "def": "UNIQUE (id, person_id)",
+      "tbl": "ua_private.student_families",
+      "conname": "student_families_id_person_id_key"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.student_families",
+      "conname": "student_families_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.student_families",
+      "conname": "student_families_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (family_id) REFERENCES ua_private.student_families(id)",
+      "tbl": "ua_private.student_refresh",
+      "conname": "student_refresh_family_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (digest)",
+      "tbl": "ua_private.student_refresh",
+      "conname": "student_refresh_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (person_id) REFERENCES ua_private.people(id)",
+      "tbl": "ua_private.teacher_subject_approvals",
+      "conname": "teacher_subject_approvals_person_id_fkey"
+    },
+    {
+      "def": "PRIMARY KEY (person_id, subject_id)",
+      "tbl": "ua_private.teacher_subject_approvals",
+      "conname": "teacher_subject_approvals_pkey"
+    },
+    {
+      "def": "FOREIGN KEY (demo_id) REFERENCES ua_private.demos(id)",
+      "tbl": "ua_private.test_versions",
+      "conname": "test_versions_demo_id_fkey"
+    },
+    {
+      "def": "UNIQUE (id, demo_id)",
+      "tbl": "ua_private.test_versions",
+      "conname": "test_versions_id_demo_id_key"
+    },
+    {
+      "def": "PRIMARY KEY (id)",
+      "tbl": "ua_private.test_versions",
+      "conname": "test_versions_pkey"
+    }
+  ]
+}

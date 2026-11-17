@@ -1,0 +1,1949 @@
+{
+  "functions": [
+    {
+      "name": "locate_student_access",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.locate_student_access(p_digest text)\n RETURNS TABLE(person_id uuid)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ BEGIN\n  IF NOT COALESCE(length(p_digest)=64 AND p_digest ~ '^[0-9a-f]{64}$',false)\n    OR current_setting('ua.phase',true) IS DISTINCT FROM 'auth'\n    OR current_setting('ua.person_id',true) IS DISTINCT FROM ''\n    OR current_setting('ua.person_ids',true) IS DISTINCT FROM '[]'\n    OR current_setting('ua.clerk_issuer',true) IS DISTINCT FROM ''\n    OR current_setting('ua.clerk_subject',true) IS DISTINCT FROM ''\n    OR current_setting('ua.telegram_id',true) IS DISTINCT FROM '' THEN\n    RAISE EXCEPTION 'INVALID_ACCESS_LOCATOR_SCOPE' USING ERRCODE='42501';\n  END IF;\n  -- Hint only, INCLUDING expired/superseded/revoked relationships. Current\n  -- authorization happens under person locks in the trusted application.\n  RETURN QUERY SELECT f.person_id FROM ua_private.student_access a\n    JOIN ua_private.student_families f ON f.id=a.family_id WHERE a.digest=p_digest;\nEND $function$\n",
+      "owner": "ua_access_locator_owner",
+      "acl": [
+        "ua_access_locator_owner=X/ua_access_locator_owner",
+        "ua_runtime=X/ua_access_locator_owner"
+      ]
+    },
+    {
+      "name": "lock_people",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.lock_people(p_person_ids uuid[])\n RETURNS TABLE(id uuid)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ BEGIN\n  IF p_person_ids IS NULL OR cardinality(p_person_ids)=0 OR array_ndims(p_person_ids)<>1\n    OR array_position(p_person_ids,NULL) IS NOT NULL\n    OR p_person_ids IS DISTINCT FROM ARRAY(SELECT DISTINCT v.pid FROM unnest(p_person_ids) AS v(pid) ORDER BY v.pid)\n    OR current_setting('ua.phase',true) IS DISTINCT FROM 'auth'\n    OR current_setting('ua.telegram_id',true) IS DISTINCT FROM ''\n    OR current_setting('ua.person_id',true) IS NULL\n    OR current_setting('ua.person_ids',true) IS NULL\n    OR current_setting('ua.clerk_issuer',true) IS NULL OR current_setting('ua.clerk_subject',true) IS NULL THEN\n    RAISE EXCEPTION 'INVALID_PERSON_LOCK_SCOPE' USING ERRCODE='42501';\n  END IF;\n  IF current_setting('ua.person_ids',true)::jsonb IS DISTINCT FROM to_jsonb(p_person_ids)\n    OR current_setting('ua.person_id',true) IS DISTINCT FROM (CASE WHEN cardinality(p_person_ids)=1 THEN p_person_ids[1]::text ELSE '' END)\n    OR NOT ((current_setting('ua.clerk_issuer',true)='' AND current_setting('ua.clerk_subject',true)='')\n      OR (current_setting('ua.clerk_issuer',true) ~ '^https://[^/[:space:]]+$' AND current_setting('ua.clerk_subject',true) ~ '^user_[A-Za-z0-9]+$'\n        AND current_setting('ua.clerk_subject',true) !~ '[[:space:]]')) THEN\n    RAISE EXCEPTION 'INVALID_PERSON_LOCK_SCOPE' USING ERRCODE='42501';\n  END IF;\n  RETURN QUERY SELECT p.id FROM ua_private.people p WHERE p.id=ANY(p_person_ids) ORDER BY p.id FOR UPDATE OF p;\nEND $function$\n",
+      "owner": "ua_person_lock_owner",
+      "acl": [
+        "ua_person_lock_owner=X/ua_person_lock_owner",
+        "ua_runtime=X/ua_person_lock_owner"
+      ]
+    },
+    {
+      "name": "lock_clerk_identity",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.lock_clerk_identity(p_issuer text, p_subject text)\n RETURNS TABLE(person_id uuid, enabled boolean)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ BEGIN\n  IF NOT COALESCE(p_issuer ~ '^https://[^/[:space:]]+$' AND p_subject ~ '^user_[A-Za-z0-9]+$' AND p_subject !~ '[[:space:]]',false)\n    OR current_setting('ua.phase',true) IS DISTINCT FROM 'auth'\n    OR current_setting('ua.person_id',true) IS DISTINCT FROM '' OR current_setting('ua.person_ids',true) IS DISTINCT FROM '[]'\n    OR current_setting('ua.clerk_issuer',true) COLLATE \"C\" IS DISTINCT FROM p_issuer COLLATE \"C\"\n    OR current_setting('ua.clerk_subject',true) COLLATE \"C\" IS DISTINCT FROM p_subject COLLATE \"C\"\n    OR current_setting('ua.telegram_id',true) IS DISTINCT FROM '' THEN\n    RAISE EXCEPTION 'INVALID_CLERK_LOCK_SCOPE' USING ERRCODE='42501';\n  END IF;\n  -- Disabled mappings are returned, not hidden as absent. No create/reassignment.\n  RETURN QUERY SELECT c.person_id,c.enabled FROM ua_private.clerk_identities c\n    WHERE c.issuer=p_issuer COLLATE \"C\" AND c.subject=p_subject COLLATE \"C\" FOR UPDATE OF c;\nEND $function$\n",
+      "owner": "ua_clerk_lock_owner",
+      "acl": [
+        "ua_clerk_lock_owner=X/ua_clerk_lock_owner",
+        "ua_runtime=X/ua_clerk_lock_owner"
+      ]
+    },
+    {
+      "name": "check_answer_binding",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.check_answer_binding()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE a ua_private.attempts%ROWTYPE; q jsonb;\nBEGIN\n  SELECT * INTO STRICT a FROM ua_private.attempts WHERE id=NEW.attempt_id;\n  IF a.body->>'status'<>'in_progress' THEN RAISE EXCEPTION 'answer on terminal attempt' USING ERRCODE='23514'; END IF;\n  SELECT value INTO STRICT q FROM jsonb_array_elements(a.frozen_test->'questions') WHERE value->>'id'=NEW.question_id::text;\n  IF NEW.selected_option_id IS NOT NULL AND NOT (q->'optionIds' ? NEW.selected_option_id::text) THEN\n    RAISE EXCEPTION 'option outside pinned question' USING ERRCODE='23514'; END IF;\n  IF NEW.saved_at_ms >= (a.body->>'deadlineAt')::bigint THEN RAISE EXCEPTION 'answer after deadline' USING ERRCODE='23514'; END IF;\n  RETURN NEW;\nEND $function$\n",
+      "owner": "ua_invariant_owner",
+      "acl": [
+        "ua_invariant_owner=X/ua_invariant_owner"
+      ]
+    },
+    {
+      "name": "check_membership_projection",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.check_membership_projection()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE pid uuid; p ua_private.people%ROWTYPE; m ua_private.memberships%ROWTYPE; expected jsonb;\nBEGIN\n  IF TG_TABLE_NAME='people' THEN pid:=NEW.id; ELSE pid:=NEW.person_id; END IF;\n  SELECT * INTO STRICT p FROM ua_private.people WHERE id=pid;\n  SELECT * INTO STRICT m FROM ua_private.memberships WHERE person_id=pid;\n  expected:=CASE WHEN m.active THEN to_jsonb(m.affinity_group_id::text) ELSE 'null'::jsonb END;\n  IF p.profile->'active_group_id' IS DISTINCT FROM expected THEN RAISE EXCEPTION 'profile/membership mismatch' USING ERRCODE='23514'; END IF;\n  RETURN NULL;\nEND $function$\n",
+      "owner": "ua_invariant_owner",
+      "acl": [
+        "ua_invariant_owner=X/ua_invariant_owner"
+      ]
+    },
+    {
+      "name": "check_family_projection",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.check_family_projection()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE fid uuid; f ua_private.student_families%ROWTYPE; cnt bigint;\nBEGIN\n  IF TG_TABLE_NAME='student_families' THEN fid:=NEW.id; ELSE fid:=NEW.family_id; END IF;\n  SELECT * INTO STRICT f FROM ua_private.student_families WHERE id=fid;\n  SELECT count(*) INTO cnt FROM ua_private.clerk_family_bindings WHERE family_id=fid AND person_id=f.person_id;\n  IF (f.auth_provider='clerk' AND cnt<>1) OR (f.auth_provider='telegram' AND cnt<>0) THEN\n    RAISE EXCEPTION 'provider family/binding mismatch' USING ERRCODE='23514'; END IF;\n  IF EXISTS (SELECT 1 FROM ua_private.student_access WHERE family_id=fid AND expires_at_ms>f.expires_at_ms) THEN\n    RAISE EXCEPTION 'access outlives family' USING ERRCODE='23514'; END IF;\n  RETURN NULL;\nEND $function$\n",
+      "owner": "ua_invariant_owner",
+      "acl": [
+        "ua_invariant_owner=X/ua_invariant_owner"
+      ]
+    },
+    {
+      "name": "check_access_projection",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.check_access_projection()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE expiry bigint;\nBEGIN\n  SELECT expires_at_ms INTO STRICT expiry FROM ua_private.student_families WHERE id=NEW.family_id;\n  IF NEW.expires_at_ms>expiry THEN RAISE EXCEPTION 'access outlives family' USING ERRCODE='23514'; END IF;\n  RETURN NULL;\nEND $function$\n",
+      "owner": "ua_invariant_owner",
+      "acl": [
+        "ua_invariant_owner=X/ua_invariant_owner"
+      ]
+    },
+    {
+      "name": "check_attempt_projection",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.check_attempt_projection()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE aid uuid; a ua_private.attempts%ROWTYPE; assignment ua_private.assignments%ROWTYPE; has_result boolean; q jsonb; ord jsonb; frozen_options jsonb; ordered_options jsonb;\nBEGIN\n  IF TG_TABLE_NAME='attempts' THEN aid:=NEW.id; ELSE aid:=NEW.attempt_id; END IF;\n  SELECT * INTO STRICT a FROM ua_private.attempts WHERE id=aid;\n  SELECT * INTO STRICT assignment FROM ua_private.assignments WHERE id=a.assignment_id;\n  IF a.body->>'groupId' IS DISTINCT FROM assignment.group_id::text OR a.frozen_test IS DISTINCT FROM assignment.record->'published' THEN\n    RAISE EXCEPTION 'attempt outside frozen assignment binding' USING ERRCODE='23514'; END IF;\n  IF jsonb_typeof(a.frozen_test->'questions') IS DISTINCT FROM 'array'\n    OR jsonb_typeof(a.frozen_test->'durationMs') IS DISTINCT FROM 'number'\n    OR jsonb_typeof(a.frozen_test->'individualEnabled') IS DISTINCT FROM 'boolean' THEN\n    RAISE EXCEPTION 'invalid frozen test shape' USING ERRCODE='23514'; END IF;\n  IF (a.frozen_test->>'durationMs')::ua_private.safe_counter=0 OR jsonb_array_length(a.frozen_test->'questions')=0\n     OR jsonb_array_length(a.question_order)<>jsonb_array_length(a.frozen_test->'questions')\n     OR (SELECT count(DISTINCT value->>'id') FROM jsonb_array_elements(a.frozen_test->'questions'))<>jsonb_array_length(a.frozen_test->'questions')\n     OR (SELECT count(DISTINCT value->>'questionId') FROM jsonb_array_elements(a.question_order))<>jsonb_array_length(a.question_order) THEN\n    RAISE EXCEPTION 'frozen question/order set mismatch' USING ERRCODE='23514'; END IF;\n  FOR q IN SELECT value FROM jsonb_array_elements(a.frozen_test->'questions') LOOP\n    SELECT value INTO STRICT ord FROM jsonb_array_elements(a.question_order) WHERE value->>'questionId'=q->>'id';\n    IF jsonb_typeof(q->'optionIds') IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'missing frozen options' USING ERRCODE='23514'; END IF;\n    IF jsonb_array_length(q->'optionIds')<>4\n      OR (SELECT count(DISTINCT value) FROM jsonb_array_elements(q->'optionIds'))<>4\n      OR NOT COALESCE(q->'optionIds' ? (q->>'correctOptionId'),false) THEN\n      RAISE EXCEPTION 'invalid frozen option set' USING ERRCODE='23514'; END IF;\n    SELECT jsonb_agg(value ORDER BY value) INTO frozen_options FROM jsonb_array_elements(q->'optionIds');\n    SELECT jsonb_agg(value ORDER BY value) INTO ordered_options FROM jsonb_array_elements(ord->'optionIds');\n    IF ordered_options IS DISTINCT FROM frozen_options THEN RAISE EXCEPTION 'ordered options outside frozen set' USING ERRCODE='23514'; END IF;\n  END LOOP;\n  SELECT EXISTS(SELECT 1 FROM ua_private.ordinary_results WHERE attempt_id=aid) INTO has_result;\n  IF (a.body->>'status'='in_progress' AND has_result)\n     OR (a.body->>'status' IN ('submitted','expired') AND NOT has_result) THEN\n    RAISE EXCEPTION 'attempt/ordinary invariant' USING ERRCODE='23514'; END IF;\n  RETURN NULL;\nEND $function$\n",
+      "owner": "ua_invariant_owner",
+      "acl": [
+        "ua_invariant_owner=X/ua_invariant_owner"
+      ]
+    },
+    {
+      "name": "check_series_projection",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.check_series_projection()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE s ua_private.exam_series%ROWTYPE; a ua_private.attempts%ROWTYPE;\nBEGIN\n  SELECT * INTO STRICT s FROM ua_private.exam_series WHERE person_id=NEW.person_id AND demo_id=NEW.demo_id;\n  SELECT * INTO STRICT a FROM ua_private.attempts WHERE id=s.current_attempt_id AND person_id=s.person_id AND demo_id=s.demo_id AND generation=s.generation;\n  IF s.state_revision<>(a.body->>'seriesStateRevision')::bigint THEN RAISE EXCEPTION 'current series revision mismatch' USING ERRCODE='23514'; END IF;\n  IF s.official_attempt_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM ua_private.ordinary_results WHERE attempt_id=s.official_attempt_id) THEN\n    RAISE EXCEPTION 'official pointer without ordinary result' USING ERRCODE='23514'; END IF;\n  RETURN NULL;\nEND $function$\n",
+      "owner": "ua_invariant_owner",
+      "acl": [
+        "ua_invariant_owner=X/ua_invariant_owner"
+      ]
+    },
+    {
+      "name": "ratio_shape",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.ratio_shape(v jsonb)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE\n SET search_path TO 'pg_catalog'\nAS $function$ SELECT COALESCE(jsonb_typeof(v) = 'object'\n  AND jsonb_typeof(v->'numerator') = 'string' AND (v->>'numerator') ~ '^(0|[1-9][0-9]*)$'\n  AND jsonb_typeof(v->'denominator') = 'string' AND (v->>'denominator') ~ '^[1-9][0-9]*$', false) $function$\n",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=X/ua_owner",
+        "ua_runtime=X/ua_owner"
+      ]
+    },
+    {
+      "name": "guard_history",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.guard_history()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$\nDECLARE b jsonb := to_jsonb(OLD); n jsonb := to_jsonb(NEW);\nBEGIN\n  IF TG_TABLE_NAME IN ('ordinary_results','command_receipts','staff_receipts','staff_audit',\n      'clerk_exchange_replays','init_data_replays','clerk_family_bindings','statistical_bonuses','attempt_cancellations','assignments') THEN\n    IF n IS DISTINCT FROM b THEN RAISE EXCEPTION 'immutable history: %',TG_TABLE_NAME USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='student_access' THEN\n    IF (n-'superseded') IS DISTINCT FROM (b-'superseded') OR (OLD.superseded AND NOT NEW.superseded) THEN RAISE EXCEPTION 'immutable access binding' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='student_refresh' THEN\n    IF (n-'consumed') IS DISTINCT FROM (b-'consumed') OR (OLD.consumed AND NOT NEW.consumed) THEN RAISE EXCEPTION 'immutable refresh binding' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='student_families' THEN\n    IF (n-ARRAY['revoked_at_ms','logout_retain_until_ms']) IS DISTINCT FROM (b-ARRAY['revoked_at_ms','logout_retain_until_ms'])\n       OR (OLD.revoked_at_ms IS NOT NULL AND n IS DISTINCT FROM b)\n       OR (OLD.revoked_at_ms IS NULL AND NEW.revoked_at_ms IS NULL AND NEW.logout_retain_until_ms IS DISTINCT FROM OLD.logout_retain_until_ms) THEN\n      RAISE EXCEPTION 'immutable family origin/expiry/first revocation' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='clerk_student_sessions' THEN\n    IF (n-'retired_at_ms') IS DISTINCT FROM (b-'retired_at_ms') OR (OLD.retired_at_ms IS NOT NULL AND NEW.retired_at_ms IS DISTINCT FROM OLD.retired_at_ms) THEN\n      RAISE EXCEPTION 'immutable provider session/first retirement' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='test_versions' THEN\n    IF NEW.id<>OLD.id OR NEW.demo_id<>OLD.demo_id OR NEW.revision<>OLD.revision+1 OR OLD.status<>'draft' OR (OLD.published_snapshot IS NOT NULL AND OLD.published_snapshot<>'null'::jsonb) THEN\n      RAISE EXCEPTION 'frozen version/revision' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='attempts' THEN\n    IF (n-ARRAY['body','state_revision']) IS DISTINCT FROM (b-ARRAY['body','state_revision'])\n      OR (NEW.body-ARRAY['status','completedAt','stateRevision','seriesStateRevision']) IS DISTINCT FROM (OLD.body-ARRAY['status','completedAt','stateRevision','seriesStateRevision'])\n      OR NEW.state_revision<>OLD.state_revision+1\n      OR (NEW.body->>'seriesStateRevision')::bigint<>(OLD.body->>'seriesStateRevision')::bigint+1\n      OR OLD.body->>'status'<>'in_progress' THEN\n      RAISE EXCEPTION 'immutable attempt/history or invalid revision' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='exam_series' THEN\n    IF NEW.person_id<>OLD.person_id OR NEW.demo_id<>OLD.demo_id OR NEW.id<>OLD.id\n      OR (OLD.normal_attempt_used AND NOT NEW.normal_attempt_used) OR NEW.generation<OLD.generation OR NEW.state_revision<OLD.state_revision THEN\n      RAISE EXCEPTION 'immutable series identity/global normal usage' USING ERRCODE='23514'; END IF;\n  ELSIF TG_TABLE_NAME='answers' THEN\n    IF NEW.attempt_id<>OLD.attempt_id OR NEW.question_id<>OLD.question_id OR NEW.revision<>OLD.revision+1 THEN\n      RAISE EXCEPTION 'immutable answer identity or invalid CAS revision' USING ERRCODE='23514'; END IF;\n  END IF;\n  RETURN NEW;\nEND $function$\n",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=X/ua_owner",
+        "ua_runtime=X/ua_owner"
+      ]
+    },
+    {
+      "name": "link_telegram_identity",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.link_telegram_identity(p_person_id uuid, p_telegram_id bigint)\n RETURNS TABLE(state text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ DECLARE prior_id bigint; changed_id uuid; BEGIN\n IF NOT COALESCE(p_telegram_id>0 AND p_telegram_id<=9007199254740991,false)\n   OR current_setting('ua.phase',true) IS DISTINCT FROM 'exchange'\n   OR current_setting('ua.person_id',true) IS DISTINCT FROM p_person_id::text\n   OR current_setting('ua.person_ids',true)::jsonb IS DISTINCT FROM jsonb_build_array(p_person_id::text)\n   OR NOT COALESCE(current_setting('ua.clerk_issuer',true) ~ '^https://[^/[:space:]]+$',false)\n   OR NOT COALESCE(current_setting('ua.clerk_subject',true) ~ '^user_[A-Za-z0-9]+$',false)\n   OR current_setting('ua.telegram_id',true) IS DISTINCT FROM '' THEN\n   RAISE EXCEPTION 'INVALID_TELEGRAM_LINK_SCOPE' USING ERRCODE='42501';\n END IF;\n -- Caller already holds Clerk gate -> Telegram gate -> Clerk mapping row ->\n -- sorted person locks. Re-read current local authority; no context SET or\n -- transaction control occurs inside this helper.\n SELECT p.telegram_id INTO prior_id FROM ua_private.people p WHERE p.id=p_person_id AND p.enabled AND 'student'=ANY(p.roles)\n   AND EXISTS(SELECT 1 FROM ua_private.clerk_identities i WHERE i.person_id=p.id AND i.enabled\n     AND i.issuer=current_setting('ua.clerk_issuer',true) AND i.subject=current_setting('ua.clerk_subject',true));\n IF NOT FOUND THEN RAISE EXCEPTION 'INVALID_TELEGRAM_LINK_AUTHORITY' USING ERRCODE='42501'; END IF;\n IF prior_id IS NOT NULL THEN\n   RETURN QUERY SELECT (CASE WHEN prior_id=p_telegram_id THEN 'linked' ELSE 'conflict' END)::text; RETURN;\n END IF;\n IF EXISTS(SELECT 1 FROM ua_private.people p WHERE p.telegram_id=p_telegram_id AND p.id<>p_person_id) THEN\n   RETURN QUERY SELECT 'conflict'::text; RETURN;\n END IF;\n BEGIN\n   UPDATE ua_private.people SET telegram_id=p_telegram_id WHERE id=p_person_id AND telegram_id IS NULL RETURNING id INTO changed_id;\n EXCEPTION WHEN unique_violation THEN\n   RETURN QUERY SELECT 'conflict'::text; RETURN;\n END;\n IF changed_id IS NULL THEN RETURN QUERY SELECT 'conflict'::text;\n ELSE RETURN QUERY SELECT 'linked'::text; END IF;\nEND $function$\n",
+      "owner": "ua_clerk_lock_owner",
+      "acl": [
+        "ua_clerk_lock_owner=X/ua_clerk_lock_owner",
+        "ua_runtime=X/ua_clerk_lock_owner"
+      ]
+    },
+    {
+      "name": "locate_student_refresh",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.locate_student_refresh(p_digest text)\n RETURNS TABLE(person_id uuid)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ BEGIN\n  IF NOT COALESCE(length(p_digest)=64 AND p_digest ~ '^[0-9a-f]{64}$',false)\n    OR current_setting('ua.phase',true) IS DISTINCT FROM 'auth'\n    OR current_setting('ua.person_id',true) IS DISTINCT FROM ''\n    OR current_setting('ua.person_ids',true) IS DISTINCT FROM '[]'\n    OR current_setting('ua.clerk_issuer',true) IS DISTINCT FROM ''\n    OR current_setting('ua.clerk_subject',true) IS DISTINCT FROM ''\n    OR current_setting('ua.telegram_id',true) IS DISTINCT FROM '' THEN\n    RAISE EXCEPTION 'INVALID_REFRESH_LOCATOR_SCOPE' USING ERRCODE='42501';\n  END IF;\n  -- Hint only, INCLUDING consumed, expired and revoked relationships. This\n  -- reveals neither digest/family nor private data. Lock and reauthorize later.\n  RETURN QUERY SELECT f.person_id FROM ua_private.student_refresh r\n    JOIN ua_private.student_families f ON f.id=r.family_id WHERE r.digest=p_digest;\nEND $function$\n",
+      "owner": "ua_access_locator_owner",
+      "acl": [
+        "ua_access_locator_owner=X/ua_access_locator_owner",
+        "ua_runtime=X/ua_access_locator_owner"
+      ]
+    },
+    {
+      "name": "lookup_telegram_start",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.lookup_telegram_start(p_telegram_id bigint)\n RETURNS TABLE(state text)\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ DECLARE p record; BEGIN\n IF NOT COALESCE(p_telegram_id>0 AND p_telegram_id<=9007199254740991,false)\n   OR current_setting('ua.phase',true) IS DISTINCT FROM 'auth'\n   OR current_setting('ua.person_id',true) IS DISTINCT FROM ''\n   OR current_setting('ua.person_ids',true) IS DISTINCT FROM '[]'\n   OR current_setting('ua.clerk_issuer',true) IS DISTINCT FROM ''\n   OR current_setting('ua.clerk_subject',true) IS DISTINCT FROM ''\n   OR current_setting('ua.telegram_id',true) IS DISTINCT FROM '' THEN\n   RAISE EXCEPTION 'INVALID_TELEGRAM_LOOKUP_SCOPE' USING ERRCODE='42501';\n END IF;\n SELECT x.id,x.enabled,x.roles INTO p FROM ua_private.people x WHERE x.telegram_id=p_telegram_id;\n IF NOT FOUND THEN RETURN QUERY SELECT 'needs_clerk'::text; RETURN; END IF;\n IF NOT p.enabled OR NOT ('student'=ANY(p.roles)) OR\n   (EXISTS(SELECT 1 FROM ua_private.clerk_identities i WHERE i.person_id=p.id)\n    AND NOT EXISTS(SELECT 1 FROM ua_private.clerk_identities i WHERE i.person_id=p.id AND i.enabled)) THEN\n   RETURN QUERY SELECT 'disabled'::text;\n ELSIF EXISTS(SELECT 1 FROM ua_private.clerk_identities i WHERE i.person_id=p.id AND i.enabled) THEN\n   RETURN QUERY SELECT 'linked'::text;\n ELSE RETURN QUERY SELECT 'needs_clerk'::text;\n END IF;\nEND $function$\n",
+      "owner": "ua_access_locator_owner",
+      "acl": [
+        "ua_access_locator_owner=X/ua_access_locator_owner",
+        "ua_runtime=X/ua_access_locator_owner"
+      ]
+    },
+    {
+      "name": "locate_telegram_return",
+      "definition": "CREATE OR REPLACE FUNCTION ua_private.locate_telegram_return(p_telegram_id bigint, p_issuer text)\n RETURNS TABLE(person_id uuid, person_enabled boolean, issuer text, subject text, identity_enabled boolean)\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'ua_private'\nAS $function$ BEGIN\n IF NOT COALESCE(p_telegram_id>0 AND p_telegram_id<=9007199254740991,false)\n   OR NOT COALESCE(p_issuer ~ '^https://[^/[:space:]]+$',false)\n   OR current_setting('ua.phase',true) IS DISTINCT FROM 'auth'\n   OR current_setting('ua.person_id',true) IS DISTINCT FROM ''\n   OR current_setting('ua.person_ids',true) IS DISTINCT FROM '[]'\n   OR current_setting('ua.clerk_issuer',true) IS DISTINCT FROM ''\n   OR current_setting('ua.clerk_subject',true) IS DISTINCT FROM ''\n   OR current_setting('ua.telegram_id',true) IS DISTINCT FROM '' THEN\n   RAISE EXCEPTION 'INVALID_TELEGRAM_LOCATOR_SCOPE' USING ERRCODE='42501';\n END IF;\n -- Hint only, bounded at two rows so ambiguity is explicit. Disabled mappings\n -- remain visible and are never treated as a missing identity. No SID is guessed\n -- or returned here; current family/fence selection follows the ordered locks.\n RETURN QUERY SELECT p.id,p.enabled,i.issuer,i.subject,i.enabled\n   FROM ua_private.people p LEFT JOIN ua_private.clerk_identities i ON i.person_id=p.id AND i.issuer=p_issuer\n   WHERE p.telegram_id=p_telegram_id ORDER BY p.id,i.subject LIMIT 2;\nEND $function$\n",
+      "owner": "ua_access_locator_owner",
+      "acl": [
+        "ua_access_locator_owner=X/ua_access_locator_owner",
+        "ua_runtime=X/ua_access_locator_owner"
+      ]
+    }
+  ],
+  "policies": [
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_access",
+      "policyname": "locator_access_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_access_locator_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_families",
+      "policyname": "locator_family_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_access_locator_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "person_lock_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_person_lock_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "person_lock_rowmark",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_person_lock_owner"
+      ],
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "false"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_identities",
+      "policyname": "clerk_lock_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_clerk_lock_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_identities",
+      "policyname": "clerk_lock_rowmark",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_clerk_lock_owner"
+      ],
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "false"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "memberships",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_families",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_family_bindings",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_access",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "attempts",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "assignments",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "ordinary_results",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "exam_series",
+      "policyname": "invariant_complete_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_invariant_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "memberships",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_identities",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_student_sessions",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_families",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_family_bindings",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_exchange_replays",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "statistical_bonuses",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "init_data_replays",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_access",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_access.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_refresh",
+      "policyname": "student_auth_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = ANY (ARRAY['auth'::text, 'domain'::text, 'exchange'::text])) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_refresh.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "grants",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "assignments",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((EXISTS ( SELECT 1\n   FROM ua_private.grants g\n  WHERE ((g.assignment_id = assignments.id) AND ((g.person_id)::text = current_setting('ua.person_id'::text, true))))) OR (EXISTS ( SELECT 1\n   FROM ua_private.attempts t\n  WHERE ((t.assignment_id = assignments.id) AND ((t.person_id)::text = current_setting('ua.person_id'::text, true)))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "exam_series",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "attempts",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "answers",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.attempts a\n  WHERE ((a.id = answers.attempt_id) AND ((a.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "ordinary_results",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.attempts a\n  WHERE ((a.id = ordinary_results.attempt_id) AND ((a.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "command_receipts",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "attempt_cancellations",
+      "policyname": "student_domain_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "SELECT",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "attempts",
+      "policyname": "student_domain_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "attempts",
+      "policyname": "student_domain_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "exam_series",
+      "policyname": "student_domain_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "exam_series",
+      "policyname": "student_domain_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "answers",
+      "policyname": "student_domain_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.attempts a\n  WHERE ((a.id = answers.attempt_id) AND ((a.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "answers",
+      "policyname": "student_domain_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.attempts a\n  WHERE ((a.id = answers.attempt_id) AND ((a.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.attempts a\n  WHERE ((a.id = answers.attempt_id) AND ((a.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "ordinary_results",
+      "policyname": "student_domain_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.attempts a\n  WHERE ((a.id = ordinary_results.attempt_id) AND ((a.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "command_receipts",
+      "policyname": "student_domain_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_families",
+      "policyname": "student_exchange_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (auth_provider = 'clerk'::text)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_student_sessions",
+      "policyname": "student_exchange_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\"))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_family_bindings",
+      "policyname": "student_exchange_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\"))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_exchange_replays",
+      "policyname": "student_exchange_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND ((person_id)::text = current_setting('ua.person_id'::text, true)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_access",
+      "policyname": "student_exchange_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_access.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_refresh",
+      "policyname": "student_exchange_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_refresh.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_families",
+      "policyname": "student_exchange_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (auth_provider = 'clerk'::text)))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (auth_provider = 'clerk'::text)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_student_sessions",
+      "policyname": "student_exchange_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\"))))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (((person_id)::text = current_setting('ua.person_id'::text, true)) AND (issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\"))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_access",
+      "policyname": "student_exchange_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_access.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_access.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_refresh",
+      "policyname": "student_exchange_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_refresh.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.clerk_issuer'::text, true) <> ''::text) AND (current_setting('ua.clerk_subject'::text, true) <> ''::text) AND ((length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (((current_setting('ua.clerk_issuer'::text, true) = ''::text) AND (current_setting('ua.clerk_subject'::text, true) = ''::text)) OR ((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.student_families f\n  WHERE ((f.id = student_refresh.family_id) AND ((f.person_id)::text = current_setting('ua.person_id'::text, true))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "registration_people_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_issuer'::text, true) !~ '[[:space:]]'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text) AND ((id)::text = current_setting('ua.person_id'::text, true)) AND (telegram_id IS NULL) AND enabled AND (roles = ARRAY['student'::text]) AND (qadam_id IS NOT NULL) AND (qadam_id ~ '^[0-9]{10}$'::text) AND (profile = jsonb_build_object('person_id', (id)::text, 'first_name', (profile ->> 'first_name'::text), 'last_name', (profile ->> 'last_name'::text), 'roles', to_jsonb(roles), 'registration_complete', false, 'active_group_id', NULL::unknown, 'qadam_id', qadam_id)) AND (jsonb_typeof((profile -> 'first_name'::text)) = 'string'::text) AND (jsonb_typeof((profile -> 'last_name'::text)) = 'string'::text) AND ((char_length((profile ->> 'first_name'::text)) >= 0) AND (char_length((profile ->> 'first_name'::text)) <= 100)) AND ((char_length((profile ->> 'last_name'::text)) >= 0) AND (char_length((profile ->> 'last_name'::text)) <= 100)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "memberships",
+      "policyname": "registration_member_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_issuer'::text, true) !~ '[[:space:]]'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text) AND ((person_id)::text = current_setting('ua.person_id'::text, true)) AND (NOT active) AND ((epoch)::bigint = 0) AND ((revision)::bigint = 0) AND (affinity_group_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM ua_private.people p\n  WHERE ((p.id = memberships.person_id) AND ((p.id)::text = current_setting('ua.person_id'::text, true)) AND (p.telegram_id IS NULL) AND p.enabled AND (p.roles = ARRAY['student'::text]) AND ((p.profile -> 'registration_complete'::text) = 'false'::jsonb) AND ((p.profile -> 'active_group_id'::text) = 'null'::jsonb) AND (jsonb_typeof((p.profile -> 'first_name'::text)) = 'string'::text) AND (jsonb_typeof((p.profile -> 'last_name'::text)) = 'string'::text) AND ((char_length((p.profile ->> 'first_name'::text)) >= 0) AND (char_length((p.profile ->> 'first_name'::text)) <= 100)) AND ((char_length((p.profile ->> 'last_name'::text)) >= 0) AND (char_length((p.profile ->> 'last_name'::text)) <= 100))))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_identities",
+      "policyname": "registration_identity_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_issuer'::text, true) !~ '[[:space:]]'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text) AND ((person_id)::text = current_setting('ua.person_id'::text, true)) AND enabled AND (issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\")) AND (EXISTS ( SELECT 1\n   FROM ua_private.people p\n  WHERE ((p.id = clerk_identities.person_id) AND ((p.id)::text = current_setting('ua.person_id'::text, true)) AND (p.telegram_id IS NULL) AND p.enabled AND (p.roles = ARRAY['student'::text]) AND ((p.profile -> 'registration_complete'::text) = 'false'::jsonb) AND ((p.profile -> 'active_group_id'::text) = 'null'::jsonb) AND (jsonb_typeof((p.profile -> 'first_name'::text)) = 'string'::text) AND (jsonb_typeof((p.profile -> 'last_name'::text)) = 'string'::text) AND ((char_length((p.profile ->> 'first_name'::text)) >= 0) AND (char_length((p.profile ->> 'first_name'::text)) <= 100)) AND ((char_length((p.profile ->> 'last_name'::text)) >= 0) AND (char_length((p.profile ->> 'last_name'::text)) <= 100))))) AND (EXISTS ( SELECT 1\n   FROM ua_private.memberships m\n  WHERE ((m.person_id = clerk_identities.person_id) AND (NOT m.active) AND ((m.epoch)::bigint = 0) AND ((m.revision)::bigint = 0) AND (m.affinity_group_id IS NULL)))) AND (NOT (EXISTS ( SELECT 1\n   FROM ua_private.clerk_identities c\n  WHERE (c.person_id = clerk_identities.person_id)))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "registration_profile_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_issuer'::text, true) !~ '[[:space:]]'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text) AND ((id)::text = current_setting('ua.person_id'::text, true)) AND enabled AND (roles = ARRAY['student'::text]) AND (EXISTS ( SELECT 1\n   FROM ua_private.clerk_identities c\n  WHERE ((c.person_id = people.id) AND c.enabled AND (c.issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (c.subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\"))))))",
+      "with_check": "((current_setting('ua.phase'::text, true) = 'domain'::text) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND (length(current_setting('ua.person_id'::text, true)) = 36) AND (current_setting('ua.person_id'::text, true) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array(current_setting('ua.person_id'::text, true))) AND (current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text) AND (current_setting('ua.clerk_issuer'::text, true) !~ '[[:space:]]'::text) AND (current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text) AND ((id)::text = current_setting('ua.person_id'::text, true)) AND enabled AND (roles = ARRAY['student'::text]) AND (EXISTS ( SELECT 1\n   FROM ua_private.clerk_identities c\n  WHERE ((c.person_id = people.id) AND c.enabled AND (c.issuer = (current_setting('ua.clerk_issuer'::text, true) COLLATE \"C\")) AND (c.subject = (current_setting('ua.clerk_subject'::text, true) COLLATE \"C\"))))) AND (profile = jsonb_build_object('person_id', (id)::text, 'first_name', (profile ->> 'first_name'::text), 'last_name', (profile ->> 'last_name'::text), 'roles', to_jsonb(roles), 'registration_complete', true, 'active_group_id', (profile -> 'active_group_id'::text), 'qadam_id', qadam_id)) AND (jsonb_typeof((profile -> 'first_name'::text)) = 'string'::text) AND (jsonb_typeof((profile -> 'last_name'::text)) = 'string'::text) AND ((char_length((profile ->> 'first_name'::text)) >= 1) AND (char_length((profile ->> 'first_name'::text)) <= 100)) AND ((char_length((profile ->> 'last_name'::text)) >= 1) AND (char_length((profile ->> 'last_name'::text)) <= 100)) AND (btrim((profile ->> 'first_name'::text)) <> ''::text) AND (btrim((profile ->> 'last_name'::text)) <> ''::text) AND (EXISTS ( SELECT 1\n   FROM ua_private.memberships m\n  WHERE ((m.person_id = people.id) AND ((people.profile -> 'active_group_id'::text) =\n        CASE\n            WHEN m.active THEN to_jsonb((m.affinity_group_id)::text)\n            ELSE 'null'::jsonb\n        END)))))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "student_refresh",
+      "policyname": "locator_refresh_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_access_locator_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "telegram_helper_people_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_access_locator_owner",
+        "ua_clerk_lock_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "clerk_identities",
+      "policyname": "telegram_helper_identity_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_access_locator_owner"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "people",
+      "policyname": "telegram_helper_link_write",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_clerk_lock_owner"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((telegram_id IS NULL) AND enabled AND ('student'::text = ANY (roles)))",
+      "with_check": "((telegram_id IS NOT NULL) AND (telegram_id > 0) AND enabled AND ('student'::text = ANY (roles)))"
+    },
+    {
+      "schemaname": "ua_private",
+      "tablename": "init_data_replays",
+      "policyname": "telegram_exchange_replay_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "ua_runtime"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((current_setting('ua.phase'::text, true) = 'exchange'::text) AND (current_setting('ua.person_id'::text, true) = (person_id)::text) AND ((current_setting('ua.person_ids'::text, true))::jsonb = jsonb_build_array((person_id)::text)) AND (current_setting('ua.telegram_id'::text, true) = ''::text) AND COALESCE((current_setting('ua.clerk_issuer'::text, true) ~ '^https://[^/[:space:]]+$'::text), false) AND COALESCE((current_setting('ua.clerk_subject'::text, true) ~ '^user_[A-Za-z0-9]+$'::text), false) AND (current_setting('ua.clerk_subject'::text, true) !~ '[[:space:]]'::text) AND (EXISTS ( SELECT 1\n   FROM ua_private.people p\n  WHERE ((p.id = init_data_replays.person_id) AND p.enabled AND ('student'::text = ANY (p.roles)) AND (p.telegram_id IS NOT NULL)))) AND (EXISTS ( SELECT 1\n   FROM ua_private.clerk_identities i\n  WHERE ((i.person_id = init_data_replays.person_id) AND i.enabled AND (i.issuer = current_setting('ua.clerk_issuer'::text, true)) AND (i.subject = current_setting('ua.clerk_subject'::text, true))))))"
+    }
+  ],
+  "grants": null,
+  "column_grants": null,
+  "roles": [
+    {
+      "name": "ua_owner",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": false,
+      "bypassrls": false
+    },
+    {
+      "name": "ua_runtime",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": false,
+      "bypassrls": false
+    },
+    {
+      "name": "ua_access_locator_owner",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": false,
+      "bypassrls": false
+    },
+    {
+      "name": "ua_person_lock_owner",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": false,
+      "bypassrls": false
+    },
+    {
+      "name": "ua_clerk_lock_owner",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": false,
+      "bypassrls": false
+    },
+    {
+      "name": "ua_invariant_owner",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": false,
+      "bypassrls": false
+    },
+    {
+      "name": "ua_api_login",
+      "super": false,
+      "inherit": false,
+      "create_role": false,
+      "create_db": false,
+      "login": true,
+      "bypassrls": false
+    }
+  ],
+  "memberships": [
+    {
+      "role": "ua_owner",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_runtime",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_access_locator_owner",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_person_lock_owner",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_clerk_lock_owner",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_invariant_owner",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_api_login",
+      "member": "postgres",
+      "inherit": false,
+      "set": false,
+      "admin": true
+    },
+    {
+      "role": "ua_runtime",
+      "member": "ua_api_login",
+      "inherit": true,
+      "set": false,
+      "admin": false
+    }
+  ],
+  "table_acl": [
+    {
+      "table": "people",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "memberships",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "groups",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "staff_identities",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "staff_access",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "staff_group_scope",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "staff_subject_scope",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "teacher_subject_approvals",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "demos",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "test_versions",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "draft_questions",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "staff_receipts",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "staff_audit",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "clerk_identities",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "init_data_replays",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "grants",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "assignments",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "statistical_bonuses",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "attempt_cancellations",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=r/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "attempts",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "exam_series",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "answers",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "ordinary_results",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "command_receipts",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "student_families",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "clerk_student_sessions",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "clerk_family_bindings",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "clerk_exchange_replays",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "student_access",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_invariant_owner=r/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    },
+    {
+      "table": "student_refresh",
+      "owner": "ua_owner",
+      "acl": [
+        "ua_owner=arwdDxtm/ua_owner",
+        "ua_runtime=ar/ua_owner"
+      ],
+      "rls": true,
+      "force": true
+    }
+  ],
+  "column_acl": [
+    {
+      "table": "people",
+      "column": "id",
+      "acl": [
+        "ua_person_lock_owner=r/ua_owner",
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner",
+        "ua_clerk_lock_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "people",
+      "column": "telegram_id",
+      "acl": [
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner",
+        "ua_clerk_lock_owner=rw/ua_owner"
+      ]
+    },
+    {
+      "table": "people",
+      "column": "qadam_id",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "people",
+      "column": "enabled",
+      "acl": [
+        "ua_person_lock_owner=w/ua_owner",
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner",
+        "ua_clerk_lock_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "people",
+      "column": "roles",
+      "acl": [
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner",
+        "ua_clerk_lock_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "people",
+      "column": "profile",
+      "acl": [
+        "ua_runtime=aw/ua_owner"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "person_id",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "affinity_group_id",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "active",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "revision",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "epoch",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "clerk_identities",
+      "column": "issuer",
+      "acl": [
+        "ua_clerk_lock_owner=r/ua_owner",
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "clerk_identities",
+      "column": "subject",
+      "acl": [
+        "ua_clerk_lock_owner=r/ua_owner",
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "clerk_identities",
+      "column": "person_id",
+      "acl": [
+        "ua_clerk_lock_owner=r/ua_owner",
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "clerk_identities",
+      "column": "enabled",
+      "acl": [
+        "ua_clerk_lock_owner=rw/ua_owner",
+        "ua_runtime=a/ua_owner",
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "init_data_replays",
+      "column": "digest",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "init_data_replays",
+      "column": "person_id",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "init_data_replays",
+      "column": "consumed_at_ms",
+      "acl": [
+        "ua_runtime=a/ua_owner"
+      ]
+    },
+    {
+      "table": "attempts",
+      "column": "state_revision",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "attempts",
+      "column": "body",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "current_attempt_id",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "generation",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "state_revision",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "normal_attempt_used",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "official_attempt_id",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "recovery_state",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "exam_series",
+      "column": "recovery_window",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "answers",
+      "column": "selected_option_id",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "answers",
+      "column": "revision",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "answers",
+      "column": "saved_at_ms",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "answers",
+      "column": "series_state_revision",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "student_families",
+      "column": "id",
+      "acl": [
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "student_families",
+      "column": "person_id",
+      "acl": [
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "student_families",
+      "column": "revoked_at_ms",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "student_families",
+      "column": "logout_retain_until_ms",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "clerk_student_sessions",
+      "column": "retired_at_ms",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "student_access",
+      "column": "digest",
+      "acl": [
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "student_access",
+      "column": "family_id",
+      "acl": [
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "student_access",
+      "column": "superseded",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    },
+    {
+      "table": "student_refresh",
+      "column": "digest",
+      "acl": [
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "student_refresh",
+      "column": "family_id",
+      "acl": [
+        "ua_access_locator_owner=r/ua_owner"
+      ]
+    },
+    {
+      "table": "student_refresh",
+      "column": "consumed",
+      "acl": [
+        "ua_runtime=w/ua_owner"
+      ]
+    }
+  ],
+  "domains": [
+    {
+      "name": "safe_counter",
+      "base": "bigint",
+      "not_null": false,
+      "default": null,
+      "checks": [
+        "CHECK (((VALUE >= 0) AND (VALUE <= '9007199254740991'::bigint)))"
+      ]
+    },
+    {
+      "name": "ms_time",
+      "base": "bigint",
+      "not_null": false,
+      "default": null,
+      "checks": [
+        "CHECK (((VALUE >= 0) AND (VALUE <= '8640000000000000'::bigint)))"
+      ]
+    },
+    {
+      "name": "proof_digest",
+      "base": "text",
+      "not_null": false,
+      "default": null,
+      "checks": [
+        "CHECK ((VALUE ~ '^[0-9a-f]{64}$'::text))"
+      ]
+    }
+  ],
+  "defaults": null,
+  "checks": [
+    {
+      "table": "ua_private.groups",
+      "name": "groups_status_check",
+      "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])))"
+    },
+    {
+      "table": "ua_private.people",
+      "name": "people_telegram_id_check",
+      "definition": "CHECK (((telegram_id >= 1) AND (telegram_id <= '9007199254740991'::bigint)))"
+    },
+    {
+      "table": "ua_private.people",
+      "name": "people_qadam_id_check",
+      "definition": "CHECK ((qadam_id ~ '^[0-9]{10}$'::text))"
+    },
+    {
+      "table": "ua_private.people",
+      "name": "people_roles_check",
+      "definition": "CHECK (((cardinality(roles) > 0) AND (roles <@ ARRAY['student'::text, 'teacher'::text, 'admin'::text, 'owner'::text]) AND (array_position(roles, NULL::text) IS NULL)))"
+    },
+    {
+      "table": "ua_private.people",
+      "name": "people_profile_shape",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(profile) = 'object'::text) AND ((profile ->> 'person_id'::text) = (id)::text) AND ((profile -> 'roles'::text) = to_jsonb(roles)) AND (profile ?& ARRAY['first_name'::text, 'last_name'::text, 'registration_complete'::text, 'active_group_id'::text, 'qadam_id'::text]) AND (jsonb_typeof((profile -> 'first_name'::text)) = 'string'::text) AND (jsonb_typeof((profile -> 'last_name'::text)) = 'string'::text) AND (jsonb_typeof((profile -> 'registration_complete'::text)) = 'boolean'::text) AND ((profile -> 'qadam_id'::text) = COALESCE(to_jsonb(qadam_id), 'null'::jsonb)) AND ((jsonb_typeof((profile -> 'active_group_id'::text)) = 'string'::text) OR ((profile -> 'active_group_id'::text) = 'null'::jsonb))), false))"
+    },
+    {
+      "table": "ua_private.memberships",
+      "name": "memberships_check",
+      "definition": "CHECK (((NOT active) OR (affinity_group_id IS NOT NULL)))"
+    },
+    {
+      "table": "ua_private.staff_identities",
+      "name": "staff_identities_issuer_check",
+      "definition": "CHECK ((issuer <> ''::text))"
+    },
+    {
+      "table": "ua_private.staff_identities",
+      "name": "staff_identities_provider_subject_check",
+      "definition": "CHECK ((provider_subject <> ''::text))"
+    },
+    {
+      "table": "ua_private.staff_subject_scope",
+      "name": "staff_subject_scope_subject_id_check",
+      "definition": "CHECK ((subject_id <> ''::text))"
+    },
+    {
+      "table": "ua_private.teacher_subject_approvals",
+      "name": "teacher_subject_approvals_subject_id_check",
+      "definition": "CHECK ((subject_id <> ''::text))"
+    },
+    {
+      "table": "ua_private.clerk_identities",
+      "name": "clerk_identities_issuer_check",
+      "definition": "CHECK ((issuer <> ''::text))"
+    },
+    {
+      "table": "ua_private.clerk_identities",
+      "name": "clerk_identities_subject_check",
+      "definition": "CHECK ((subject <> ''::text))"
+    },
+    {
+      "table": "ua_private.clerk_student_sessions",
+      "name": "clerk_student_sessions_sid_check",
+      "definition": "CHECK ((sid <> ''::text))"
+    },
+    {
+      "table": "ua_private.student_families",
+      "name": "student_families_auth_provider_check",
+      "definition": "CHECK ((auth_provider = ANY (ARRAY['clerk'::text, 'telegram'::text])))"
+    },
+    {
+      "table": "ua_private.student_families",
+      "name": "student_families_check",
+      "definition": "CHECK (((logout_retain_until_ms IS NULL) OR ((revoked_at_ms IS NOT NULL) AND ((logout_retain_until_ms)::bigint >= (revoked_at_ms)::bigint))))"
+    },
+    {
+      "table": "ua_private.demos",
+      "name": "demos_subject_id_check",
+      "definition": "CHECK ((subject_id <> ''::text))"
+    },
+    {
+      "table": "ua_private.test_versions",
+      "name": "test_versions_status_check",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text])))"
+    },
+    {
+      "table": "ua_private.test_versions",
+      "name": "test_versions_check",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(wire) = 'object'::text) AND ((wire ->> 'id'::text) = (id)::text) AND ((wire ->> 'demo_id'::text) = (demo_id)::text) AND ((wire ->> 'revision'::text) = (revision)::text) AND ((wire ->> 'status'::text) = status)), false))"
+    },
+    {
+      "table": "ua_private.test_versions",
+      "name": "test_versions_check1",
+      "definition": "CHECK (COALESCE((((status = 'draft'::text) AND ((published_snapshot IS NULL) OR (published_snapshot = 'null'::jsonb))) OR ((status = 'published'::text) AND (jsonb_typeof(published_snapshot) = 'object'::text))), false))"
+    },
+    {
+      "table": "ua_private.draft_questions",
+      "name": "draft_questions_check",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(record) = 'object'::text) AND ((record ->> 'id'::text) = (id)::text) AND ((record ->> 'position'::text) = (\"position\")::text)), false))"
+    },
+    {
+      "table": "ua_private.assignments",
+      "name": "assignments_check",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(record) = 'object'::text) AND ((record #>> '{admission,assignmentId}'::text[]) = (id)::text) AND ((record #>> '{admission,groupId}'::text[]) = (group_id)::text) AND ((record #>> '{published,demoId}'::text[]) = (demo_id)::text) AND ((record #>> '{published,versionId}'::text[]) = (version_id)::text) AND (jsonb_typeof((record -> 'reviewGate'::text)) = 'object'::text) AND (jsonb_typeof((record -> 'cancelled'::text)) = 'boolean'::text)), false))"
+    },
+    {
+      "table": "ua_private.exam_series",
+      "name": "exam_series_generation_check",
+      "definition": "CHECK (((generation)::bigint > 0))"
+    },
+    {
+      "table": "ua_private.exam_series",
+      "name": "exam_series_recovery_state_check",
+      "definition": "CHECK ((recovery_state = ANY (ARRAY['none'::text, 'ready'::text, 'active'::text, 'lapsed'::text])))"
+    },
+    {
+      "table": "ua_private.exam_series",
+      "name": "exam_series_check",
+      "definition": "CHECK (COALESCE((((recovery_state = ANY (ARRAY['ready'::text, 'active'::text])) AND (jsonb_typeof(recovery_window) = 'object'::text)) OR ((recovery_state = 'none'::text) AND ((recovery_window IS NULL) OR (recovery_window = 'null'::jsonb))) OR ((recovery_state = 'lapsed'::text) AND ((recovery_window IS NULL) OR (recovery_window = 'null'::jsonb) OR (jsonb_typeof(recovery_window) = 'object'::text)))), false))"
+    },
+    {
+      "table": "ua_private.attempts",
+      "name": "attempts_generation_check",
+      "definition": "CHECK (((generation)::bigint > 0))"
+    },
+    {
+      "table": "ua_private.attempts",
+      "name": "attempts_check",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(body) = 'object'::text) AND ((body ->> 'id'::text) = (id)::text) AND ((body ->> 'personId'::text) = (person_id)::text) AND ((body ->> 'assignmentId'::text) = (assignment_id)::text) AND ((body ->> 'generation'::text) = (generation)::text) AND ((body ->> 'stateRevision'::text) = (state_revision)::text) AND ((body ->> 'status'::text) = ANY (ARRAY['in_progress'::text, 'submitted'::text, 'expired'::text, 'forced'::text, 'cancelled'::text])) AND (body ?& ARRAY['groupId'::text, 'startedAt'::text, 'deadlineAt'::text, 'completedAt'::text, 'seriesStateRevision'::text]) AND (jsonb_typeof((body -> 'startedAt'::text)) = 'number'::text) AND (jsonb_typeof((body -> 'deadlineAt'::text)) = 'number'::text) AND (jsonb_typeof((body -> 'seriesStateRevision'::text)) = 'number'::text) AND (jsonb_typeof((body -> 'generation'::text)) = 'number'::text) AND (jsonb_typeof((body -> 'stateRevision'::text)) = 'number'::text) AND ((jsonb_typeof((body -> 'completedAt'::text)) = 'number'::text) OR ((body -> 'completedAt'::text) = 'null'::jsonb)) AND (jsonb_typeof(frozen_test) = 'object'::text) AND ((frozen_test ->> 'demoId'::text) = (demo_id)::text) AND (jsonb_typeof(question_order) = 'array'::text)), false))"
+    },
+    {
+      "table": "ua_private.attempts",
+      "name": "attempts_body_check",
+      "definition": "CHECK (((((body ->> 'startedAt'::text))::ua_private.ms_time)::bigint < (((body ->> 'deadlineAt'::text))::ua_private.ms_time)::bigint))"
+    },
+    {
+      "table": "ua_private.attempts",
+      "name": "attempts_body_check1",
+      "definition": "CHECK (((((body ->> 'seriesStateRevision'::text))::ua_private.safe_counter)::bigint >= 0))"
+    },
+    {
+      "table": "ua_private.attempts",
+      "name": "attempts_body_check2",
+      "definition": "CHECK ((((body -> 'completedAt'::text) = 'null'::jsonb) OR ((((body ->> 'completedAt'::text))::ua_private.ms_time)::bigint >= (((body ->> 'startedAt'::text))::ua_private.ms_time)::bigint)))"
+    },
+    {
+      "table": "ua_private.attempts",
+      "name": "attempts_body_check3",
+      "definition": "CHECK (COALESCE(\nCASE (body ->> 'status'::text)\n    WHEN 'in_progress'::text THEN ((body -> 'completedAt'::text) = 'null'::jsonb)\n    WHEN 'expired'::text THEN ((body ->> 'completedAt'::text) = (body ->> 'deadlineAt'::text))\n    WHEN 'submitted'::text THEN (((body ->> 'completedAt'::text))::bigint < ((body ->> 'deadlineAt'::text))::bigint)\n    ELSE true\nEND, false))"
+    },
+    {
+      "table": "ua_private.answers",
+      "name": "answers_revision_check",
+      "definition": "CHECK (((revision)::bigint > 0))"
+    },
+    {
+      "table": "ua_private.ordinary_results",
+      "name": "ordinary_results_exact_result_check",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(exact_result) = 'object'::text) AND ua_private.ratio_shape((exact_result -> 'earned'::text)) AND ua_private.ratio_shape((exact_result -> 'maximum'::text)) AND ua_private.ratio_shape((exact_result -> 'percentage'::text)) AND (exact_result ? 'calculatedAt'::text)), false))"
+    },
+    {
+      "table": "ua_private.ordinary_results",
+      "name": "ordinary_results_exact_result_check1",
+      "definition": "CHECK (\nCASE\n    WHEN (jsonb_typeof((exact_result -> 'calculatedAt'::text)) = 'number'::text) THEN (((((exact_result ->> 'calculatedAt'::text))::numeric >= (0)::numeric) AND (((exact_result ->> 'calculatedAt'::text))::numeric <= ('8640000000000000'::bigint)::numeric)) AND (trunc(((exact_result ->> 'calculatedAt'::text))::numeric) = ((exact_result ->> 'calculatedAt'::text))::numeric))\n    ELSE false\nEND)"
+    },
+    {
+      "table": "ua_private.command_receipts",
+      "name": "command_receipts_check",
+      "definition": "CHECK ((\"left\"(key, (length((person_id)::text) + 1)) = ((person_id)::text || '/'::text)))"
+    },
+    {
+      "table": "ua_private.statistical_bonuses",
+      "name": "statistical_bonuses_record_check",
+      "definition": "CHECK (COALESCE(((jsonb_typeof(record) = 'object'::text) AND ua_private.ratio_shape((record -> 'earned'::text))), false))"
+    },
+    {
+      "table": "ua_private.attempt_cancellations",
+      "name": "attempt_cancellations_record_check",
+      "definition": "CHECK ((jsonb_typeof(record) = 'object'::text))"
+    },
+    {
+      "table": "ua_private.staff_receipts",
+      "name": "staff_receipts_check",
+      "definition": "CHECK (((\"left\"(key, (length((actor_id)::text) + 1)) = ((actor_id)::text || '/'::text)) AND (jsonb_typeof(response) = 'object'::text)))"
+    }
+  ],
+  "triggers": [
+    {
+      "table": "answers",
+      "definition": "CREATE TRIGGER answer_binding BEFORE INSERT OR UPDATE ON ua_private.answers FOR EACH ROW EXECUTE FUNCTION ua_private.check_answer_binding()"
+    },
+    {
+      "table": "people",
+      "definition": "CREATE CONSTRAINT TRIGGER people_membership_projection AFTER INSERT OR UPDATE ON ua_private.people DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_membership_projection()"
+    },
+    {
+      "table": "memberships",
+      "definition": "CREATE CONSTRAINT TRIGGER membership_profile_projection AFTER INSERT OR UPDATE ON ua_private.memberships DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_membership_projection()"
+    },
+    {
+      "table": "student_families",
+      "definition": "CREATE CONSTRAINT TRIGGER family_binding_projection AFTER INSERT OR UPDATE ON ua_private.student_families DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_family_projection()"
+    },
+    {
+      "table": "clerk_family_bindings",
+      "definition": "CREATE CONSTRAINT TRIGGER binding_family_projection AFTER INSERT OR UPDATE ON ua_private.clerk_family_bindings DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_family_projection()"
+    },
+    {
+      "table": "student_access",
+      "definition": "CREATE CONSTRAINT TRIGGER access_family_projection AFTER INSERT OR UPDATE ON ua_private.student_access DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_access_projection()"
+    },
+    {
+      "table": "attempts",
+      "definition": "CREATE CONSTRAINT TRIGGER attempt_ordinary_projection AFTER INSERT OR UPDATE ON ua_private.attempts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_attempt_projection()"
+    },
+    {
+      "table": "ordinary_results",
+      "definition": "CREATE CONSTRAINT TRIGGER ordinary_attempt_projection AFTER INSERT OR UPDATE ON ua_private.ordinary_results DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_attempt_projection()"
+    },
+    {
+      "table": "exam_series",
+      "definition": "CREATE CONSTRAINT TRIGGER current_series_projection AFTER INSERT OR UPDATE ON ua_private.exam_series DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_series_projection()"
+    },
+    {
+      "table": "attempts",
+      "definition": "CREATE CONSTRAINT TRIGGER attempt_current_series_projection AFTER INSERT OR UPDATE ON ua_private.attempts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION ua_private.check_series_projection()"
+    },
+    {
+      "table": "ordinary_results",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.ordinary_results FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "command_receipts",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.command_receipts FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "staff_receipts",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.staff_receipts FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "staff_audit",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.staff_audit FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "clerk_exchange_replays",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.clerk_exchange_replays FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "init_data_replays",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.init_data_replays FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "clerk_family_bindings",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.clerk_family_bindings FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "statistical_bonuses",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.statistical_bonuses FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "attempt_cancellations",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.attempt_cancellations FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "assignments",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.assignments FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "student_access",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.student_access FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "student_refresh",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.student_refresh FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "student_families",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.student_families FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "clerk_student_sessions",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.clerk_student_sessions FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "test_versions",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.test_versions FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "attempts",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.attempts FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "exam_series",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.exam_series FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    },
+    {
+      "table": "answers",
+      "definition": "CREATE TRIGGER immutable_history BEFORE UPDATE ON ua_private.answers FOR EACH ROW EXECUTE FUNCTION ua_private.guard_history()"
+    }
+  ],
+  "schema_acl": {
+    "owner": "ua_owner",
+    "acl": [
+      "ua_owner=UC/ua_owner",
+      "ua_runtime=U/ua_owner",
+      "ua_access_locator_owner=U/ua_owner",
+      "ua_person_lock_owner=U/ua_owner",
+      "ua_clerk_lock_owner=U/ua_owner",
+      "ua_invariant_owner=U/ua_owner"
+    ]
+  }
+}

@@ -40,6 +40,11 @@ export function createClerkAppSession(createConnection: (signal: AbortSignal, me
       } };
   }
   return { retire,
+    deletionBinding(){
+      const target=active,personId=target?.connection.auth.person();if(!target||!personId)return null;
+      return{personId,port:target.connection.auth.createDeletionPort(personId),isCurrent:()=>active===target&&target.connection.auth.person()===personId,
+        clearMatching:()=>{if(active===target&&target.connection.auth.person()===personId){target.connection.auth.clearMatching(personId);active=null;epoch++;target.abort.abort()}}};
+    },
     authorize: (evidence: SignInEvidence, requireReturn = false) => open(evidence.proof, 'clerk', requireReturn),
     resumeTelegram: (raw: string) => open(raw, 'telegram_resume', true),
     async link(authorization: { person: string; port: StudentConnection['port'] }, clerkProof: string, raw: string) {

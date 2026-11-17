@@ -1,3 +1,7 @@
+import {createDeletionHttpPort} from './account-deletion-candidate/http-port.ts';
+import {createPublicRecoveryStatus} from './account-deletion-candidate/recovery-status-port.ts';
+import type {DeletionPort} from './account-deletion-candidate/controller.ts';
+import { createProductionTelegramAtomicClient, TELEGRAM_ATOMIC_CONTRACT_SHA256 } from './owner-client/telegram-atomic-client.ts';
 import { createLocalStudentClient, createProductionStudentClient, STUDENT_CONTRACT_SHA256, StudentApiError, StudentClientProtocolError } from './owner-client/student-client.ts';
 import type { StudentSchema, StudentClient } from './owner-client/student-client.ts';
 import { createStudentTransport, StudentFailure } from './transport.ts';
@@ -18,14 +22,14 @@ function returnClient(client: Client): Client {
 type View = { title: string; groupLabel: string; startAllowed: boolean };
 export type OwnerPortOptions = {
   mode: 'local_fixture' | 'production'; contractSha256: string; baseUrl: string;
-  loginMethod?: 'telegram' | 'clerk' | 'telegram_resume'; loginSignal?: AbortSignal;
+  loginMethod?: 'telegram' | 'clerk' | 'telegram_resume' | 'telegram_atomic'; loginSignal?: AbortSignal; atomicInitData?: string;
   fetcher(request: Request): Promise<Response>; view(assignmentId: string, metadata?: StudentSchema['Meta']): View; assetUrl(value: string): string;
   now?: () => number;
   logoutReceiptPolicy?: { retentionMs: number; monotonicNow?: () => number };
 };
 export function createOwnerPort(options: OwnerPortOptions) {
   if (!['local_fixture', 'production'].includes(options.mode) || options.contractSha256 !== STUDENT_CONTRACT_SHA256) throw new Error('CONTRACT_HASH_MISMATCH');
-  if (options.loginMethod !== undefined && !['telegram', 'clerk', 'telegram_resume'].includes(options.loginMethod)) throw new Error('LOGIN_METHOD_INVALID');
+  if (options.loginMethod !== undefined && !['telegram', 'clerk', 'telegram_resume', 'telegram_atomic'].includes(options.loginMethod)) throw new Error('LOGIN_METHOD_INVALID');
   // Native browser fetch must not receive the options object as its receiver.
   const fetcher = options.fetcher;
   const mapper = createWireMap({ assetUrl: options.assetUrl });
@@ -58,6 +62,17 @@ export function createOwnerPort(options: OwnerPortOptions) {
       throw error;
     }
   }
+  async function atomicEntry(clerkJwt:string) {
+    if(options.mode!=='production'||!options.atomicInitData)throw new StudentFailure('protocol','ATOMIC_CONFIG_REQUIRED');
+    try {
+      return await createProductionTelegramAtomicClient({mode:'production',contractSha256:TELEGRAM_ATOMIC_CONTRACT_SHA256,baseUrl:options.baseUrl,
+        transport:request=>fetcher(new Request(request,{signal:options.loginSignal?AbortSignal.any([request.signal,options.loginSignal]):request.signal,cache:'no-store',credentials:'omit',redirect:'error'})),
+      }).enter(clerkJwt,{init_data:options.atomicInitData,confirmation:'link-telegram-account-v1'});
+    }catch(error){
+      if(error instanceof StudentApiError)throw new StudentFailure(error.status===401?'auth':error.status===409?'conflict':'protocol',error.code,null,error.status>=500);
+      throw error;
+    }
+  }
   function projectSession(value: StudentSchema['Session']) {
     if (value.token_type !== 'Bearer') throw new StudentFailure('protocol', 'RESPONSE_INVARIANT_FAILED');
     return { access: value.access_token, refresh: value.refresh_token, expiresAt: Date.parse(value.expires_at), person: mapper.profile(value.profile).person };
@@ -69,7 +84,9 @@ export function createOwnerPort(options: OwnerPortOptions) {
     logoutReceiptPolicy: options.logoutReceiptPolicy,
     loginFailurePolicy: options.loginMethod === 'telegram_resume' ? 'telegram_return' : undefined,
     sessions: {
-      login: async raw => projectSession((await call(client => options.loginMethod === 'clerk'
+      login: async raw => options.loginMethod === 'telegram_atomic'
+        ? projectSession((await atomicEntry(raw)).data)
+        : projectSession((await call(client => options.loginMethod === 'clerk'
         ? client.exchangeClerkSession(raw) : options.loginMethod === 'telegram_resume'
           ? returnClient(client).resumeTelegramSession({ init_data: raw })
           : client.telegramLogin({ init_data: raw }), options.loginSignal)).data),
@@ -126,6 +143,27 @@ export function createOwnerPort(options: OwnerPortOptions) {
       if (!result?.data || result.data.ok !== true || Object.keys(result.data).length !== 1)
         throw new StudentFailure('protocol', 'RESPONSE_INVARIANT_FAILED', null, true);
     },
+    createDeletionPort(expectedPerson:string):DeletionPort {
+      const check=()=>{if(!expectedPerson||transport.person()!==expectedPerson)throw new StudentFailure('auth','ACCESS_SUPERSEDED',null,true)};
+      check();
+      const apiOrigin=new URL(options.baseUrl).origin;
+      const http:typeof fetch=(input,init)=>fetcher(new Request(input,init));
+      return{
+        async submit(request){
+          check();
+          const outcome=await transport.withAccess(async access=>{
+            check();
+            try{return{ok:true as const,value:await createDeletionHttpPort({apiOrigin,appBearer:access,fetch:http}).submit(request)}}
+            catch(error){return{ok:false as const,error}}
+          },true);
+          check();
+          if(!outcome.ok)throw outcome.error;
+          return outcome.value;
+        },
+        status:createPublicRecoveryStatus({apiOrigin,fetch:http}),
+      };
+    },
+    clearMatching(expectedPerson:string){if(transport.person()===expectedPerson)transport.clear()},
     clear: transport.clear,
     logoutReceipt: transport.logoutReceipt, retryLogoutReceipt: transport.retryLogoutReceipt, cancelLogoutReceipt: transport.cancelLogoutReceipt } };
 }

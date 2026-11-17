@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {generateKeyPair,exportJWK,createLocalJWKSet,SignJWT} from 'jose';
+import {createTelegramClerkEntryHttp} from '../../runtime/telegram-clerk-entry-http.mjs';
+const {privateKey,publicKey}=await generateKeyPair('RS256');const jwk={...await exportJWK(publicKey),kid:'test'};
+const origin='https://mini.example.com',issuer='https://clerk.example.com',iat=1000000;
+const verifier={issuer,authorizedParties:[origin],audience:{kind:'clerk_default_no_audience'},trustedKeys:createLocalJWKSet({keys:[jwk]}),now:()=>iat*1000};
+async function jwt(claims={}){return new SignJWT({iss:issuer,sub:'user_a',sid:'sess_a',iat,nbf:iat,exp:iat+300,azp:origin,v:2,jti:'one',fva:[0,-1],...claims}).setProtectedHeader({alg:'RS256',kid:'test'}).sign(privateKey)}
+function fixture(enabled=true){const calls=[];const handler=createTelegramClerkEntryHttp({enabled,verifier,allowedOrigins:[origin],entry:{enter:async(proof,raw)=>{calls.push({proof,raw});return {access_token:'opaque'};}}});
+ return {calls,call:async(body={init_data:'signed-telegram',confirmation:'link-telegram-account-v1'},claims={},headers={},path='/api/v1/auth/telegram/entry')=>handler(new Request('https://api.example.com'+path,{method:'POST',headers:{origin,'content-type':'application/json',authorization:'Bearer '+await jwt(claims),...headers},body:JSON.stringify(body)}))};}
+test('atomic route verifies fresh signed token then invokes exactly one operation',async()=>{const f=fixture(),r=await f.call();assert.equal(r.status,200);assert.equal(f.calls.length,1);assert.equal(f.calls[0].proof.proof.userId,'user_a');assert.equal(r.headers.get('cache-control'),'no-store');});
+test('default disabled route cannot mutate',async()=>{const f=fixture(false);assert.equal((await f.call()).status,404);assert.equal(f.calls.length,0);});
+for(const body of [{init_data:'raw'},{init_data:'raw',confirmation:'wrong'},{init_data:'raw',confirmation:'link-telegram-account-v1',telegram_id:123},{init_data:'raw',confirmation:'link-telegram-account-v1',clerk_user_id:'user_a'}])test('old or identity-injected body denied '+JSON.stringify(body),async()=>{const f=fixture();assert.equal((await f.call(body)).status,422);assert.equal(f.calls.length,0);});
+for(const claims of [{fva:undefined},{fva:[4,-1]},{sub:'user_a',azp:'https://foreign.example'}])test('cached stale or invalid Clerk proof cannot link '+JSON.stringify(claims),async()=>{const f=fixture();assert.notEqual((await f.call(undefined,claims)).status,200);assert.equal(f.calls.length,0);});
+test('wrong origin and query URLs denied before operation',async()=>{const f=fixture();assert.equal((await f.call(undefined,{}, {origin:'https://evil.example'})).status,403);assert.equal((await f.call(undefined,{}, {},'/api/v1/auth/telegram/entry?telegram_id=1')).status,404);assert.equal(f.calls.length,0);});

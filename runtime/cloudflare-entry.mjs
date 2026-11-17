@@ -1,3 +1,5 @@
+import {createTelegramClerkEntryApi,atomicEntryEnabled,atomicAuthorizedParties,atomicEntryEnvironmentKeys} from "./telegram-clerk-entry-api.mjs";
+import {createDeletionApi,isDeletionRequestPath,deletionRequestEnvironmentKeys} from "./account-deletion-api.mjs";
 import {isContractPath} from "./contract-paths.mjs";
 import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
 import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
@@ -14,7 +16,7 @@ const deny=()=>{throw unavailable();};
 const unavailableNumbers=Object.freeze({policyId:"registration-only-scoring-unavailable",
   toFiniteNumber:deny,toDisplayString:deny,toStudentPointsDisplayString:deny});
 const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
-  "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS"];
+  "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS",...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys];
 const policyKeys=["initDataMaxAgeSeconds","futureSkewSeconds","accessTtlMs",
   "familyTtlMs","logoutTombstoneMs","identityCollisionAttempts","newLogin"];
 
@@ -81,6 +83,10 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
       if(!(request instanceof Request))throw unavailable();
       publics=publicBindings(env);
       if(new URL(request.url).origin!==publics.apiOrigin)return response("MALFORMED_REQUEST",400);
+      if(isDeletionRequestPath(new URL(request.url).pathname))
+        return await createDeletionApi({allowedOrigins:publics.allowedOrigins,loadClient,makeClerk,transport,now}).fetch(request,env);
+      if(new URL(request.url).pathname==="/api/v1/auth/telegram/entry")
+        return await createTelegramClerkEntryApi({allowedOrigins:publics.allowedOrigins,getBindings:env=>privateBindings(env,true),loadClient,makeClerk,transport,now,numericPresentation:unavailableNumbers}).fetch(request,env);
       return await withPublicCors(async scopedRequest=>{
         // Liveness only: no private binding, database, provider, version or topology.
         if(scopedRequest.method==="GET"&&new URL(scopedRequest.url).pathname==="/health")
@@ -91,10 +97,20 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
         try{
           if(scopedRequest.signal.aborted)throw unavailable();
           const telegram=/^\/api\/v1\/auth\/telegram\/(link|resume)\/?$/.test(new URL(scopedRequest.url).pathname);
+          const path=new URL(scopedRequest.url).pathname.replace(/\/$/,"");
+          const atomic=(path==="/api/v1/auth/clerk"||path==="/api/v1/auth/telegram/link")&&atomicEntryEnabled(env);
+          if(atomic&&path==="/api/v1/auth/telegram/link")return response("NOT_FOUND",404);
           const bindings=privateBindings(env,telegram);
+          if(atomic&&path==="/api/v1/auth/clerk"){
+            const parties=atomicAuthorizedParties(env,bindings.settings);
+            const webParties=bindings.settings.authorizedParties.filter(p=>!parties.includes(p));
+            if(!webParties.length)return response("NOT_FOUND",404);
+            bindings.settings={...bindings.settings,authorizedParties:webParties};
+          }
           clerk=await makeClerk(bindings.settings,{secretKey:bindings.secretKey,transport,now,
             timeoutMs:bindings.settings?.timeoutMs,maxResponseBytes:65536,signal:scopedRequest.signal});
           if(scopedRequest.signal.aborted||typeof clerk?.close!=="function")throw unavailable();
+          if(atomic)clerk={...clerk,verifier:{...clerk.verifier,authorizedParties:bindings.settings.authorizedParties}};
           const Client=await loadClient();
           if(scopedRequest.signal.aborted||typeof Client!=="function")throw unavailable();
           const configuration={mode:"production",sessionPolicy:bindings.sessionPolicy,

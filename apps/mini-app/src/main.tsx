@@ -4,7 +4,10 @@ import './style.css';
 const demoRoot = () => createRoot(document.getElementById('root')!);
 
 // Backend-owned local client is available only through explicit DEV fixture mode.
-if (import.meta.env.DEV && __AUTH_PROTOTYPE_PREVIEW__) {
+if (location.pathname === '/account-deletion-status') {
+  void import('./account-deletion-candidate/recovery-entry.tsx').then(({mountDeletionRecovery}) =>
+    mountDeletionRecovery(document.getElementById('root')!, {env:import.meta.env,pageOrigin:location.origin,storage:()=>localStorage}));
+} else if (import.meta.env.DEV && __AUTH_PROTOTYPE_PREVIEW__) {
   void import('./common-entry-prototype.tsx').then(({ CommonEntryPrototypeApp }) => demoRoot().render(<CommonEntryPrototypeApp />));
 } else if (import.meta.env.DEV && import.meta.env.MODE === 'local_fixture') {
   void import('./local-http.tsx').then(({ LocalHttpApp }) => demoRoot().render(<LocalHttpApp />));

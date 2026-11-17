@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { AccountDashboard } from './account-dashboard.tsx';
 import { localizeServerDisplay, historySummary } from './display.ts';
 import type { ReactNode } from 'react';
 import type { StudentFlow } from './flow.ts';
 
 const letters = ['A', 'B', 'C', 'D'];
 
-export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls }: {
+export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls, onDeleteAccount, deletionBusy = false }: {
   studentFlow: StudentFlow; mode: 'demo' | 'local_fixture' | 'telegram';
   onEnter?: () => Promise<void>; onLogout?: () => Promise<void>; demoControls?: ReactNode;
+  onDeleteAccount?: () => void; deletionBusy?: boolean;
 }) {
   const flow = studentFlow;
-  const s = useSyncExternalStore(flow.subscribe, flow.snapshot);
+  const [dashboardPerson, setDashboardPerson] = useState<string | null>(null);
+  const s = useSyncExternalStore(flow.subscribe, flow.snapshot, flow.snapshot);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [confirmation, setConfirmation] = useState<'start' | 'submit' | 'questions' | null>(null);
@@ -19,7 +22,8 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
   const lastName = useRef<HTMLInputElement>(null);
   const focusTarget = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => { focusTarget.current?.focus(); }, [s.screen]);
+  useEffect(() => { setDashboardPerson(null); }, [s.student?.person]);
+  useEffect(() => { focusTarget.current?.focus(); }, [s.screen, dashboardPerson]);
   useEffect(() => {
     if (confirmation) dialog.current?.showModal();
     else dialog.current?.close();
@@ -49,6 +53,7 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
   const a = s.attempt;
   const q = a?.questions[Math.min(questionIndex, Math.max(0, a.questions.length - 1))];
   const answered = a?.questions.filter(question => a.answers[question.id]?.optionId != null).length ?? 0;
+  const dashboard = !!s.student && dashboardPerson === s.student.person && s.screen !== 'attempt';
   const testing = s.screen === 'attempt' && !!a;
   const pending = s.draft?.questionId === q?.id ? s.draft : null;
   const confirmedOption = q ? a?.answers[q.id]?.optionId : null;
@@ -59,15 +64,18 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
 
   return <main className={`shell${testing ? ' test-shell' : ''}`}>
     {!testing && <><header className="brand"><span className="brand-mark" aria-hidden="true">U</span>
-      <span>UniverAcademy<small>O‘quvchi kabineti</small></span>{mode !== 'telegram' && <span className="demo-badge">Lokal namuna</span>}</header>
+      <span className="account-name">{[s.student?.firstName, s.student?.lastName].filter(Boolean).join(' ') || 'UniverAcademy'}<small>O‘quvchi kabineti</small></span>
+      {s.student && <button className="dashboard-button" aria-pressed={dashboard} disabled={s.busy || deletionBusy} onClick={() => setDashboardPerson(dashboard ? null : s.student!.person)}>Dashboard</button>}{mode !== 'telegram' && <span className="demo-badge">Lokal namuna</span>}</header>
     {mode !== 'telegram' && <p className="sample-notice">{mode === 'local_fixture' ? 'Mahalliy sintetik sinov. Haqiqiy o‘quvchi yoki Telegram hisobidan foydalanmang.' : 'Bu sinov interfeysi. Telegram va haqiqiy test xizmatiga ulanmagan. Sahifa yangilansa namuna boshidan boshlanadi.'}</p>}
-    {mode !== 'demo' && s.student && <button className="text-button" onClick={() => void onLogout?.()}>Chiqish</button>}
-    <section className="page-heading"><p className="eyebrow">O‘zingizga ishonch bilan</p>
-      <h1 ref={focusTarget} tabIndex={-1}>{title}</h1></section></>}
+    <section className="page-heading">
+      <h1 ref={focusTarget} tabIndex={-1}>{dashboard ? 'Dashboard' : title}</h1></section></>}
     {s.notice && <div className="notice" role="alert">{s.notice}</div>}
     {s.failure && ['exams', 'attempt', 'lifecycle'].includes(s.screen) && <button className="text-button" disabled={s.busy}
       onClick={() => void (s.screen === 'exams' ? flow.showExams() : flow.reconcile())}>Holatni qayta tekshirish</button>}
 
+    {dashboard && s.student && <AccountDashboard key={s.student.person} student={s.student} flow={flow} busy={s.busy}
+      onBack={() => setDashboardPerson(null)} onLogout={onLogout} onDeleteAccount={onDeleteAccount} deletionBusy={deletionBusy} />}
+    {!dashboard && <>
     {s.screen === 'welcome' && <section className="card welcome">
       <div className="orbit" aria-hidden="true">↗</div><h2>Birinchi qadam — bilimni sinash</h2>
       <p>Testni boshlang, savollarga javob bering va natijangizni ko‘ring.</p>
@@ -84,7 +92,6 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
     </form>}
 
     {s.screen === 'exams' && <>
-      <div className="student-line"><span>Salom, <strong>{s.student?.firstName}</strong></span><span className="pill">ID: {s.student?.displayId}</span></div>
       {s.exams.map(exam => <article className="card exam-card" key={exam.id}>
         <div className="card-top"><span className="subject-icon" aria-hidden="true">⚛</span><span className="pill green">Sizga biriktirilgan</span></div>
         <h2>{exam.title}</h2><p>{exam.group}</p>
@@ -94,7 +101,6 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
       </article>)}
       {!s.exams.length && <section className="card"><h2>Hozircha test yo‘q</h2><p>Guruh testiga o‘qituvchi yoki administrator biriktiradi.</p></section>}
       <button className="text-button" disabled={s.busy} onClick={() => void flow.showExams()}>Testlar ro‘yxatini yangilash</button>
-      <div className="future-links"><span>Fanlar <small>Tez kunda</small></span><span>Yo‘l xaritasi <small>Tez kunda</small></span><span>Videodarslar <small>Tez kunda</small></span></div>
     </>}
 
     {s.screen === 'instructions' && <section className="card">
@@ -162,7 +168,7 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls 
       {s.history.length ? s.history.map((entry, i) => <article className="history-entry" key={i}><strong>{entry.title}</strong><span>{entry.status}</span><p>{entry.result ? historySummary(entry.result, !!entry.official, ',') : entry.summary}</p></article>) : <p>Hali urinish yo‘q.</p>}
       <button className="text-button" disabled={s.busy} onClick={() => void flow.showExams()}>← Testlarimga qaytish</button></section>}
 
-    {!testing && <footer><span>UniverAcademy</span><span>Har bir qadam — oldinga.</span></footer>}
+    </>}
     {demoControls}
 
     <dialog id="exam-dialog" ref={dialog} onCancel={() => setConfirmation(null)} onClose={() => setConfirmation(null)}

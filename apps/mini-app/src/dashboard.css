@@ -1,0 +1,13 @@
+.brand .account-name { min-width: 0; overflow-wrap: anywhere; flex: 1; }
+.brand .brand-mark { flex-shrink: 0; }
+.dashboard-button { margin-left: auto; flex-shrink: 0; padding: 10px 12px; font-size: .85rem; background: #fff; color: #123d32; border-color: #c9d8ce; }
+.account-dashboard { display: grid; gap: 16px; }
+.account-dashboard > .text-button { justify-self: start; }
+.account-dashboard form .primary { margin-top: 22px; width: 100%; }
+.account-id { font-size: .85rem; overflow-wrap: anywhere; }
+.account-actions > button { width: 100%; }
+.account-danger { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e6ddd8; }
+.account-danger p { font-size: .9rem; }
+.account-danger small { display: block; margin-top: 10px; color: #64796f; }
+.danger-button { background: #fff4f2; color: #922f24; border-color: #e3b9b3; width: 100%; }
+@media(max-width: 400px) { .brand { gap: 8px; } .brand .brand-mark { width: 32px; height: 34px; font-size: 1.2rem; } .dashboard-button { padding: 8px; font-size: .75rem; } }

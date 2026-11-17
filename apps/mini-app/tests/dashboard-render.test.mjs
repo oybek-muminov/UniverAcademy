@@ -1,0 +1,28 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'vite';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { StudentFlow } from '../src/flow.ts';
+const student = {person:'p1',firstName:'Namuna',lastName:'O‘quvchi',displayId:'1',registrationComplete:true};
+test('cabinet header and dashboard render accessible controls without placeholders',async()=>{
+ const server=await createServer({root:new URL('..',import.meta.url).pathname,server:{middlewareMode:true}});
+ try {
+  const {StudentApp}=await server.ssrLoadModule('/src/student-app.tsx');
+  const {AccountDashboard}=await server.ssrLoadModule('/src/account-dashboard.tsx');
+  const flow=new StudentFlow({});
+  flow.patch({student,screen:'exams'});
+  const html=renderToStaticMarkup(createElement(StudentApp,{studentFlow:flow,mode:'telegram'}));
+  assert.match(html,/Namuna O‘quvchi/);
+  assert.match(html,/>Dashboard<\/button>/);
+  assert.doesNotMatch(html,/Salom,|Tez kunda|Har bir qadam/);
+  const panel=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onBack(){},onLogout:async()=>{},onDeleteAccount(){}}));
+  assert.match(panel,/dashboard-first-name/);
+  assert.match(panel,/>Chiqish<\/button>/);
+  assert.match(panel,/class="danger-button">Hisobni o‘chirish/);
+  const disabled=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onBack(){}}));
+  assert.match(disabled,/class="danger-button" disabled=""/);
+  const pending=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onBack(){},deletionBusy:true,onDeleteAccount(){}}));
+  assert.match(pending,/class="danger-button" disabled=""/);
+ } finally {await server.close();}
+});

@@ -22,7 +22,7 @@ export const createProductionConnection: ProductionConnectionFactory = config =>
 // Explicit transport seam for local synthetic tests; production main passes fetch.
 // No URLs/proofs are read from window slots and no local client fallback exists.
 export function createProductionOwnerConnection(config: Parameters<ProductionConnectionFactory>[0], fetcher: typeof fetch,
-  auth: Pick<OwnerPortOptions, 'loginMethod' | 'loginSignal'> = {}) {
+  auth: Pick<OwnerPortOptions, 'loginMethod' | 'loginSignal' | 'atomicInitData'> = {}) {
   if (config.mode !== 'production') throw new StudentFailure('protocol', 'PRODUCTION_CLIENT_MODE_REQUIRED');
   const apiOrigin = new URL(config.baseUrl).origin;
   const views = new Map<string, { title: string; groupLabel: string; startAllowed: boolean }>();

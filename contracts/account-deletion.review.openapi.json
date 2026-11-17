@@ -1,0 +1,165 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UniverAcademy account deletion review candidate",
+    "version": "0.1.0-account-deletion-review.1",
+    "description": "Additive fragment. Default disabled. No production deployment or acceptance is asserted. Existing telegram-return contract unchanged."
+  },
+  "servers": [
+    {
+      "url": "https://api.invalid"
+    }
+  ],
+  "paths": {
+    "/api/v1/me/deletion": {
+      "post": {
+        "operationId": "requestAccountDeletion",
+        "description": "Explicit confirmation plus current cabinet bearer and fresh same-subject Clerk token. Server verifies signature, liveness, issuer and first-factor freshness less than five minutes; DB locks exact access/identity and freezes accepted job. No person ID accepted. Never deletes Clerk-only users. Staff/shared-owner accounts rejected.",
+        "security": [
+          {
+            "CabinetBearer": [],
+            "ClerkProof": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "requestId",
+                  "receipt",
+                  "confirmation"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "receipt": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+                    "description": "Client-generated cryptographically random256-bit opaque receipt; persist before submission; never put in URL/log."
+                  },
+                  "confirmation": {
+                    "const": "delete-account-v1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "pending"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          },
+          "401": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          },
+          "403": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          },
+          "404": {
+            "description": "New deletion disabled or unknown route"
+          },
+          "503": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          }
+        }
+      }
+    },
+    "/api/v1/me/deletion/status": {
+      "get": {
+        "operationId": "getAccountDeletionStatus",
+        "description": "Receipt only, never session credentials required. Availability independent of new-request acceptance. Completed means provider acknowledgment plus database finalization. 404 means unknown/expired, never completion.",
+        "security": [
+          {
+            "DeletionReceipt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmed status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "completed"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          },
+          "403": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          },
+          "404": {
+            "description": "Unknown or expired receipt; preserve uncertainty"
+          },
+          "503": {
+            "description": "Denied or unconfirmed. 401/403 is rejection before acceptance; 503 or transport failure may have accepted a job. Preserve the receipt and query status."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "CabinetBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "ClerkProof": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-clerk-token"
+      },
+      "DeletionReceipt": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-deletion-receipt"
+      }
+    }
+  }
+}

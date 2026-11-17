@@ -1,0 +1,98 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UniverAcademy atomic Telegram entry review",
+    "version": "0.1.0-atomic-telegram-review.1",
+    "description": "Review-only default-disabled operation. Both identities and profile/session/link/replay commit atomically. Activation requires replacing old Telegram two-step fallback and actual account-choice/reverification UX."
+  },
+  "servers": [
+    {
+      "url": "https://api.invalid"
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/telegram/entry": {
+      "post": {
+        "operationId": "atomicTelegramClerkEntry",
+        "description": "Server verifies raw Telegram launch HMAC/freshness and signed Clerk JWT with recent first-factor verification. Caller must visibly choose and confirm the Clerk account; cached session presence alone is not consent. No client identity IDs accepted. Existing Telegram ownership conflict is rejected before provisioning.",
+        "security": [
+          {
+            "ClerkBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "init_data",
+                  "confirmation"
+                ],
+                "properties": {
+                  "init_data": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16384
+                  },
+                  "confirmation": {
+                    "const": "link-telegram-account-v1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session/profile returned only after one successful database commit. Response envelope data with access_token, refresh_token, expires_at, refresh_expires_at, token_type Bearer and profile. No-store.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./telegram-return.openapi.json#/components/schemas/SuccessSession"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired Clerk/Telegram proof"
+          },
+          "403": {
+            "description": "Reverification required, disabled account or denied origin"
+          },
+          "404": {
+            "description": "Unknown route or feature disabled"
+          },
+          "409": {
+            "description": "Identity ownership conflict or consumed launch/token replay. No partial provisioning."
+          },
+          "422": {
+            "description": "Invalid shape; no identity overrides accepted"
+          },
+          "503": {
+            "description": "Unconfirmed result. Do not presume rollback or create another profile; reconcile through existing authenticated resume."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ClerkBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Clerk JWT"
+      }
+    }
+  }
+}
