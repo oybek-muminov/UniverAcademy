@@ -12,7 +12,7 @@ function walk(p){return readdirSync(p,{withFileTypes:true}).flatMap(e=>e.name===
 const paths=[
 'apps/mini-app/src/student-app.tsx','apps/mini-app/src/clerk-app-session.ts','apps/mini-app/src/account-dashboard.tsx','apps/mini-app/src/dashboard-profile.ts','apps/mini-app/src/dashboard.css',
 ...walk('apps/mini-app/tests').filter(p=>p.includes('/dashboard-')), 
-'runtime/cloudflare-entry.mjs','contracts/account-deletion.review.openapi.json','apps/mini-app/src/main.tsx','apps/mini-app/package.json','apps/mini-app/package-lock.json','apps/mini-app/src/clerk-prebuilt-entry.tsx','apps/mini-app/src/common-production-runtime.ts','apps/mini-app/src/owner-port.ts','apps/mini-app/src/production-connection.ts',
+'runtime/cloudflare-entry.mjs','runtime/cloudflare-worker.mjs','runtime/telegram-menu-completion.mjs','contracts/account-deletion.review.openapi.json','apps/mini-app/src/main.tsx','apps/mini-app/package.json','apps/mini-app/package-lock.json','apps/mini-app/src/clerk-prebuilt-entry.tsx','apps/mini-app/src/common-production-runtime.ts','apps/mini-app/src/owner-port.ts','apps/mini-app/src/production-connection.ts',
 ...walk('runtime').filter(p=>p.startsWith('runtime/telegram-clerk-entry-')),'contracts/telegram-atomic-entry.review.openapi.json','supabase/functions/univeracademy-api/storage/telegram-clerk-entry-rows.ts',
 ...walk('tests/telegram-entry').filter(p=>!p.endsWith('.md')),
 ...walk('runtime').filter(p=>p.startsWith('runtime/account-deletion-')),

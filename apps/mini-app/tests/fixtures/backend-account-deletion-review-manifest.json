@@ -444,8 +444,21 @@
       },
       "result": {
         "path": "runtime/cloudflare-entry.mjs",
-        "bytes": 9015,
-        "sha256": "15fcdf2eca7de31f801a22ea224bedf918bd340b748305f0d91c7788b701ce06"
+        "bytes": 9122,
+        "sha256": "277992a589c9ad88b10cee24ce3d9e2b748adea26d8952b7efe4dc669a8e0339"
+      }
+    },
+    {
+      "path": "runtime/cloudflare-worker.mjs",
+      "preimage": {
+        "path": "runtime/cloudflare-worker.mjs",
+        "bytes": 765,
+        "sha256": "f080176e973c962be8310c9a476cf32030439bf5a7339bdcf169d778facb00b7"
+      },
+      "result": {
+        "path": "runtime/cloudflare-worker.mjs",
+        "bytes": 868,
+        "sha256": "7fd30f2391cec512b8ef4f3066e16a595a05053ad97f36ad80b8669422ed771a"
       }
     },
     {
@@ -464,6 +477,15 @@
         "path": "runtime/telegram-clerk-entry-http.mjs",
         "bytes": 3966,
         "sha256": "ec8e70c2aa081ef23bf9c986f53e563a90576c7c9dfd292ab735ba320f28c904"
+      }
+    },
+    {
+      "path": "runtime/telegram-menu-completion.mjs",
+      "preimage": null,
+      "result": {
+        "path": "runtime/telegram-menu-completion.mjs",
+        "bytes": 3224,
+        "sha256": "4b0a9a385c07e4c53d41829761ac431f5bffa699fbcb7e470006d5c1aa78ee37"
       }
     },
     {

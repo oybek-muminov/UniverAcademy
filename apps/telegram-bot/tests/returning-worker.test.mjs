@@ -208,7 +208,7 @@ test('parallel private users cannot exchange chat destinations through shared re
   assert.deepEqual(h.calls, [{ update_id: 7, telegram_user_id: 42 }, { update_id: 8, telegram_user_id: 43 }]);
 });
 test('production dispatcher reads no token/storage/legacy AUTH_SIGN_IN_URL and performs no outbound fetch', async () => {
-  const h = fixture(); const allowed = new Set(['TELEGRAM_WEBHOOK_SECRET', 'TELEGRAM_START_LOOKUP', 'MINI_CABINET_URL', 'MINI_SIGN_IN_URL']);
+  const h = fixture(); const allowed = new Set(['TELEGRAM_WEBHOOK_SECRET', 'TELEGRAM_START_LOOKUP', 'MINI_CABINET_URL', 'MINI_SIGN_IN_URL', 'TELEGRAM_MESSAGE_LIFECYCLE_ENABLED']);
   const env = new Proxy(h.env, { get(target, key) { assert(allowed.has(key)); return target[key]; } });
   assert.equal((await createReturningBotWorker().fetch(request(), env)).status, 200);
   assert.equal(outbound, 0);
@@ -236,4 +236,18 @@ test('new Wrangler entry is explicitly dynamic, with no invented URLs/binding ta
     services: [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' }],
     vars: { MINI_CABINET_URL: 'https://mini.univeracademy.uz/', MINI_SIGN_IN_URL: 'https://mini.univeracademy.uz/sign-in' } });
   assert.equal(config.vars.MINI_SIGN_IN_URL, 'https://mini.univeracademy.uz/sign-in');
+});
+
+test('opt-in lifecycle receives authenticated context and suppresses webhook-send reply', async () => {
+  const h = fixture(); const captured = [];
+  h.env.TELEGRAM_MESSAGE_LIFECYCLE_ENABLED = 'true';
+  h.env.LOGIN_MESSAGE_LIFECYCLE = { getByName: name => ({ start: context => { captured.push({name, context}); } }) };
+  const response = await worker.fetch(request(), h.env);
+  assert.equal(response.status, 200); assert.equal(await response.text(), '');
+  assert.equal(captured.length, 1); assert.equal(captured[0].name, '42');
+  assert.equal(captured[0].context.telegram_user_id, 42);
+});
+test('enabled lifecycle without durable storage never falls back to untracked send', async () => {
+  const h = fixture(); h.env.TELEGRAM_MESSAGE_LIFECYCLE_ENABLED = 'true';
+  const response = await worker.fetch(request(), h.env); assert.equal(response.status, 503);
 });

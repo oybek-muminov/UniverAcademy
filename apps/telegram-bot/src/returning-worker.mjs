@@ -50,6 +50,13 @@ export function createReturningBotWorker() {
     try {
       const context = await readPrivateStartContext(request, env);
       if (context === null) return ack(); // Unsupported authenticated update.
+      // Opt-in only: a missing durable binding must fail closed, never silently
+      // fall back to untracked sends after lifecycle activation.
+      if (env.TELEGRAM_MESSAGE_LIFECYCLE_ENABLED === 'true') {
+        if (!env.LOGIN_MESSAGE_LIFECYCLE?.getByName) throw configFailure();
+        await env.LOGIN_MESSAGE_LIFECYCLE.getByName(String(context.telegram_user_id)).start(context);
+        return ack();
+      }
       // First application action after ingress validation. No static fallback,
       // public lookup URL, trusted header or raw update forwarding exists.
       const navigation = await lookupValidatedStart(context, env.TELEGRAM_START_LOOKUP);

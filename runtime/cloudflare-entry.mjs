@@ -1,3 +1,4 @@
+import {telegramMenuEnvironmentKeys} from './telegram-menu-completion.mjs';
 import {createTelegramClerkEntryApi,atomicEntryEnabled,atomicAuthorizedParties,atomicEntryEnvironmentKeys} from "./telegram-clerk-entry-api.mjs";
 import {createDeletionApi,isDeletionRequestPath,deletionRequestEnvironmentKeys} from "./account-deletion-api.mjs";
 import {isContractPath} from "./contract-paths.mjs";
@@ -16,7 +17,7 @@ const deny=()=>{throw unavailable();};
 const unavailableNumbers=Object.freeze({policyId:"registration-only-scoring-unavailable",
   toFiniteNumber:deny,toDisplayString:deny,toStudentPointsDisplayString:deny});
 const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
-  "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS",...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys];
+  "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS",...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys];
 const policyKeys=["initDataMaxAgeSeconds","futureSkewSeconds","accessTtlMs",
   "familyTtlMs","logoutTombstoneMs","identityCollisionAttempts","newLogin"];
 

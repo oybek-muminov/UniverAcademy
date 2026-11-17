@@ -1,3 +1,4 @@
+import {withTelegramMenuCompletion} from './telegram-menu-completion.mjs';
 import {WorkerEntrypoint} from 'cloudflare:workers';
 import api from './cloudflare-entry.mjs';
 import {createTelegramDirectory} from './cloudflare-telegram-directory.mjs';
@@ -10,4 +11,4 @@ export class TelegramAccountDirectory extends WorkerEntrypoint{
  async lookupTelegramStart(input){return directory.lookupTelegramStart(input,this.env);}
  async fetch(){return new Response(null,{status:404,headers:{'cache-control':'no-store'}});}
 }
-export default api;
+export default withTelegramMenuCompletion(api);
