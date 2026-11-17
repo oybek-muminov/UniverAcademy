@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "esbuild": "0.25.12",
-    "miniflare": "4.20260730.0"
+    "miniflare": "4.20260730.0",
+    "workerd": "1.20261117.1"
   }
 }

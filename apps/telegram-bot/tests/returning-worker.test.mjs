@@ -231,10 +231,13 @@ test('internal numeric lookup fields are snapshotted once before the asynchronou
 });
 test('new Wrangler entry is explicitly dynamic, with no invented URLs/binding target or implicit deployment', async () => {
   const config = JSON.parse(await readFile(new URL('../wrangler.json', import.meta.url), 'utf8'));
-  assert.deepEqual(config, { name: 'univeracademy-bot', main: 'src/returning-worker.mjs',
+  assert.deepEqual(config, { name: 'univeracademy-bot', main: 'src/lifecycle-cloudflare-entry.mjs',
     compatibility_date: '2026-11-11', keep_vars: true,
     services: [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' }],
-    vars: { MINI_CABINET_URL: 'https://mini.univeracademy.uz/', MINI_SIGN_IN_URL: 'https://mini.univeracademy.uz/sign-in' } });
+    vars: { MINI_CABINET_URL: 'https://mini.univeracademy.uz/', MINI_SIGN_IN_URL: 'https://mini.univeracademy.uz/sign-in', TELEGRAM_MESSAGE_LIFECYCLE_ENABLED: 'false', LOGIN_MESSAGE_TTL_SECONDS: '86400' },
+    durable_objects: { bindings: [{ name: 'LOGIN_MESSAGE_LIFECYCLE', class_name: 'LoginMessageLifecycleObject' }] },
+    migrations: [{ tag: 'menu-lifecycle-v1', new_sqlite_classes: ['LoginMessageLifecycleObject'] }],
+    observability: { enabled: true, logs: { enabled: true, invocation_logs: false }, traces: { enabled: false } } });
   assert.equal(config.vars.MINI_SIGN_IN_URL, 'https://mini.univeracademy.uz/sign-in');
 });
 
@@ -251,3 +254,12 @@ test('enabled lifecycle without durable storage never falls back to untracked se
   const h = fixture(); h.env.TELEGRAM_MESSAGE_LIFECYCLE_ENABLED = 'true';
   const response = await worker.fetch(request(), h.env); assert.equal(response.status, 503);
 });
+
+ test('explicit safe-off ignores token, TTL and DO binding', async () => {
+  const h=fixture(); h.env.TELEGRAM_MESSAGE_LIFECYCLE_ENABLED='false';
+  for (const key of ['TELEGRAM_BOT_TOKEN','LOGIN_MESSAGE_TTL_SECONDS','LOGIN_MESSAGE_LIFECYCLE'])
+    Object.defineProperty(h.env,key,{get(){throw Error('disabled lifecycle accessed');}});
+  const response=await worker.fetch(request(),h.env);
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).method,'sendMessage');
+ });

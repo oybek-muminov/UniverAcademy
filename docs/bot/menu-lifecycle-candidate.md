@@ -1,8 +1,9 @@
-# Menu lifecycle candidate (not deployed)
+# Menu lifecycle integration (feature off)
 
 User correction: remove old login messages even if no cabinet was created; a
 fresh /start issues a fresh button. Message cleanup is not account deletion.
-The optional integration is implemented locally but is not enabled or deployed.
+The optional code is on main; the lifecycle feature is not enabled. The existing
+bot automatic build ran successfully with its original stateless entrypoint.
 
 Integration requirements:
 - Direct sendMessage with a stored returned message_id; current webhook reply
@@ -78,7 +79,8 @@ were updated; account deletion implementation was not modified. Account-deleted
 notification is still to be integrated by its owner; /start always reconciles.
 
 Read-only Cloudflare check: bot has lookup service, webhook secret and Mini URLs;
-it lacks the Telegram send token and lifecycle storage. API has its Telegram
+the owner has now supplied TELEGRAM_BOT_TOKEN as a secret binding, verified by
+name/type only. Lifecycle storage is still absent live. API has its Telegram
 verification secret already; secret values were not read/exported. No settings
 were changed.
 
@@ -87,12 +89,14 @@ Reproducible isolated runtime test:
 npm ci --prefix apps/telegram-bot/tests/runtime
 node apps/telegram-bot/tests/runtime/run.mjs
 ```
-The available pinned Miniflare/workerd only supports up to 2026-08-06; production
-uses 2026-11-11. Exact-date runtime startup was blocked. A lower-date smoke run
-with `UA_BOT_TEST_COMPATIBILITY_DATE=2026-08-06` passed real local workerd SQLite,
-RPC, alarms, completion hook and no-extra-chat-message behavior. This is NOT full
-production-compatibility validation. It caught/fixed Workers' unsupported
-redirect:error; transport now uses manual redirect and refuses 3xx.
+Runtime parity check passed at production compatibility_date=2026-11-11 using
+official workerd 1.20261117.1. Stable Miniflare bundles an older binary, so the test
+pins workerd separately and selects it through its supported
+MINIFLARE_WORKERD_PATH. Local workerd exercises SQLite receipts, private RPC,
+alarms, completion hooks, no-extra-message and 429 retry behavior. This is not
+live Telegram acceptance; no deployment or provider configuration is involved.
+The earlier lower-date smoke caught/fixed Workers' unsupported redirect:error;
+transport uses manual redirect and refuses 3xx.
 All Telegram traffic was intercepted by a fixture; no real users contacted.
 
 ## Delivery guarantees and rate-limit correction
@@ -113,7 +117,7 @@ we try removing its inline button; sustained outage or rejection can still leave
 a message/button and is recorded as exhausted cleanup. No expired-deadline retry
 is attempted early to bypass Telegram's retry_after. Fresh /start remains the
 recovery path. Before release, operational visibility for these diagnostic
-markers and production-compatibility validation remain required.
+markers and live acceptance verification remain required.
 
 Cooldowns survive new events: delete receipts carry a separate notBefore,
 menu updates carry menuNotBefore, and send attempts carry sendNotBefore.
@@ -121,3 +125,58 @@ Reconciliation and fresh /start may mark work due/superseded but cannot erase
 these provider cooldowns. A fresh login button queued during a send cooldown
 replaces the old unsent intent and waits for the same allowed send time.
 Regression tests cover repeated reconcile/start before and exactly at retry time.
+
+## Prepared safe-off configuration (not pushed or applied)
+
+The local bot configuration selects lifecycle-cloudflare-entry.mjs, binds
+LOGIN_MESSAGE_LIFECYCLE to LoginMessageLifecycleObject, adds the SQLite migration
+menu-lifecycle-v1, and explicitly sets TELEGRAM_MESSAGE_LIFECYCLE_ENABLED=false.
+Existing URLs, lookup service and separately stored secrets are preserved. The reviewed
+TTL is 86400 seconds (24 hours), leaving a further 23-hour retry window before
+the 47-hour cleanup cutoff.
+The disabled path performs no direct Telegram calls or lifecycle storage writes.
+
+Deployment order for review:
+1. Publish the safe-off bot configuration and verify its build, exports, binding,
+   migration and unchanged secret names. Do not enable yet.
+2. Add the API private service TELEGRAM_MENU_SYNC -> univeracademy-bot, entrypoint
+   TelegramMenuSync, with UA_TELEGRAM_MENU_SYNC_ENABLED=false. Preserve Hyperdrive,
+   routes, Clerk vars/secrets, lookup entrypoint and all deletion settings. This
+   adds an internal RPC capability and must be reviewed before applying.
+3. Confirm operational diagnostics and an owner-only acceptance test window.
+4. Enable bot lifecycle, then API completion notification. Never use arbitrary
+   real user accounts as fixtures. Verify both a new and existing owner-scoped
+   account, successful and abandoned login, duplicate webhook, and menu behavior.
+5. Rollback disables API notification and bot lifecycle flags; do not delete the
+   DO namespace or stored receipts. Outstanding alarms still need to finish
+   cleanup, so disabling new work is not cancellation of already scheduled work.
+
+This change does not wire account-deletion events; that integration remains
+with the deletion work owner. No credentials, production bindings, migration,
+flags, network/security settings, or real Telegram messages were changed here.
+
+### Production effect / rollback record (pre-change, 2026-11-17)
+
+Observed bot version: 9d0f03c0-32c9-46bd-a039-6026ccfcd685.
+Observed API version: 82ba88c1-1bd2-44b0-bfbb-99501f54b7c9.
+These are observations, not instructions to restore old secrets or overwrite
+later work. Re-read active versions/settings immediately before any change.
+
+Safe-off bot provisioning adds a namespace and exports but retains stateless
+/start behavior. API service binding must be deployed only AFTER the bot export
+exists. It grants only the named private reconciliation entrypoint; there is no
+new public route, database privilege, credential rotation or network policy.
+
+Diagnostics emit fixed event/send/menu/cleanup enums after durable persistence;
+no chat/message/user IDs, request bodies, provider descriptions, tokens or URLs.
+Observer failure cannot block the operation. Worker logs enabled, invocation
+logs disabled, traces disabled. Diagnostic markers may reappear after a cold
+start and are not exactly-once metrics. Pending indicates an attempt, not proven
+delivery; confirmed/rejected/unconfirmed and exhausted retry markers distinguish
+outcomes. Existing webhook-response messages cannot be retroactively tracked.
+
+For rollback, keep the new module/namespace and disable feature flags first.
+Blind rollback to an older module without the Durable Object class could strand
+stored alarms; do not delete a namespace or migration to undo enablement. Existing
+cleanup alarms continue after feature-off. If ALL side effects need to stop,
+that is a separate reviewed cancellation change, not the feature-off procedure.

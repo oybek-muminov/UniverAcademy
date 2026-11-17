@@ -6,7 +6,7 @@ import { createTelegramDelivery } from './telegram-delivery.mjs';
 export class LoginMessageLifecycleObject extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.engine = new LoginMessageLifecycle(ctx.storage, env, createTelegramDelivery(env.TELEGRAM_BOT_TOKEN));
+    this.engine = new LoginMessageLifecycle(ctx.storage, env, createTelegramDelivery(env.TELEGRAM_BOT_TOKEN), Date.now, event => console.log(JSON.stringify(event)));
     this.tail = Promise.resolve();
   }
   // Serialize across network awaits, without holding blockConcurrencyWhile I/O.

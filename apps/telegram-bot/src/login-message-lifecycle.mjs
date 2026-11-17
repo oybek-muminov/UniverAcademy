@@ -4,7 +4,7 @@ const RETRY = 60000, POLL = 30000, DAY = 86400000;
 const positive = n => Number.isSafeInteger(n) && n > 0;
 // Injectable durable engine; all public operations are serialized by the DO wrapper.
 export class LoginMessageLifecycle {
-  constructor(storage, env, deliver, now = Date.now) { Object.assign(this, { storage, env, deliver, now }); }
+  constructor(storage, env, deliver, now = Date.now, observe = () => {}) { Object.assign(this, { storage, env, deliver, now, observe }); }
   async load() { return await this.storage.get('state') || { receipts: [], seen: [] }; }
   async save(s) {
     const times = [...s.receipts.map(r => r.next), ...(s.menuDue ? [s.menuDue] : []), ...(s.sendRetry ? [s.sendRetry.next] : [])];
@@ -13,6 +13,16 @@ export class LoginMessageLifecycle {
       if (times.length) await tx.setAlarm(Math.max(this.now() + 1000, Math.min(...times)));
       else await tx.deleteAlarm();
     });
+    // Only fixed diagnostic enums, never identity, URLs, provider descriptions or secrets.
+    const diagnostic = { event: 'telegram_menu_lifecycle',
+      send: ['pending','not_needed','confirmed','rate_limited','rejected','unconfirmed','retry_window_exhausted'].includes(s.lastSend) ? s.lastSend : 'none',
+      menu: s.menuFailure === 'retry_window_exhausted' ? 'retry_window_exhausted' : 'none',
+      cleanup: s.cleanupFailure === 'retry_window_exhausted' ? 'retry_window_exhausted' : 'none' };
+    const signature = JSON.stringify(diagnostic);
+    if (signature !== this.lastDiagnostic) {
+      this.lastDiagnostic = signature;
+      try { this.observe(diagnostic); } catch { /* Diagnostics cannot block durable work. */ }
+    }
   }
   async start(context) {
     const { telegram_user_id: chatId, update_id: updateId } = context;

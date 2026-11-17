@@ -1,4 +1,7 @@
 import {Miniflare} from 'miniflare';
+import workerdPath from 'workerd';
+// Pin the official runtime separately: Miniflare stable currently bundles an older binary.
+process.env.MINIFLARE_WORKERD_PATH ??= typeof workerdPath === 'string' ? workerdPath : workerdPath.default;
 import {build} from 'esbuild';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';

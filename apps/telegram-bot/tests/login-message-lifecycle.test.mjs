@@ -146,3 +146,15 @@ test('menu retry_after survives reconciliation and new start', async () => {
   time=1089999;await engine.reconcile();assert.equal(menus,1);
   time=1090000;await engine.reconcile();assert.equal(menus,2);assert.equal(h.state().menuNotBefore,null);
 });
+test('diagnostics emit only fixed enums and cannot break persisted work', async () => {
+  const h = harness(), events = [];
+  h.engine.observe = event => { events.push(event); throw Error('observer failure'); };
+  await h.engine.start(context);
+  assert.equal(h.state().lastSend, 'confirmed');
+  assert.ok(events.some(e => e.send === 'confirmed'));
+  assert.ok(events.every(e => Object.keys(e).join(',') === 'event,send,menu,cleanup'));
+  const state = h.state(); state.lastSend = 'secret-user-data'; state.menuFailure = 'secret'; state.cleanupFailure = 'secret';
+  await h.engine.save(state);
+  assert.deepEqual(events.at(-1), {event:'telegram_menu_lifecycle',send:'none',menu:'none',cleanup:'none'});
+  assert.ok(!JSON.stringify(events).includes('secret'));
+});
