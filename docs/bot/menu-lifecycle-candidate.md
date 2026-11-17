@@ -1,3 +1,30 @@
+# Release status (2026-11-17)
+
+Reviewed staged activation: bot flag first, API completion flag second. TTL is
+24 hours. Safe-off deployment and binding preservation were verified before
+activation. Local tests and exact production-date workerd passed; actual live
+Telegram/DB lookup acceptance remains pending the owner's own /start. No
+synthetic /start or real-user test messages were sent.
+
+Owner acceptance: send /start from an existing account and verify Kabinet appears
+in the menu with no new cabinet chat message. From a genuinely new/unlinked
+account, verify the login message, complete Clerk login, then verify that message
+disappears and Kabinet becomes available in the menu. Abandoned login messages
+expire after 24h; prior messages sent before tracking cannot be recovered.
+
+Known limits: account-deletion event is not wired, so menu reset after deletion
+requires /start; the menu itself never grants access. Unknown accepted send
+receipts cannot be reconstructed. Live lookup DB health is not proven by
+/health, which is liveness only. No direct private invoker was available and
+recent lookup telemetry had no matching events.
+
+Safe-off rollback anchors: bot version 8b39ebab-8669-43fc-86aa-1688b5fa286e; API
+version 487e0709-4623-4a05-be7e-035da980f971. Prefer feature flags false in source
+and production, not restoring an old module without the Durable Object class.
+Preserve namespace, secrets and receipts; existing alarms continue cleanup.
+
+The following historical preparation notes describe the staged rollout.
+
 # Menu lifecycle integration (feature off)
 
 User correction: remove old login messages even if no cabinet was created; a

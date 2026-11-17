@@ -20,7 +20,7 @@ test('API production configuration pins exact origins and supported policy shape
 });
 test('API source configuration never provides private secrets or stale temporary mode', () => {
   assert.deepEqual(Object.keys(config.vars).sort(),['UA_ALLOWED_ORIGINS','UA_API_ORIGIN','UA_CLERK_PROVIDER_SETTINGS','UA_SESSION_POLICY','UA_TELEGRAM_LOOKUP_TIMEOUT_MS','UA_TELEGRAM_MENU_SYNC_ENABLED']);
-  assert.equal(config.vars.UA_TELEGRAM_MENU_SYNC_ENABLED,'false');
+  assert.equal(config.vars.UA_TELEGRAM_MENU_SYNC_ENABLED,'true');
   assert.deepEqual(config.services,[{binding:'TELEGRAM_MENU_SYNC',service:'univeracademy-bot',entrypoint:'TelegramMenuSync'}]);
   assert.equal(config.keep_vars,true);
   assert.equal(config.workers_dev,false);

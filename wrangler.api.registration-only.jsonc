@@ -16,7 +16,7 @@
   ],
   "services": [{ "binding": "TELEGRAM_MENU_SYNC", "service": "univeracademy-bot", "entrypoint": "TelegramMenuSync" }],
   "vars": {
-    "UA_TELEGRAM_MENU_SYNC_ENABLED": "false",
+    "UA_TELEGRAM_MENU_SYNC_ENABLED": "true",
     "UA_API_ORIGIN": "https://api.univeracademy.uz",
     "UA_ALLOWED_ORIGINS": "[\"https://mini.univeracademy.uz\"]",
     "UA_SESSION_POLICY": "{\"initDataMaxAgeSeconds\":300,\"futureSkewSeconds\":0,\"accessTtlMs\":900000,\"familyTtlMs\":86400000,\"logoutTombstoneMs\":86400000,\"identityCollisionAttempts\":4,\"newLogin\":\"revoke_previous\"}",
