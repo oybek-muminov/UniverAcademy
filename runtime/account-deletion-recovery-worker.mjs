@@ -1,3 +1,12 @@
+import {WorkflowEntrypoint} from 'cloudflare:workers';
+import {checkDeletionProviderReadiness} from './account-deletion-readiness.mjs';
+// REST-triggered private operational check. No public endpoint or cron required.
+// Registry points to this class; no Workflow env binding is added to recovery.
+export class DeletionProviderReadinessWorkflow extends WorkflowEntrypoint{
+ async run(_event,step){
+  return step.do('verify-clerk-production-key',{retries:{limit:0,delay:'1 second'},timeout:'10 seconds'},()=>checkDeletionProviderReadiness(this.env));
+ }
+}
 import {createCloudflarePostgres} from './cloudflare-postgres.mjs';
 import {isHyperdriveConnectionString} from './hyperdrive-connection-string.mjs';
 import {AccountDeletionRecovery} from '../supabase/functions/univeracademy-api/storage/account-deletion-rows.ts';
