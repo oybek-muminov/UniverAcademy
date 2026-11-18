@@ -706,6 +706,75 @@ for(const file of deletion.files){
  assert(Number.isSafeInteger(file.result.bytes)&&file.result.bytes>=0&&/^[a-f0-9]{64}$/.test(file.result.sha256));
  selected.set(file.path,file.result);
 }
+// Reviewed rollout 5ad758a and provider-readiness 0f41056d. Preserve historic
+// manifests; pin only these approved changes, never regenerate from current files.
+const approvedDeletionRollout = [
+  {
+    "path": "apps/mini-app/src/account-deletion-candidate/panel.tsx",
+    "preimage": {
+      "path": "apps/mini-app/src/account-deletion-candidate/panel.tsx",
+      "bytes": 3299,
+      "sha256": "4b189cc13a4c33d882d9bc1943e3fc5ae62d8482e96f16c9f56285b7cbb52e91"
+    },
+    "result": {
+      "path": "apps/mini-app/src/account-deletion-candidate/panel.tsx",
+      "bytes": 3546,
+      "sha256": "ca473747a473696471dbab5367f2b03b1b95fddfee4fdef9cc47c2b8a6dee245"
+    }
+  },
+  {
+    "path": "apps/mini-app/src/account-deletion-candidate/recovery-panel.tsx",
+    "preimage": {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery-panel.tsx",
+      "bytes": 997,
+      "sha256": "313615998ae9d8d08c729aff4ed48ff6c46ac9c628fd8a583608e373b73101a5"
+    },
+    "result": {
+      "path": "apps/mini-app/src/account-deletion-candidate/recovery-panel.tsx",
+      "bytes": 1231,
+      "sha256": "4e02a8bd9d7d12b933065fcd40711f742805e1a151c6a4554daaa68a52151cbc"
+    }
+  },
+  {
+    "path": "supabase/functions/univeracademy-api/storage/account-deletion-rows.ts",
+    "preimage": {
+      "path": "supabase/functions/univeracademy-api/storage/account-deletion-rows.ts",
+      "bytes": 6735,
+      "sha256": "c02689edbf66299b8e8f440d47a60c04048395e386813d88736eb15d64848c72"
+    },
+    "result": {
+      "path": "supabase/functions/univeracademy-api/storage/account-deletion-rows.ts",
+      "bytes": 8466,
+      "sha256": "fb95a43deb712c6b92cdd29793bec2527caf31c91f3edf14ebde52aace46c999"
+    }
+  },
+  {
+    "path": "runtime/account-deletion-recovery-worker.mjs",
+    "preimage": {
+      "path": "runtime/account-deletion-recovery-worker.mjs",
+      "bytes": 4394,
+      "sha256": "6012242cb9b704d6239098d1258f1cf66466158d808c51e926f0e5a244c0383d"
+    },
+    "result": {
+      "path": "runtime/account-deletion-recovery-worker.mjs",
+      "bytes": 4949,
+      "sha256": "2eaf3c7a2466d82ffb462150a26e0fbc117e2abbd4fb76279c2f278c68fae059"
+    }
+  },
+  {
+    "path": "runtime/account-deletion-readiness.mjs",
+    "preimage": null,
+    "result": {
+      "path": "runtime/account-deletion-readiness.mjs",
+      "bytes": 2621,
+      "sha256": "cb053bc39149676380ff2937bb00e400cd49e8837a51d4cd04dbedc81749e7e1"
+    }
+  }
+];
+for (const file of approvedDeletionRollout) {
+  assert.deepEqual(selected.get(file.path) ?? null, file.preimage, 'DELETION_ROLLOUT_PREIMAGE_MISMATCH: ' + file.path);
+  selected.set(file.path, file.result);
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {
