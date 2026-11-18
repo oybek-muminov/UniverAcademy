@@ -138,3 +138,208 @@ Timeout, 404/expired receipt yoki noaniq javob “hisob o‘chirildi” degani e
 - Birlashtirilgan dashboard+deletion paketining yakuniy test/audit natijasi va secret-scan.
 
 Bu talablar tugamaguncha source ZIPni yuklash mumkinligi funksiyani productionda yoqishga ruxsat yoki muvaffaqiyat isboti emas.
+
+## 10. 2026-11-18 real-account-only continuation
+
+The owner's latest direction governs all further validation: use the real project
+and the already designated real account. Do not create synthetic data/accounts or
+run synthetic fixtures. If another real account or a populated group is required,
+ask first. Earlier fixture results are historical engineering evidence, not the
+owner's accepted real-project completion criterion. Do not include newly created
+synthetic fixture/test files in an upload package without explicit authorization.
+
+Current blockers, in dependency order:
+
+1. **Managed production migration.** The two `*.review.sql` files require an
+   isolated-fixture marker and must not be used on production by setting that
+   marker. A separate reviewed production composition is needed. It must preserve
+   the observed managed `postgres` ADMIN-only memberships, explicitly bound any
+   temporary owner/SET/CREATE authority, and prove that authority is closed before
+   completion. The observed baseline has no deletion tables or roles.
+2. **Dedicated credentials and infrastructure.** Two named restricted runtime
+   logins and separate Hyperdrive bindings must be provisioned through the
+   approved secret/configuration flow. Keep secrets out of source and chat.
+   Confirm TLS verification, disabled query cache, actual current_user and narrow
+   effective privileges. Do not replace the ordinary API's broader binding.
+3. **Disabled deployment first.** API and recovery Worker are deployed with
+   acceptance and recovery disabled; Mini deletion UI remains off. Verify exact
+   source/version, origin/CORS/status routing, provider instance/domain readiness,
+   redacted logs and monitoring without accepting a deletion job.
+4. **Real-account readiness.** Have the owner sign in to the previously designated
+   account and complete reverification. Verify identity continuity and cancellation
+   through the real UI. Do not use an old bearer/token from logs or export session
+   material. The designated account had no attempts/results at the last read-only
+   check: testing real education cleanup requires the owner's genuine activity,
+   not an inserted fixture. A second-user preservation test needs an additional
+   real account selected by the owner if the current set is insufficient.
+5. **Explicit destructive confirmation.** Before the first actual delete submit,
+   display the exact account and explain that Clerk identity, platform profile,
+   personal results and Telegram binding will be removed; DB backup alone cannot
+   restore the Clerk identity. Obtain the owner's fresh concrete confirmation.
+   General past willingness to accept test risk is not this confirmation.
+6. **Activation and completion.** Independently check an empty pending queue,
+   scheduler/provider readiness and the approved rollout scope before enabling
+   submission. Follow accepted→provider-deleted→completed via receipt status and
+   read-only counts, without automatic retries of ambiguous submits. Never unfreeze
+   or resurrect a provider-deleted job as a rollback shortcut.
+
+Approval boundaries remain separate: source upload, managed DB/configuration
+change and deployment must be within their concrete approved scope; the actual
+irreversible account deletion additionally requires action-time confirmation.
+No step above is recorded as performed by writing this plan.
+
+### Managed production composition candidate, prepared but not applied
+
+`supabase/proposals/account-deletion-managed-production.candidate.sql` now supplies
+an actual managed-operator composition for independent review, rather than asking
+an operator to bypass the isolated-fixture guard. It is NOT a migration-history
+record and has never been executed. No credentials or real-account identifiers
+are embedded.
+
+Design:
+- One transaction; accepts only the observed PostgreSQL17.11 managed `postgres`
+  operator, database and bootstrap-role/membership shape.
+- Pins a read-only catalog fingerprint before changes. Any baseline drift or
+  existing deletion roles aborts; there is no broad IF NOT EXISTS overwrite.
+- Creates three restricted NOLOGIN roles and verifies their bootstrap-issued
+  ADMIN-only creator rows. No LOGIN or password is supplied.
+- Opens separate operator-granted temporary INHERIT/SET edges for ua_owner,
+  ua_access_locator_owner and ua_deletion_executor. Destination schema CREATE is
+  temporary and applies only to the new executor for function ownership transfer.
+- Uses the corrected deletion business SQL verbatim. Adds tables with acceptance
+  false; leaves jobs/tombstones empty. New table ownership becomes ua_owner.
+- Normalizes ACLs on NEW objects only, then grants exact request/recovery/helper
+  execution. It does not rewrite existing unrelated default privileges.
+- Revokes temporary schema CREATE and operator-granted membership edges while
+  preserving original bootstrap ADMIN-only edges; postflight verifies closure,
+  role attributes, RLS, table ownership and exact new-function ACLs before COMMIT.
+
+Static validation only: pglast7.23 using PostgreSQL17 grammar parsed72 SQL
+statements and20 PL/pgSQL blocks; the business SQL block is byte-identical to the
+corrected review source. `git diff --check` passed. Parsing does not establish
+permission behavior or production success; no database execution or synthetic
+fixture was used for this candidate.
+
+Independent review must examine the managed ownership/GRANTOR window, source
+fingerprint stability, effective ACL checks and DDL lock impact before approval.
+Schedule a quiet maintenance window: new triggers/policies require locks, and a
+catalog snapshot does not defend against a concurrent administrator changing
+DDL/ACL after the initial check. Approval marker text is only an accident guard,
+not a substitute for the owner's concrete authorization. Never set it just to
+make a rejected command pass. Keep UI/recovery disabled and NOLOGIN placeholders
+unchanged until the separately approved credential/binding/deployment steps.
+
+The only persistent row inserted during installation is the disabled singleton
+control row. No profile, test attempt, result, accepted job or provider deletion
+is created by installation. A backup restore cannot undo a later Clerk deletion.
+
+### Reviewer correction: disabled acceptance is not a no-impact install
+
+The initial production composition attached enabled barriers immediately. That
+would change ordinary writes even with accepting=false. The revised candidate
+now leaves **all31 newly added barriers DISABLED at commit**, adds
+`guards_active=false`, and enforces `CHECK (NOT accepting OR guards_active)`.
+This avoids persistent per-row helper/locking impact in the installed state;
+it does NOT remove DDL lock/planning/catalog impact during installation. A quiet,
+separately approved maintenance window remains necessary.
+
+Read-only effective-writer audit of the real project found:
+- ua_api_login inherits ua_runtime: DML capability on15 private tables.
+- ua_clerk_lock_owner can update people/clerk_identities; its actual linking
+  function performs UPDATE on people.
+- ua_person_lock_owner has people UPDATE privilege needed for its current
+  SELECT FOR UPDATE helper. That helper currently issues no row mutation.
+- ua_owner owns30 tables and is relevant during approved maintenance windows.
+- supabase_admin is a platform superuser. The predefined pg_write_all_data role
+  represents broad capability, not a provisioned application login. Any future
+  non-superuser membership in that role is an activation blocker.
+- No ua_* connections were visible at the observation instant. That does not
+  prove absence of traffic or certify a maintenance window.
+
+The revised production ACL adds only the narrow row-freeze helper to ua_owner
+and ua_person_lock_owner, and the staff helper to ua_owner. ua_api_login obtains
+its existing guard access through ua_runtime. No executor membership, table
+rights or credential is added to these existing writers. The exact-function
+postflight allowlist is updated accordingly. Do not distribute the helper to
+PUBLIC, service_role or every role as a workaround for permission errors.
+
+`account-deletion-guard-rollout.candidate.sql` provides a separate reviewed stage:
+1. Keep API acceptance/recovery/UI off. Confirm backup, deployment compatibility,
+   actual writer inventory, production identity pins and the approved real-account
+   observation plan. No synthetic probes are allowed.
+2. In an approved quiet window, enable mode takes deterministic ACCESS EXCLUSIVE
+   NOWAIT locks on the25 affected tables and four control/history tables. Busy
+   tables cause a rollback, not automatic retry or session termination. It checks
+   the exact31 barriers, owner/path/state, empty jobs/tombstones and narrow effective
+   writer helper ACLs before enabling. It leaves accepting=false.
+3. Observe genuine intended activity through the real project and designated
+   account: sign-in/return, profile update if explicitly included, normal result
+   write if the owner has genuine educational content, cancellation and session
+   behavior. Inspect only redacted errors/lock-wait metrics and count/status
+   metadata. One successful login is not proof of every writer or race case.
+4. Only after that checkpoint may a separately approved acceptance/UI/recovery
+   activation proceed. The first irreversible account deletion still requires
+   fresh action-time confirmation for the exact account.
+
+Rollback boundaries:
+- If install/guard-change fails before COMMIT: PostgreSQL transaction rollback
+  restores its DDL/grants/trigger state. No partial manual cleanup or broad DROP.
+- Before ANY accepted job/tombstone: stop submission/UI/recovery through the
+  approved config path, verify acceptance=false, then the same guard-rollout file
+  in disable-empty-guards mode can atomically disable exactly these31 barriers.
+  It refuses if ANY job (even completed) or tombstone exists. Leave inert tables
+  and NOLOGIN roles in place; removing them is not necessary for this rollback.
+- Once a job/tombstone exists: DO NOT disable barriers, clear tombstones, unfreeze
+  a profile or restore only the DB as a rollback. Stop NEW submissions, retain
+  receipt status and reconcile accepted work. If a wrong-target/provider risk is
+  suspected, stop the recovery scheduler first and investigate while preserving
+  all guards and records. Resume only under the clarified approved scope.
+- Neither row triggers nor these gates make a malicious privileged administrator
+  safe. Owner/superuser TRUNCATE or arbitrary DDL remains outside the runtime
+  protection boundary and must not be used as a maintenance shortcut.
+
+These changes were statically parsed only: PostgreSQL17 grammar accepted the
+revised install (75 statements/21 PL/pgSQL blocks) and separate rollout
+(10 statements/3 blocks). No script was executed, no synthetic data was created,
+and no production write occurred. Independent review is required again.
+
+#### Second review corrections (not executed)
+
+The managed candidate's prepare predicate is now explicitly
+`accepting AND guards_active`. The earlier `accepting OR guards_active` was an
+incorrect broad text-replacement and would have admitted deletion during the
+guard-only observation phase. It is fixed. Other OR expressions are rejection
+conditions or the implication CHECK and are intentionally unchanged. The
+production function body therefore differs from the base review source at this
+one deliberate admission gate; earlier byte-identical evidence describes the
+pre-staging copy, not this revised production body.
+
+The rollout candidate additionally pins exact MD5 hashes of the reviewed prosrc
+text for all five guard functions, with their exact signatures, expected owner,
+PL/pgSQL language, SECURITY DEFINER/INVOKER setting, fixed configuration,
+volatility/parallel/strict/leakproof/return/default-argument properties. Hashes
+are drift checks, not protection against a malicious administrator.
+
+All31 triggers are checked for exact timing/event bitmask, row mode, target and
+function, UPDATE column list, absence of WHEN, exact argument bytes/count, and
+non-constraint/non-deferred semantics, in addition to expected enabled state.
+The six identity/proof triggers distinguish BEFORE vs AFTER and Clerk vs Telegram
+arguments. A same-name trigger with a different event, WHEN filter or argument
+now fails closed rather than being enabled. PostgreSQL17 static parsing and
+whitespace checks passed; no runtime or synthetic test was performed.
+
+## Latest continuation: source preparation does not wait for backup
+
+The owner directed that completion of the separate backup project must not block
+independent account-deletion implementation. Continue source, configuration and
+read-only readiness work now. This is not permission to delete a real account,
+push without the repository's per-upload approval, or change production ACLs
+without the concrete security-change approval. Keep those decisions separate.
+
+`wrangler.account-deletion-recovery.jsonc` is now the disabled deployment candidate:
+no public/preview routes, no cron, enabled=false, verified issuer/instance pins.
+The dedicated Hyperdrive and secret must be provisioned separately. Preserve the
+strict five-binding runtime contract. The JSONC structure and disabled invariants
+were statically checked; root TypeScript check passed. This is not an executed
+provider deployment or a verified real-account E2E result. See the official
+[Wrangler configuration reference](https://developers.cloudflare.com/workers/wrangler/configuration/).

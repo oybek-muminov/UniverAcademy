@@ -25,18 +25,34 @@ async function transaction<T>(pool:PgPool,work:(c:PgClient)=>Promise<T>):Promise
   throw new StorageUnavailable('not_committed');
  }finally{closeTrustedServerContext(c);try{c.release(discard);}catch{/* one cleanup attempt only */}}
 }
-const privilegeSql=`SELECT current_user AS role,
- r.rolsuper OR r.rolbypassrls OR r.rolcreaterole AS elevated,
- EXISTS(SELECT 1 FROM pg_roles x WHERE (x.rolname IN('ua_owner','ua_deletion_executor','ua_person_lock_owner','ua_clerk_lock_owner') OR x.rolsuper OR x.rolbypassrls OR x.rolcreaterole)
- AND (pg_has_role(current_user,x.oid,'MEMBER') OR pg_has_role(current_user,x.oid,'SET'))) AS inherited,
+const requestFunctions=['ua_private.locate_student_access(text)','ua_private.prepare_account_deletion(uuid,uuid,text,text,text,text,text,bigint)','ua_private.account_deletion_status(text)'];
+const recoveryFunctions=['ua_private.due_account_deletions()','ua_private.claim_account_deletion(uuid,uuid)','ua_private.mark_account_provider_deleted(uuid,uuid)','ua_private.finish_account_deletion(uuid,uuid)'];
+/** Recheck effective privileges on every transaction: PUBLIC grants, column-only
+ * access and additional callable definers count, not just explicit role ACLs. */
+const privilegeSql=`WITH allowed AS (SELECT to_regprocedure(signature)::oid AS oid FROM unnest($1::text[]) signature)
+ SELECT current_user AS role,
+ r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication AS elevated,
+ EXISTS(SELECT 1 FROM pg_auth_members WHERE member=r.oid) AS inherited,
+ (has_schema_privilege(current_user,'ua_private','CREATE') OR
  EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='ua_private' AND
- c.relname IN('account_deletion_jobs','account_deletion_control','deleted_clerk_subjects','deleted_proof_digests') AND
- (has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR
- has_any_column_privilege(current_user,c.oid,'INSERT,UPDATE,REFERENCES'))) AS writable
+ ((c.relkind IN('r','p','v','m','f') AND
+ (has_table_privilege(current_user,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR
+ has_any_column_privilege(current_user,c.oid,'SELECT,INSERT,UPDATE,REFERENCES'))) OR
+ (c.relkind='S' AND has_sequence_privilege(current_user,c.oid,'USAGE,SELECT,UPDATE'))))) AS writable,
+ (NOT has_schema_privilege(current_user,'ua_private','USAGE') OR
+ EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='ua_private'
+ AND has_function_privilege(current_user,p.oid,'EXECUTE') AND NOT EXISTS(SELECT 1 FROM allowed a WHERE a.oid=p.oid)) OR
+ EXISTS(SELECT 1 FROM allowed a LEFT JOIN pg_proc p ON p.oid=a.oid LEFT JOIN pg_roles owner ON owner.oid=p.proowner
+ WHERE p.oid IS NULL OR NOT has_function_privilege(current_user,p.oid,'EXECUTE') OR NOT p.prosecdef
+ OR owner.rolname IS DISTINCT FROM CASE WHEN p.proname='locate_student_access' THEN 'ua_access_locator_owner' ELSE 'ua_deletion_executor' END
+ OR owner.rolsuper OR owner.rolbypassrls OR owner.rolcreaterole OR owner.rolcreatedb OR owner.rolreplication OR owner.rolcanlogin
+ OR has_schema_privilege(owner.oid,'ua_private','CREATE')
+ OR EXISTS(SELECT 1 FROM pg_auth_members WHERE member=owner.oid)
+ OR NOT coalesce('search_path=pg_catalog, ua_private'=ANY(p.proconfig),false))) AS execute_drift
  FROM pg_roles r WHERE r.rolname=current_user`;
-async function requireRole(c:PgClient,expectedRole:string){
- const r=await query(c,'ua_delete_role_preflight',privilegeSql);
- if(r.rows.length!==1||r.rows[0].role!==expectedRole||r.rows[0].elevated!==false||r.rows[0].inherited!==false||r.rows[0].writable!==false)fail('SERVICE_UNAVAILABLE',503);
+async function requireRole(c:PgClient,expectedRole:string,kind:'request'|'recovery'){
+ const r=await query(c,'ua_delete_role_preflight',privilegeSql,[kind==='request'?requestFunctions:recoveryFunctions]);
+ if(r.rows.length!==1||r.rows[0].role!==expectedRole||r.rows[0].elevated!==false||r.rows[0].inherited!==false||r.rows[0].writable!==false||r.rows[0].execute_drift!==false)fail('SERVICE_UNAVAILABLE',503);
 }
 export class AccountDeletionRequests implements DeletionRequestStore {
  private readonly pool:PgPool; private readonly role:string;
@@ -44,7 +60,7 @@ export class AccountDeletionRequests implements DeletionRequestStore {
  async prepare(input:Parameters<DeletionRequestStore['prepare']>[0]):Promise<void>{
   const access=await proofHash(input.accessToken);
   await transaction(this.pool,async c=>{
-   await requireRole(c,this.role);await setTrustedPhase(c,'auth');
+   await requireRole(c,this.role,'request');await setTrustedPhase(c,'auth');
    const located=await query(c,'ua_delete_locate_access','SELECT person_id::text FROM ua_private.locate_student_access($1::text)',[access]);
    if(located.rows.length!==1||!canonicalPersonId(located.rows[0].person_id))fail('UNAUTHORIZED',401);
    const p=input.identity;
@@ -54,7 +70,7 @@ export class AccountDeletionRequests implements DeletionRequestStore {
   });
  }
  async status(receiptHash:string){return transaction(this.pool,async c=>{
-  await requireRole(c,this.role);
+  await requireRole(c,this.role,'request');
   const r=await query(c,'ua_delete_status','SELECT state FROM ua_private.account_deletion_status($1::text)',[receiptHash]);
   if(!r.rows.length)return null;
   if(r.rows.length!==1)fail('SERVICE_UNAVAILABLE',503);
@@ -70,7 +86,7 @@ export class AccountDeletionRecovery implements DeletionRecoveryStore {
   if(!role||role==='postgres')throw Error('restricted role required');this.pool=pool;this.role=role;this.newLease=newLease;
  }
  async claim():Promise<DeletionLease|null>{return transaction(this.pool,async c=>{
-  await requireRole(c,this.role);
+  await requireRole(c,this.role,'recovery');
   const jobs=await query(c,'ua_delete_due','SELECT job_id::text FROM ua_private.due_account_deletions()');
   for(const row of jobs.rows){
    if(!canonicalPersonId(row.job_id))fail('SERVICE_UNAVAILABLE',503);
@@ -86,7 +102,7 @@ export class AccountDeletionRecovery implements DeletionRecoveryStore {
  private async mutate(name:'mark_account_provider_deleted'|'finish_account_deletion',lease:DeletionLease){
   if(!canonicalPersonId(lease.jobId)||!canonicalPersonId(lease.leaseId))fail('SERVICE_UNAVAILABLE',503);
   await transaction(this.pool,async c=>{
-   await requireRole(c,this.role);
+   await requireRole(c,this.role,'recovery');
    const r=await query(c,'ua_delete_'+name,`SELECT ua_private.${name}($1::uuid,$2::uuid) AS ok`,[lease.jobId,lease.leaseId]);
    if(r.rows.length!==1||r.rows[0].ok!==true)fail('SERVICE_UNAVAILABLE',503);
   });

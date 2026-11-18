@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "univeracademy-deletion-recovery",
+  "main": "runtime/account-deletion-recovery-worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "triggers": { "crons": [] },
+  "vars": {
+    "UA_DELETION_RECOVERY_ENABLED": "false",
+    "UA_CLERK_ISSUER": "https://clerk.univeracademy.uz",
+    "UA_CLERK_INSTANCE_ID": "ins_3MCOWSoxSn5iEznhJMU0F1QKJtB"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false },
+    "traces": { "enabled": false }
+  }
+  // Disabled deployment candidate only. This file is not deployment permission.
+  // Before activation, provision HYPERDRIVE_DELETION_RECOVERY using ONLY
+  // ua_deletion_recovery_login (cache disabled, origin TLS verify-full), and put
+  // UA_CLERK_SECRET_KEY directly into the approved Worker secret destination.
+  // These are the only two missing bindings; no API/bot/session env may be copied.
+  // Do not enable the flag or add a cron until the rollout gates are approved.
+  // Existing deployed Workers must be audited before using this configuration:
+  // secrets can persist across deployment and unexpected env keys fail closed.
+}

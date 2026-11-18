@@ -9,6 +9,7 @@ export function DeletionRecoveryPanel({controller}:{controller:ReturnType<typeof
     <p>Bu qurilmada saqlangan so‘rov holati tekshiriladi. Hisobga kirish talab qilinmaydi.</p>
     <p>Bu boshqa foydalanuvchining so‘rovi bo‘lishi mumkin. Hisob ma’lumotlari ko‘rsatilmaydi.</p>
     <p role="status">{state.message}</p>
+    {state.phase==='completed'&&<p>Agar bu o‘zingizning Telegramga bog‘langan hisobingiz bo‘lsa, botga qayting va <code>/start</code> yuboring. Bu bot menyusini hozirgi holatga mos yangilaydi; boshqa hisobni o‘chirmaydi.</p>}
     {state.phase!=='completed'&&<button type="button" disabled={state.phase==='checking'} onClick={()=>void controller.refresh()}>Natijani tekshirish</button>}
   </section>;
 }

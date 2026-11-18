@@ -10,6 +10,7 @@ export function AccountDeletionPanel({controller,hideRequestButton=false,cabinet
   return <section aria-label="Hisobni o‘chirish">
     <h2>Hisobni o‘chirish</h2>
     {state.message && <p role="status">{state.message}</p>}
+    {state.phase === 'completed' && <p>Telegram orqali foydalangan bo‘lsangiz, botga qayting va <code>/start</code> yuboring. Eski «Kabinet» tugmasi qolgan bo‘lsa, menyu yangilanadi va kirish yoki ro‘yxatdan o‘tish tugmasi chiqadi.</p>}
     {!hideRequestButton && ['idle', 'rejected'].includes(state.phase) && <button onClick={() => controller.request()}>Hisobni o‘chirish</button>}
     {confirming && <ConfirmDeletion key={cabinetDisplayId} controller={controller} cabinetDisplayId={cabinetDisplayId}/>}
     {state.phase === 'verifying' && <><p>Hisob egasini qayta tasdiqlang.</p><button onClick={() => controller.cancel()}>Bekor qilish</button></>}
