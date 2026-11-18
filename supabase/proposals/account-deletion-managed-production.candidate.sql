@@ -318,13 +318,13 @@ END $$;
 -- Disable every newly installed barrier before commit, while DDL locks are held.
 ALTER TABLE ua_private.account_deletion_control ADD COLUMN guards_active boolean NOT NULL DEFAULT false;
 ALTER TABLE ua_private.account_deletion_control ADD CONSTRAINT acceptance_requires_guards CHECK(NOT accepting OR guards_active);
-DO $disable_installed_guards$ DECLARE t record; n integer:=0; BEGIN
- FOR t IN SELECT c.relname,t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+DO $disable_installed_guards$ DECLARE guard_row record; n integer:=0; BEGIN
+ FOR guard_row IN SELECT c.relname,t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
   JOIN pg_namespace ns ON ns.oid=c.relnamespace JOIN pg_proc f ON f.oid=t.tgfoid
   WHERE ns.nspname='ua_private' AND NOT t.tgisinternal AND f.proowner='ua_deletion_executor'::regrole
   AND f.proname IN('deletion_write_barrier','deletion_identity_barrier','deletion_proof_barrier')
   ORDER BY c.relname,t.tgname LOOP
-  EXECUTE format('ALTER TABLE ua_private.%I DISABLE TRIGGER %I',t.relname,t.tgname);n:=n+1;
+  EXECUTE format('ALTER TABLE ua_private.%I DISABLE TRIGGER %I',guard_row.relname,guard_row.tgname);n:=n+1;
  END LOOP;
  IF n<>31 THEN RAISE EXCEPTION 'UNEXPECTED_DELETION_BARRIER_COUNT'; END IF;
 END $disable_installed_guards$;
