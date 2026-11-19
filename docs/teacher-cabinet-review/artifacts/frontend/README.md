@@ -1,0 +1,11 @@
+# Telegram Teacher cabinet: local frontend review candidate
+
+`candidate.patch` targets UniverAcademy main commit `3dbb714f2f758c7dbe03548a71c161718cf9cb53`, pinned GitHub source. The existing entry blob matches `120cc543bb2ba3a5076892b7497e50bbc1fe86a0`. The `base/` and `candidate/` trees contain just the affected source files, not a checkout.
+
+This patch adds an optional review-only dependency. No existing caller supplies it. In the normal unwired path, the existing `AccountDeletionHost → StudentApp` subtree and callbacks remain the same. No URL or fetch, new sign-in, new family, permissions mutation, or Teacher mount is configured by this patch.
+
+The proposed access shape is exactly `{person_id, default_cabinet}`. An unknown, missing, invalid, inactive, or timed-out Teacher result leaves an otherwise still-current account on Student; the independent destination check must confirm the same authenticated person before supplying a Teacher view. The adapter's signal is for preflight only, not the mounted view. The Teacher server still independently authorizes all data and actions. The route gate is keyed by ready StudentFlow instance, not Clerk ID or person ID alone. Pending work is canceled on cleanup, timeout, and invalidation. After Student renders, a late result cannot change the route. An invalidated entry shows a restart message rather than mounting either cabinet for the stale identity. The draft 650 ms budget is not a performance claim; measure typical and slow network/browser conditions before enabling it.
+
+Do not wire the port until the Backend verifies current session/person and permission, and authoritative cross-launch active-attempt continuity. The proposed server route is not an accepted endpoint yet. No inference from a missing local Student attempt. No real browser identity bridge or Teacher live adapter is supplied or claimed. Supabase appointment/revocation is a separate deferred task.
+
+Validation: pinned original Git blob hash, strict Git patch apply/whitespace, exact applied-tree comparison, reverse applicability, and source inspection. No checkout or framework compiler was available. No runtime/browser tests, generated fixtures, database access, GitHub updates or deployment.

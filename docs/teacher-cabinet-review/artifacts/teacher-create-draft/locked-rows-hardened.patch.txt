@@ -1,0 +1,125 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-pilot-first-draft-rows.ts b/supabase/functions/univeracademy-api/storage/teacher-pilot-first-draft-rows.ts
+new file mode 100644
+index 0000000..f78240c
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/teacher-pilot-first-draft-rows.ts
+@@ -0,0 +1,119 @@
++import { fail } from "../fault.ts";
++import type { Version } from "../staff-state.ts";
++import { prepareTeacherPilotFirstDraft } from "../teacher-pilot-create-draft.ts";
++import { integer, own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++import { StaffAccessRows } from "./staff-access-rows.ts";
++
++const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
++const operationKey = /^[A-Za-z0-9_-]{8,128}$/u;
++const lockScope = new StaffAccessRows();
++
++type LockedClerkActor = Readonly<{ personId: string; issuer: string; subject: string }>;
++type PilotConfig = Readonly<{ subjectId: string; groupId: string }>;
++type DraftIds = { demoId: string; versionId: string };
++
++function validateReceiptIds(value: unknown): DraftIds {
++  if (!value || typeof value !== "object" || Array.isArray(value)) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const row = value as Record<string, unknown>;
++  if (Object.keys(row).length !== 2 || typeof row.demoId !== "string" ||
++      typeof row.versionId !== "string" || !uuid.test(row.demoId) || !uuid.test(row.versionId))
++    fail("RESPONSE_INVARIANT_FAILED", 500);
++  return { demoId: row.demoId, versionId: row.versionId };
++}
++
++// Offline adapter only. Caller must hold the independently verified current
++// Clerk identity lock + this actor's canonical person/deletion lock on this
++// open transaction, and enforce fresh provider and abort checks through COMMIT.
++// Use an approved dedicated writer; never call through a Student or owner pool.
++export async function insertTeacherPilotFirstDraftRows(
++  tx: LockedTransaction,
++  actor: LockedClerkActor,
++  pilot: PilotConfig,
++  key: string,
++  input: unknown,
++  validate: (schema: "Version", wire: Version) => boolean,
++): Promise<DraftIds> {
++  own(tx, actor.personId);
++  if (!uuid.test(pilot.groupId) || !pilot.subjectId || pilot.subjectId.trim() !== pilot.subjectId)
++    fail("SERVICE_UNAVAILABLE", 503);
++  if (!operationKey.test(key)) fail("VALIDATION_ERROR", 422);
++
++  // StaffAccessRows projects away non-staff roles. Check raw roles and profile
++  // parity from the same locked canonical person before any staff/domain read.
++  const people = await query(tx, "ua_first_draft_person_roles",
++    "SELECT id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1", [actor.personId]);
++  if (people.rows.length !== 1 || people.rows[0].id !== actor.personId || people.rows[0].enabled !== true ||
++      !Array.isArray(people.rows[0].roles) || people.rows[0].roles.length !== 1 ||
++      people.rows[0].roles[0] !== "teacher") fail("FORBIDDEN", 403);
++  const profile = people.rows[0].profile as {person_id?: unknown; roles?: unknown} | null;
++  if (profile?.person_id !== actor.personId || !Array.isArray(profile.roles) ||
++      profile.roles.length !== 1 || profile.roles[0] !== "teacher")
++    fail("RESPONSE_INVARIANT_FAILED", 500);
++
++  const group = await query(tx, "ua_first_draft_group_lock",
++    "SELECT id::text FROM ua_private.groups WHERE id=$1 AND status='active' FOR UPDATE", [pilot.groupId]);
++  if (group.rows.length !== 1 || group.rows[0].id !== pilot.groupId) fail("NOT_FOUND", 404);
++  const staff = await lockScope.load(tx, actor, actor.personId, "clerk");
++  if (!staff.enabled || !staff.approved || staff.roles.length !== 1 || staff.roles[0] !== "teacher" ||
++      staff.scope.all_groups || staff.scope.group_ids.length !== 1 ||
++      staff.scope.group_ids[0] !== pilot.groupId || staff.scope.all_subjects ||
++      !staff.approvedSubjectIds.includes(pilot.subjectId))
++    fail("FORBIDDEN", 403);
++
++  const receiptKey = `${actor.personId}/POST/teacher/groups/${pilot.groupId}/first-draft/${key}`;
++  const receipts = await query(tx, "ua_first_draft_receipt_read",
++    `SELECT r.payload,r.response,a.action,a.target_id::text,a.revision::text
++     FROM ua_private.staff_receipts r LEFT JOIN ua_private.staff_audit a
++       ON a.command_key=r.key AND a.actor_id=r.actor_id WHERE r.actor_id=$1 AND r.key=$2`,
++    [actor.personId, receiptKey]);
++  if (receipts.rows.length > 1) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const prior = receipts.rows[0];
++  const ids = prior ? validateReceiptIds(prior.response) :
++    { demoId: crypto.randomUUID(), versionId: crypto.randomUUID() };
++  const { demo, draft } = prepareTeacherPilotFirstDraft(staff, pilot.subjectId, ids, input, validate);
++  const wire = draft.wire;
++  const payload = JSON.stringify({ subject_id: demo.subjectId, title: demo.title,
++    duration_seconds: wire.duration_seconds, individual_enabled: false });
++  if (prior) {
++    if (prior.payload !== payload) fail("IDEMPOTENCY_CONFLICT", 409);
++    if (prior.action !== "first_draft_create" || prior.target_id !== ids.versionId ||
++        integer(prior.revision) !== wire.revision) fail("RESPONSE_INVARIANT_FAILED", 500);
++    // Existing writer order is actor, group, version. Extend replay with
++    // conflict-failing SHARE locks: never wait on another version/demo writer.
++    // SHARE blocks non-key updates and deletion until the caller commits.
++    const versions = await query(tx, "ua_first_draft_replay_version_lock",
++      `SELECT id::text,demo_id::text FROM ua_private.test_versions
++       WHERE id=$1 AND demo_id=$2 FOR SHARE NOWAIT`, [ids.versionId, ids.demoId]);
++    if (versions.rows.length !== 1 || versions.rows[0].id !== ids.versionId ||
++        versions.rows[0].demo_id !== ids.demoId) fail("RESPONSE_INVARIANT_FAILED", 500);
++    const demos = await query(tx, "ua_first_draft_replay_demo_lock",
++      `SELECT id::text,subject_id::text FROM ua_private.demos
++       WHERE id=$1 AND subject_id::text=$2 FOR SHARE NOWAIT`, [ids.demoId, pilot.subjectId]);
++    if (demos.rows.length !== 1 || demos.rows[0].id !== ids.demoId ||
++        demos.rows[0].subject_id !== pilot.subjectId) fail("RESPONSE_INVARIANT_FAILED", 500);
++    return ids; // An already published revision remains untouched; no stale draft DTO.
++  }
++
++  const clock = await query(tx, "ua_clock", "SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::text AS now_ms");
++  if (clock.rows.length !== 1) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const now = integer(clock.rows[0].now_ms);
++  if (now > 8_640_000_000_000_000) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const write = async (name: string, sql: string, values: readonly unknown[]) => {
++    if ((await query(tx, name, sql, values)).rowCount !== 1) fail("RESPONSE_INVARIANT_FAILED", 500);
++  };
++  await write("ua_first_draft_demo_insert",
++    "INSERT INTO ua_private.demos(id,subject_id,title) VALUES($1,$2,$3) RETURNING id",
++    [demo.id, demo.subjectId, demo.title]);
++  await write("ua_first_draft_version_insert",
++    `INSERT INTO ua_private.test_versions(id,demo_id,revision,status,wire,published_snapshot)
++     VALUES($1,$2,$3,'draft',$4::jsonb,NULL) RETURNING id`,
++    [ids.versionId, ids.demoId, wire.revision, JSON.stringify(wire)]);
++  await write("ua_first_receipt_write",
++    "INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING RETURNING key",
++    [actor.personId, receiptKey, payload, JSON.stringify(ids)]);
++  await write("ua_first_audit_write",
++    "INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,$5,$6) RETURNING command_key",
++    [receiptKey, actor.personId, "first_draft_create", ids.versionId, wire.revision, now]);
++  return ids;
++}

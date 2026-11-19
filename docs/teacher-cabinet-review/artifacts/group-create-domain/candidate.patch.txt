@@ -1,0 +1,119 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-group-create.ts b/supabase/functions/univeracademy-api/teacher-group-create.ts
+new file mode 100644
+index 0000000..92314e9
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-group-create.ts
+@@ -0,0 +1,113 @@
++// Local domain candidate only. No route, renderer, SQL, authority grant or writer.
++import { fail } from "./fault.ts";
++import { currentStaff } from "./staff-state.ts";
++import type { StaffState, VerifiedStaffProof } from "./staff-state.ts";
++
++type Group = Readonly<{id:string;name:string;revision:number;status:"active"}>;
++type ReceiptIdentity = Readonly<{actorId:string;method:"POST";route:"/teacher/groups";key:string}>;
++export type TeacherGroupCreation = Readonly<{
++  receipt:ReceiptIdentity;
++  canonicalBody:string;
++  proposedGroup:Readonly<{id:string;name:string;status:"active"}>;
++  proposedScope:Readonly<{personId:string;groupId:string}>;
++}>;
++
++type Authority = Readonly<{
++  // Derived by the trusted writer only, within its canonical person lock,
++  // after verified matching Clerk identity and current provider liveness.
++  state:Pick<StaffState,"staff">;
++  proof:VerifiedStaffProof;
++  lockedPersonId:string;
++  nowMs:number;
++}>;
++
++type Persisted =
++  | Readonly<{kind:"conflict"}>
++  | Readonly<{kind:"created"|"replay";actorId:string;group:Group;currentExactScope:true}>;
++
++type GroupWriter = Readonly<{
++  // Must check cancellation, current provider liveness and earliest expiry
++  // before callback and commit. Any thrown error rolls back everything.
++  transaction<T>(signal:AbortSignal,work:(tx:GroupTransaction)=>Promise<T>):Promise<T>;
++}>;
++type GroupTransaction = Readonly<{
++  authorizeCurrent(signal:AbortSignal):Promise<Authority>;
++  // Single transaction: claim/compare scoped receipt, then insert group and
++  // ONLY its exact creator group-scope row. Never elevate capabilities.
++  // Replays need current authorization and the original group still in scope.
++  // Return only immutable original receipt fields after authorization.
++  persistAtomically(command:TeacherGroupCreation,signal:AbortSignal):Promise<Persisted>;
++}>;
++
++const uuid=(x:unknown):x is string=>typeof x==="string"&&x.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x);
++const canonicalName=(name:unknown):string=>{
++  if(typeof name!=="string"||name.length>1024||/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(name))
++    fail("VALIDATION_ERROR",422);
++  const normalized=name.normalize("NFC").trim();
++  if(!normalized||Array.from(normalized).length>200) fail("VALIDATION_ERROR",422);
++  return normalized;
++};
++
++function readName(input:unknown):string {
++  // Route decoder still owns raw JSON syntax, UTF-8/body limit and duplicate
++  // member handling. This boundary accepts only the decoded one-field object.
++  if(!input||typeof input!=="object"||Object.getPrototypeOf(input)!==Object.prototype||
++     Reflect.ownKeys(input).length!==1) fail("VALIDATION_ERROR",422);
++  const name=Object.getOwnPropertyDescriptor(input,"name");
++  if(!name||!Object.hasOwn(name,"value")) fail("VALIDATION_ERROR",422);
++  return canonicalName(name.value);
++}
++
++function readKey(key:unknown):string {
++  if(typeof key!=="string"||key.length<8||key.length>128||/[^A-Za-z0-9_.~-]/.test(key))
++    fail("VALIDATION_ERROR",422);
++  return key;
++}
++
++function actor(authority:Authority):string {
++  if(!uuid(authority.lockedPersonId)||!Number.isSafeInteger(authority.nowMs)||authority.nowMs<0)
++    fail("SERVICE_UNAVAILABLE",503);
++  const staff=currentStaff(authority.state,authority.proof,authority.nowMs);
++  if(staff.personId!==authority.lockedPersonId) fail("STAFF_TOKEN_INVALID",401);
++  if(!staff.roles.includes("teacher")||!staff.approvedSubjectIds.some(id=>typeof id==="string"&&id.trim()))
++    fail("FORBIDDEN",403);
++  return staff.personId;
++}
++
++function commandFor(personId:string,key:string,name:string):TeacherGroupCreation {
++  // No caller-controlled UUID, subject, account, role, capability, revision or status.
++  const id=crypto.randomUUID();
++  return Object.freeze({
++    receipt:Object.freeze({actorId:personId,method:"POST",route:"/teacher/groups",key}),
++    canonicalBody:JSON.stringify({name}),
++    proposedGroup:Object.freeze({id,name,status:"active"}),
++    proposedScope:Object.freeze({personId,groupId:id}),
++  });
++}
++
++/** Stays unavailable until the separately reviewed transactional writer exists. */
++export async function createTeacherGroup(input:unknown,idempotencyKey:unknown,
++  signal:AbortSignal,writer?:GroupWriter):Promise<Group> {
++  signal.throwIfAborted();
++  if(!writer||typeof writer.transaction!=="function") fail("SERVICE_UNAVAILABLE",503);
++  return writer.transaction(signal,async tx=>{
++    signal.throwIfAborted();
++    const personId=actor(await tx.authorizeCurrent(signal));
++    signal.throwIfAborted();
++    const command=commandFor(personId,readKey(idempotencyKey),readName(input));
++    const result=await tx.persistAtomically(command,signal);
++    signal.throwIfAborted();
++    if(result?.kind==="conflict") fail("IDEMPOTENCY_CONFLICT",409);
++    if(!result||(result.kind!=="created"&&result.kind!=="replay")||
++       result.actorId!==personId||result.currentExactScope!==true||!result.group||
++       !uuid(result.group.id)||result.group.name!==command.proposedGroup.name||
++       result.group.status!=="active"||!Number.isSafeInteger(result.group.revision)||result.group.revision<0||
++       (result.kind==="created"&&result.group.id!==command.proposedGroup.id))
++      fail("RESPONSE_INVARIANT_FAILED",500);
++    const {id,name,revision,status}=result.group;
++    if(actor(await tx.authorizeCurrent(signal))!==personId) fail("STAFF_TOKEN_INVALID",401);
++    signal.throwIfAborted();
++    return Object.freeze({id,name,revision,status});
++  });
++}

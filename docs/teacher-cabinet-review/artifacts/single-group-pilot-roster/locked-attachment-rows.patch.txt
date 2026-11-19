@@ -1,0 +1,135 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts b/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
+new file mode 100644
+index 0000000..6d3c07a
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
+@@ -0,0 +1,129 @@
++import { fail } from "../fault.ts";
++import { nextRevision } from "../staff-state.ts";
++import { integer, own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++import { StaffAccessRows } from "./staff-access-rows.ts";
++
++type Actor = Readonly<{ personId: string; issuer: string; subject: string }>;
++type Config = Readonly<{ groupId: string; subjectId: string }>;
++type Permit = Readonly<{
++  actorId: string; studentId: string; exactPublicId: string; groupId: string; subjectId: string;
++  expiresAt: number; groupRevision: number; membershipRevision: number; membershipEpoch: number;
++}>;
++type Result = Readonly<{ groupRevision: number; membershipRevision: number }>;
++
++const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
++const counter = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
++
++function exactResult(value: unknown): Result {
++  if (!value || typeof value !== "object" || Array.isArray(value)) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const r = value as Record<string, unknown>;
++  if (Object.keys(r).length !== 2 || !counter(r.groupRevision) || !counter(r.membershipRevision))
++    fail("RESPONSE_INVARIANT_FAILED", 500);
++  return { groupRevision: r.groupRevision, membershipRevision: r.membershipRevision };
++}
++
++// Unmounted. Must run under fresh verified Clerk plus canonical ordered locks
++// for both people and deletion checks, with rollback on any throw. The trusted
++// store resolves an explicit opaque confirmation, never a client-supplied Permit.
++export async function attachInitialTeacherPilotStudentRows(
++  tx: LockedTransaction, actor: Actor, pilot: Config, handle: string, key: string,
++  verifyConfirmation: (handle: string) => Promise<Permit | null>,
++): Promise<Result> {
++  own(tx, actor.personId);
++  if (!uuid.test(pilot.groupId) || !pilot.subjectId || pilot.subjectId.trim() !== pilot.subjectId)
++    fail("SERVICE_UNAVAILABLE", 503);
++  if (!/^[A-Za-z0-9_-]{43}$/u.test(handle) || !/^[A-Za-z0-9_-]{8,128}$/u.test(key))
++    fail("VALIDATION_ERROR", 422);
++  const p = await verifyConfirmation(handle);
++  if (!p || p.actorId !== actor.personId || p.studentId === actor.personId || !uuid.test(p.studentId) ||
++      !/^[0-9]{10}$/u.test(p.exactPublicId) || p.groupId !== pilot.groupId || p.subjectId !== pilot.subjectId ||
++      ![p.expiresAt,p.groupRevision,p.membershipRevision,p.membershipEpoch].every(counter)) fail("NOT_FOUND", 404);
++  own(tx, p.studentId);
++
++  const g = await query(tx, "ua_attach_group_lock",
++    "SELECT revision::text FROM ua_private.groups WHERE id=$1 AND status='active' FOR UPDATE", [pilot.groupId]);
++  if (g.rows.length !== 1) fail("NOT_FOUND", 404);
++  const groupRevision = integer(g.rows[0].revision);
++  const a = await new StaffAccessRows().load(tx, actor, actor.personId, "clerk");
++  if (!a.enabled || !a.approved || a.roles.length !== 1 || a.roles[0] !== "teacher" ||
++      a.scope.all_groups || a.scope.all_subjects || a.scope.group_ids.length !== 1 ||
++      a.scope.group_ids[0] !== pilot.groupId || !a.approvedSubjectIds.includes(pilot.subjectId))
++    fail("FORBIDDEN", 403);
++
++  const s = await query(tx, "ua_attach_student_current", `SELECT p.enabled,p.roles,
++    p.profile->'roles' AS profile_roles, p.profile->>'person_id' AS profile_person_id,
++    p.profile->'registration_complete' AS registration_complete,
++    p.profile ? 'active_group_id' AS has_profile_group,p.profile->>'active_group_id' AS profile_group,
++    m.affinity_group_id::text,m.active,m.revision::text,m.epoch::text
++    FROM ua_private.people p JOIN ua_private.memberships m ON m.person_id=p.id
++    WHERE p.id=$1 AND p.qadam_id=$2`, [p.studentId,p.exactPublicId]);
++  const student = s.rows[0];
++  if (s.rows.length !== 1 || student.enabled !== true || student.registration_complete !== true ||
++      !Array.isArray(student.roles) || student.roles.length !== 1 || student.roles[0] !== "student")
++    fail("NOT_FOUND", 404);
++  if (student.profile_person_id !== p.studentId || JSON.stringify(student.profile_roles) !== JSON.stringify(student.roles) ||
++      student.has_profile_group !== true || typeof student.active !== "boolean" ||
++      student.profile_group !== (student.active ? student.affinity_group_id : null))
++    fail("RESPONSE_INVARIANT_FAILED", 500);
++
++  const clock = await query(tx, "ua_clock", "SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::text AS now_ms");
++  if (clock.rows.length !== 1) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const now = integer(clock.rows[0].now_ms);
++  if (now >= p.expiresAt || now > 8_640_000_000_000_000) fail("NOT_FOUND", 404);
++
++  const receiptKey = `${actor.personId}/POST/teacher/groups/${pilot.groupId}/initial-member/${key}`;
++  const payload = JSON.stringify([p.studentId,p.subjectId,p.groupRevision,p.membershipRevision,p.membershipEpoch]);
++  const receipts = await query(tx, "ua_attach_receipt_read", `SELECT r.payload,r.response,a.action,
++    a.target_id::text,a.revision::text FROM ua_private.staff_receipts r LEFT JOIN ua_private.staff_audit a
++      ON a.actor_id=r.actor_id AND a.command_key=r.key WHERE r.actor_id=$1 AND r.key=$2`,
++    [actor.personId,receiptKey]);
++  if (receipts.rows.length > 1) fail("RESPONSE_INVARIANT_FAILED", 500);
++  const prior = receipts.rows[0];
++  if (prior) {
++    if (prior.payload !== payload) fail("IDEMPOTENCY_CONFLICT", 409);
++    const result = exactResult(prior.response);
++    if (prior.action !== "initial_membership" || prior.target_id !== p.studentId ||
++        integer(prior.revision) !== result.membershipRevision ||
++        result.groupRevision !== nextRevision(p.groupRevision) ||
++        result.membershipRevision !== nextRevision(p.membershipRevision))
++      fail("RESPONSE_INVARIANT_FAILED", 500);
++    if (!student.active || student.affinity_group_id !== pilot.groupId) fail("MEMBERSHIP_STATE_CONFLICT", 409);
++    return result; // Historical outcome only; do not reapply or reactivate.
++  }
++  if (student.active || student.affinity_group_id !== null) fail("MEMBERSHIP_STATE_CONFLICT", 409);
++  if (groupRevision !== p.groupRevision || integer(student.revision) !== p.membershipRevision ||
++      integer(student.epoch) !== p.membershipEpoch) fail("STATE_REVISION_CONFLICT", 409);
++
++  // Conservative pilot: any existing grant or attempt excludes automatic initial
++  // placement, including terminal attempts. Never guess from a partial load.
++  const evidence = await query(tx, "ua_attach_initial_evidence", `SELECT
++    EXISTS(SELECT 1 FROM ua_private.grants WHERE person_id=$1) AS prior_grant,
++    EXISTS(SELECT 1 FROM ua_private.attempts WHERE person_id=$1) AS prior_attempt,
++    EXISTS(SELECT 1 FROM ua_private.exam_series WHERE person_id=$1) AS prior_series`, [p.studentId]);
++  if (evidence.rows.length !== 1 || evidence.rows[0].prior_grant !== false ||
++      evidence.rows[0].prior_attempt !== false || evidence.rows[0].prior_series !== false)
++    fail("MEMBERSHIP_STATE_CONFLICT", 409);
++
++  const result = { groupRevision: nextRevision(groupRevision), membershipRevision: nextRevision(p.membershipRevision) };
++  const epoch = nextRevision(p.membershipEpoch);
++  const write = async (name: string, sql: string, vals: readonly unknown[]) => {
++    if ((await query(tx, name, sql, vals)).rowCount !== 1) fail("STATE_REVISION_CONFLICT", 409);
++  };
++  await write("ua_first_group_write",
++    "UPDATE ua_private.groups SET revision=$2 WHERE id=$1 AND revision=$3 AND status='active' RETURNING id",
++    [pilot.groupId,result.groupRevision,p.groupRevision]);
++  await write("ua_first_membership_write",
++    "UPDATE ua_private.memberships SET affinity_group_id=$2,active=true,revision=$3,epoch=$4 WHERE person_id=$1 AND revision=$5 AND epoch=$6 AND affinity_group_id IS NULL AND NOT active RETURNING person_id",
++    [p.studentId,pilot.groupId,result.membershipRevision,epoch,p.membershipRevision,p.membershipEpoch]);
++  await write("ua_first_person_group_write",
++    "UPDATE ua_private.people SET profile=jsonb_set(profile,'{active_group_id}',to_jsonb($2::text),true) WHERE id=$1 AND profile->'active_group_id'='null'::jsonb RETURNING id",
++    [p.studentId,pilot.groupId]);
++  await write("ua_first_receipt_write",
++    "INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING RETURNING key",
++    [actor.personId,receiptKey,payload,JSON.stringify(result)]);
++  await write("ua_first_audit_write",
++    "INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,$5,$6) RETURNING command_key",
++    [receiptKey,actor.personId,"initial_membership",p.studentId,result.membershipRevision,now]);
++  return result;
++}

@@ -1,0 +1,111 @@
+diff --git a/supabase/functions/univeracademy-api/storage/cabinet-current-series.ts b/supabase/functions/univeracademy-api/storage/cabinet-current-series.ts
+new file mode 100644
+index 0000000..72c8830
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/cabinet-current-series.ts
+@@ -0,0 +1,105 @@
++// Review-only domain reader. It accepts a transaction held by the existing
++// trusted Worker, not an identity proof from an HTTP caller.
++import type { CurrentAttemptRead } from "../cabinet-entry-decision.ts";
++import { own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++
++const MAX_SERIES = 1_000;
++const maxTime = 8_640_000_000_000_000;
++const id = (x: unknown): x is string => typeof x === "string" && x.length === 36 &&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x);
++const time = (x: unknown): x is number =>
++  typeof x === "number" && Number.isSafeInteger(x) && x >= 0 && x <= maxTime;
++const positiveIntegerText = (x: unknown): number | null => {
++  if (typeof x !== "string" || !/^[1-9][0-9]{0,15}$/.test(x)) return null;
++  const n = Number(x);
++  return Number.isSafeInteger(n) ? n : null;
++};
++
++type Projection = Readonly<{
++  personId: string;
++  atMs: number;
++  rows: readonly CurrentAttemptRead[] | null;
++}>;
++
++// Clock and projections belong to one statement. The scoped-person anchor
++// distinguishes invalid transaction phase/identity from a proven empty result.
++// LEFT JOIN preserves missing or mismatched attempt evidence as unknown.
++const read = `
++WITH cabinet_scope AS MATERIALIZED (
++  SELECT p.id, floor(extract(epoch FROM pg_catalog.clock_timestamp())*1000)::text AS now_ms
++  FROM ua_private.people AS p
++  WHERE p.id = $1::uuid AND p.enabled IS TRUE
++    AND pg_catalog.current_setting('ua.phase', true) = 'domain'
++    AND pg_catalog.current_setting('ua.person_id', true) = p.id::text
++    AND pg_catalog.current_setting('ua.person_ids', true)::jsonb = pg_catalog.jsonb_build_array(p.id::text)
++    AND pg_catalog.current_setting('ua.telegram_id', true) = ''
++    AND pg_catalog.current_setting('ua.clerk_issuer', true) = $2
++    AND pg_catalog.current_setting('ua.clerk_subject', true) = $3
++    AND EXISTS (
++      SELECT 1 FROM ua_private.clerk_identities AS i
++      WHERE i.person_id = p.id AND i.issuer = $2 AND i.subject = $3 AND i.enabled IS TRUE
++    )
++)
++SELECT c.now_ms, s.id::text AS series_id, s.demo_id::text AS demo_id, s.current_attempt_id::text AS current_attempt_id,
++       s.generation::text AS series_generation,
++       a.id::text AS attempt_id, a.person_id::text AS attempt_person_id, a.demo_id::text AS attempt_demo_id,
++       a.generation::text AS attempt_generation,
++       a.body->>'id' AS body_id, a.body->>'personId' AS body_person_id,
++       a.body->'generation' AS body_generation, a.body->'startedAt' AS started_at,
++       a.body->'deadlineAt' AS deadline_at, a.body->>'status' AS attempt_status
++FROM cabinet_scope AS c
++LEFT JOIN ua_private.exam_series AS s ON s.person_id = c.id
++LEFT JOIN ua_private.attempts AS a ON a.id = s.current_attempt_id AND a.person_id = c.id
++LIMIT 1001`;
++
++type AttemptStatus = NonNullable<CurrentAttemptRead["attempt"]>["status"];
++const statuses: readonly AttemptStatus[] = ["in_progress", "submitted", "expired", "forced", "cancelled"];
++const isStatus = (x: unknown): x is AttemptStatus => (statuses as readonly unknown[]).includes(x);
++
++/**
++ * Mount only after verifying live role/policy parity for both series and
++ * attempts. Without that premise RLS can suppress rows and manufacture an
++ * empty result. Caller must already hold the canonical single-person
++ * transaction in domain phase after validated Clerk-bound family and current
++ * provider liveness. Context labels below check consistency, not authority.
++ */
++export async function readCabinetCurrentSeries(
++  tx: LockedTransaction,
++  binding: Readonly<{ personId: string; issuer: string; subject: string }>,
++  signal: AbortSignal,
++): Promise<Projection> {
++  const { personId, issuer, subject } = binding;
++  const unknown = (atMs = 0): Projection => ({ personId, atMs, rows: null });
++  signal.throwIfAborted();
++  if (!id(personId) || typeof issuer !== "string" || issuer.length > 512 ||
++    !/^https:\/\/[^/\s]+$/.test(issuer) || typeof subject !== "string" ||
++    subject.length > 256 || !/^user_[A-Za-z0-9]+$/.test(subject) ||
++    tx.personIds.length !== 1 || tx.personIds[0] !== personId) return unknown();
++  own(tx, personId);
++  const result = await query(tx, "ua_cabinet_current_series_v1", read, [personId, issuer, subject]);
++  signal.throwIfAborted();
++  const { rows } = result;
++  if (rows.length === 0 || rows.length > MAX_SERIES) return unknown();
++  const atMs = positiveIntegerText(rows[0].now_ms);
++  if (atMs === null || !time(atMs) || rows.some(row => row.now_ms !== rows[0].now_ms)) return unknown();
++  if (rows.length === 1 && rows[0].series_id === null &&
++    rows[0].demo_id === null && rows[0].current_attempt_id === null &&
++    rows[0].series_generation === null && rows[0].attempt_id === null) return { personId, atMs, rows: [] };
++
++  const projected: CurrentAttemptRead[] = [];
++  for (const row of rows) {
++    const generation = positiveIntegerText(row.series_generation);
++    const attemptGeneration = positiveIntegerText(row.attempt_generation);
++    if (!id(row.series_id) || !id(row.demo_id) || !id(row.current_attempt_id) ||
++      generation === null || attemptGeneration !== generation ||
++      row.attempt_id !== row.current_attempt_id || row.attempt_person_id !== personId ||
++      row.attempt_demo_id !== row.demo_id || row.body_id !== row.attempt_id ||
++      row.body_person_id !== personId || row.body_generation !== generation ||
++      !time(row.started_at) || !time(row.deadline_at) || !isStatus(row.attempt_status)) return unknown(atMs);
++    projected.push({ demoId: row.demo_id, currentAttemptId: row.current_attempt_id, generation,
++      attempt: { id: row.current_attempt_id, personId, demoId: row.demo_id, generation, status: row.attempt_status,
++        startedAt: row.started_at, deadlineAt: row.deadline_at } });
++  }
++  return { personId, atMs, rows: projected };
++}

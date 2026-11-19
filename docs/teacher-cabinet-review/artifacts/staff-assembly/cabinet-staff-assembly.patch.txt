@@ -1,0 +1,114 @@
+diff --git a/runtime/cabinet-access-http.mjs b/runtime/cabinet-access-http.mjs
+index 4e111575683f3056589b7ec0f1e10d2a4e33a7b4..ca1645dc57b2da7bcdc72354a9ad95bda85b7663 100644
+--- a/runtime/cabinet-access-http.mjs
++++ b/runtime/cabinet-access-http.mjs
+@@ -32,7 +32,7 @@ export function cabinetAccessRequestFault(request){
+  * request-owned; nothing selects a reader through HTTP, env or query values.
+  * Passing a callable is not a deployment approval or ACL verification.
+  */
+-export async function handleCabinetAccess(request,{withCabinetReaders,pool,clerk}={}){
++export async function handleCabinetAccess(request,{withCabinetReaders,pool,clerk,studentConnectionRole}={}){
+   const routeFault=cabinetAccessRequestFault(request);
+   if(routeFault)return routeFault;
+   if(request.signal.aborted||typeof withCabinetReaders!=="function"||!pool||typeof clerk?.liveness!=="function")
+@@ -42,7 +42,7 @@ export async function handleCabinetAccess(request,{withCabinetReaders,pool,clerk
+   let called=0,settled=false,decision,finished=false;
+   try{
+     const returned=await withCabinetReaders(Object.freeze({
+-      accessToken,signal:request.signal,pool,clerk,request,
++      accessToken,signal:request.signal,pool,clerk,request,studentConnectionRole,
+     }),async readers=>{
+       if(finished||++called!==1||request.signal.aborted)throw Error("CABINET_READ_UNAVAILABLE");
+       decision=await readAuthorizedCabinetEntry(accessToken,request.signal,readers);
+diff --git a/runtime/cabinet-reader-assembly.mjs b/runtime/cabinet-reader-assembly.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a42cee6a2fd9d20fc79f191eab8a48af2ebd2e24
+--- /dev/null
++++ b/runtime/cabinet-reader-assembly.mjs
+@@ -0,0 +1,74 @@
++import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
++import {createCloudflarePostgres} from "./cloudflare-postgres.mjs";
++import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
++import {createCabinetReadersTransaction} from "../supabase/functions/univeracademy-api/storage/clerk-domain.ts";
++import {createCabinetStaffCapabilityReader} from "../supabase/functions/univeracademy-api/storage/cabinet-staff-capability.ts";
++
++const unavailable=()=>new ApiFault("SERVICE_UNAVAILABLE",503);
++const validRole=role=>typeof role==="string"&&/^[a-z_][a-z0-9_]{0,62}$/.test(role);
++function own(object,field){
++  const value=object&&Object.getOwnPropertyDescriptor(object,field);
++  return value&&Object.hasOwn(value,"value")?value.value:undefined;
++}
++
++/**
++ * Optional trusted assembly; the production/default Worker does not call it.
++ * The two policy checks are explicit confirmation from reviewed server
++ * composition, not evidence supplied by this module. The role check below
++ * catches an accidentally shared DSN username; it does not attest actual DB
++ * privileges, RLS completeness, upstream identity or Hyperdrive configuration.
++ * Parent must separately verify dedicated role grants, bound runtime identity,
++ * current-attempt RLS parity, no caching, TLS and bounded driver disposal.
++ */
++export function createOptInCabinetReaderAssembly(options){
++  const StaffClient=own(options,"StaffClient");
++  const dedicatedPostgres=own(options,"dedicatedPostgres");
++  const expectedStaffRole=own(options,"expectedStaffRole");
++  const timeoutMs=own(options,"timeoutMs");
++  if(own(options,"currentAttemptPolicyVerified")!==true||own(options,"staffCapabilityPolicyVerified")!==true||
++    typeof StaffClient!=="function"||typeof dedicatedPostgres!=="function"||!validRole(expectedStaffRole)||
++    !Number.isSafeInteger(timeoutMs)||timeoutMs<100||timeoutMs>5000)return undefined;
++
++  return async function withCabinetReaders(scope,use){
++    if(!(scope?.signal instanceof AbortSignal)||scope.signal.aborted||
++      !validRole(scope.studentConnectionRole)||scope.studentConnectionRole===expectedStaffRole)
++      throw unavailable();
++    // No request, app proof, digest or identity tuple is passed to the supplier.
++    let options;
++    try{options=dedicatedPostgres();}catch{throw unavailable();}
++    const connectionString=own(options,"connectionString");
++    if(!options||![Object.prototype,null].includes(Object.getPrototypeOf(options))||Reflect.ownKeys(options).length!==1||
++      !isHyperdriveConnectionString(connectionString))throw unavailable();
++    try{
++      if(decodeURIComponent(new URL(connectionString).username)!==expectedStaffRole)throw unavailable();
++    }catch{throw unavailable();}
++
++    let staffResource,staffSignal,selected=false;
++    const run=createCabinetReadersTransaction({
++      currentAttemptPolicyVerified:true,
++      async readStaffCapability(actor,signal){
++        if(selected||signal!==scope.signal||signal.aborted)throw unavailable();
++        selected=true;
++        staffSignal=AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]);
++        staffResource=createCloudflarePostgres(StaffClient,{connectionString},{signal:staffSignal});
++        if(staffResource.pool===scope.pool)throw unavailable();
++        let staffClient,usable=false;
++        try{
++          staffClient=await staffResource.pool.connect();
++          if(staffSignal.aborted)throw unavailable();
++          const verdict=await createCabinetStaffCapabilityReader(staffClient)(actor,staffSignal);
++          if(staffSignal.aborted)throw unavailable();
++          usable=true;
++          return verdict;
++        }finally{
++          staffClient?.release(!usable);
++        }
++      }
++    });
++    let result;
++    try{result=await run(scope,use);}
++    finally{if(staffResource)await staffResource.close();}
++    if(scope.signal.aborted||staffSignal?.aborted)throw unavailable();
++    return result;
++  };
++}
+diff --git a/runtime/cloudflare-api.mjs b/runtime/cloudflare-api.mjs
+index d2b87737da01ee6034fa8a38bcb1fd849e54efb5..c6ec28c5d41de73be96ab4c3df65dd6595c5ab25 100644
+--- a/runtime/cloudflare-api.mjs
++++ b/runtime/cloudflare-api.mjs
+@@ -78,6 +78,7 @@ export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,co
+       if(cabinet){
+         const handler=withPublicCors(incoming=>handleCabinetAccess(incoming,{
+           withCabinetReaders,pool:resource?.pool,clerk:scoped?.clerk,
++          studentConnectionRole:resource?decodeURIComponent(new URL(postgres.connectionString).username):undefined,
+         }),allowedOrigins);
+         response=await untilAborted(()=>handler(request),request.signal);
+       }else{

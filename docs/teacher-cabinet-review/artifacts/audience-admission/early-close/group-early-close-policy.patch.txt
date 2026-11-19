@@ -1,0 +1,115 @@
+diff --git a/supabase/functions/univeracademy-api/audience-admission-policy.ts b/supabase/functions/univeracademy-api/audience-admission-policy.ts
+index dc66ca698e3bf3a8acc9e531f631b0d97f48b297..2951ea5bb6d187c3c3ae7a889b5b4e0e7ae53391 100644
+--- a/supabase/functions/univeracademy-api/audience-admission-policy.ts
++++ b/supabase/functions/univeracademy-api/audience-admission-policy.ts
+@@ -78,11 +78,34 @@ export function hasAssignmentAudience(actor:RegisteredActor,assignment:Assignmen
+   return audienceFor(actor,assignment,group)!==null;
+ }
+ 
++type GroupAdmissionEvidence = Readonly<{
++  assignmentId:string;
++  state:"not_early_closed"|"early_closed";
++}>;
++
++function groupAdmissionState(assignment:Assignment,evidence:GroupAdmissionEvidence|null,now:number):
++  "scheduled_or_open"|"closed"|"unknown" {
++  if(!assignment||!evidence||evidence.assignmentId!==assignment.id||
++     !at(now)||!at(assignment.opensAt))return "unknown";
++  const closes=groupAdmissionCloseExclusive(assignment.opensAt);
++  if(closes===null)return "unknown";
++  if(now>=closes||evidence.state==="early_closed")return "closed";
++  return evidence.state==="not_early_closed"?"scheduled_or_open":"unknown";
++}
++
++/** A negative result never grants eligibility: the canonical scoped roster
++ * writer still decides and must hold the same assignment revision/locks. */
++export function mustBlockGroupAssignmentAutoGrant(assignment:Assignment,evidence:GroupAdmissionEvidence|null,now:number):boolean {
++  return !assignment||assignment.published!==true||assignment.cancelled!==false||
++    normalizeAssignmentAudience(assignment.audience)?.kind!=="group"||
++    groupAdmissionState(assignment,evidence,now)!=="scheduled_or_open";
++}
++
+ export function decideNormalAssignmentStart(input:Readonly<{
+   actor:RegisteredActor;assignment:Assignment;group:GroupEvidence|null;
+-  series:SeriesEvidence;now:number;
++  series:SeriesEvidence;admission:GroupAdmissionEvidence|null;now:number;
+ }>):"allow"|"denied"|"already_used"|"admission_closed"|"public_policy_pending" {
+-  const {actor,assignment,group,series,now}=input;
++  const {actor,assignment,group,series,admission,now}=input;
+   const audience=audienceFor(actor,assignment,group);
+   if(!audience||!at(now)||!at(assignment.opensAt)||!series)return "denied";
+   if(series.kind==="present"){
+@@ -96,9 +119,8 @@ export function decideNormalAssignmentStart(input:Readonly<{
+   if(series.kind!=="absent")return "denied";
+   if(now<assignment.opensAt)return "admission_closed";
+   if(audience.kind==="public")return "public_policy_pending"; // No guessed close/review policy.
+-  const close=groupAdmissionCloseExclusive(assignment.opensAt);
+-  if(close===null)return "denied";
+-  return now<close?"allow":"admission_closed";
++  const state=groupAdmissionState(assignment,admission,now);
++  return state==="scheduled_or_open"?"allow":state==="closed"?"admission_closed":"denied";
+ }
+ 
+ type AttemptEvidence = Readonly<{
+@@ -122,3 +144,61 @@ export function canResumeOriginalAssignmentAttempt(input:Readonly<{
+     at(now)&&at(attempt.startedAt)&&at(attempt.deadlineAt)&&attempt.startedAt<attempt.deadlineAt&&
+     attempt.startedAt<=now&&now<attempt.deadlineAt;
+ }
++
++type ClosureParticipant = Readonly<{
++  personId:string;originalAssignmentId:string;
++  series:StableDemoSeries|null;
++  currentAttempt:(AttemptEvidence&Readonly<{
++    completedAt:number;ordinaryOutcomeAttemptId:string;
++  }>)|null;
++  // Includes a pending, scheduled or already-started authorized reopen:
++  // none of those has the authoritative "resolved" meaning.
++  recovery:"resolved"|"unresolved"|"unknown";
++}>;
++type OriginalGroupCohort = Readonly<{
++  // This type is not authority by itself. The canonical caller must hold the
++  // original assignment and complete population/recovery revisions/locks.
++  proof:"authoritative_locked";
++  assignmentId:string;groupId:string;demoId:string;
++  assignmentRevision:number;barrierRevision:number;assignedCount:number;
++  participants:readonly ClosureParticipant[];
++}>;
++
++/**
++ * Evidence classifier only, never the close/review transition. A positive
++ * result is consumable only by canonical reconciliation under the same
++ * transaction, locks and revisions. It never opens answers/review, calculates
++ * bonus/Rasch, modifies assigned-person outcomes, or shortens active clocks.
++ */
++export function classifyGroupEarlyAdmissionClose(input:Readonly<{
++  assignment:Assignment;admission:GroupAdmissionEvidence|null;cohort:OriginalGroupCohort|null;now:number;
++}>):"ordinary_only_eligible"|"keep_admission_unchanged" {
++  const {assignment,admission,cohort,now}=input;
++  const audience=assignment&&normalizeAssignmentAudience(assignment.audience);
++  const blocked="keep_admission_unchanged" as const;
++  if(!assignment||audience?.kind!=="group"||assignment.published!==true||
++    assignment.cancelled!==false||!id(assignment.id)||!id(assignment.demoId)||
++    groupAdmissionState(assignment,admission,now)!=="scheduled_or_open"||now<assignment.opensAt||
++    !cohort||cohort.proof!=="authoritative_locked"||cohort.assignmentId!==assignment.id||
++    cohort.groupId!==audience.groupId||cohort.demoId!==assignment.demoId||
++    !epoch(cohort.assignmentRevision)||!epoch(cohort.barrierRevision)||
++    !generation(cohort.assignedCount)||cohort.assignedCount>500||!Array.isArray(cohort.participants)||
++    cohort.participants.length!==cohort.assignedCount)return blocked;
++  const people=new Set<string>(),attempts=new Set<string>();
++  for(const member of cohort.participants){
++    if(!member||!id(member.personId)||people.has(member.personId)||
++      member.originalAssignmentId!==assignment.id||member.recovery!=="resolved")return blocked;
++    const {series,currentAttempt:a}=member;
++    if(!series||!a||series.personId!==member.personId||series.demoId!==assignment.demoId||
++      series.normalAttemptUsed!==true||!id(a.id)||attempts.has(a.id)||series.currentAttemptId!==a.id||
++      a.personId!==member.personId||a.originalAssignmentId!==assignment.id||a.demoId!==assignment.demoId||
++      !generation(a.generation)||series.generation!==a.generation||
++      (a.status!=="submitted"&&a.status!=="expired"&&a.status!=="forced")||
++      !at(a.startedAt)||!at(a.deadlineAt)||!at(a.completedAt)||a.startedAt>=a.deadlineAt||
++      a.completedAt<a.startedAt||a.completedAt>now||
++      (a.status==="expired"?a.completedAt!==a.deadlineAt:a.completedAt>=a.deadlineAt)||
++      a.ordinaryOutcomeAttemptId!==a.id)return blocked;
++    people.add(member.personId);attempts.add(a.id);
++  }
++  return "ordinary_only_eligible";
++}

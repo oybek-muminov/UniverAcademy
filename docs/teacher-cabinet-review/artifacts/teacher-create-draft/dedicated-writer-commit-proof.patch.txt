@@ -1,0 +1,45 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-draft-commit-proof.ts b/supabase/functions/univeracademy-api/storage/teacher-draft-commit-proof.ts
+new file mode 100644
+index 0000000..7ca89ec
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/teacher-draft-commit-proof.ts
+@@ -0,0 +1,39 @@
++// Unmounted, dedicated first-draft writer only. Compose ABOVE the pool port:
++// it strips Statement.name before pg but passes the raw driver result back.
++import { StorageUnavailable } from "./postgres-transaction.ts";
++import type { PgPool, Rows, Statement } from "./postgres-transaction.ts";
++
++function isCommitResult(value: unknown): value is Rows & { command: "COMMIT" } {
++  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
++  const result = value as { command?: unknown; rows?: unknown; rowCount?: unknown };
++  return result.command === "COMMIT" && Array.isArray(result.rows) &&
++    result.rows.length === 0 && result.rowCount === null;
++}
++
++export function withTeacherDraftCommitProof(pool: PgPool, signal: AbortSignal): PgPool {
++  if (typeof pool?.connect !== "function" || !(signal instanceof AbortSignal))
++    throw new StorageUnavailable("not_committed");
++
++  return Object.freeze({ async connect() {
++    if (signal.aborted) throw new StorageUnavailable("not_committed");
++    const client = await pool.connect();
++    if (typeof client?.query !== "function" || typeof client?.release !== "function") {
++      if (typeof client?.release === "function") client.release(true);
++      throw new StorageUnavailable("not_committed");
++    }
++    return {
++      async query(statement: Statement): Promise<Rows> {
++        if (statement.name !== "ua_commit") return client.query(statement);
++        // This exact internal statement is produced by PostgresTransactions.
++        // Reject instead of resolving the COMMIT promise; its committing
++        // branch discards the connection and classifies the outcome as unknown.
++        if (signal.aborted || statement.text !== "COMMIT" || statement.values.length !== 0)
++          throw new StorageUnavailable("commit_unknown");
++        const result: unknown = await client.query(statement);
++        if (signal.aborted || !isCommitResult(result)) throw new StorageUnavailable("commit_unknown");
++        return result;
++      },
++      release(discard?: boolean) { return client.release(discard); },
++    };
++  } });
++}

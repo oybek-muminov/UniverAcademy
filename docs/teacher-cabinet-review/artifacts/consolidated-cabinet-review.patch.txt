@@ -1,0 +1,1470 @@
+diff --git a/apps/mini-app/src/cabinet-access-transport.ts b/apps/mini-app/src/cabinet-access-transport.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5af4d7fc2ce5e1c2802783bc4b93fd76a01904c
+--- /dev/null
++++ b/apps/mini-app/src/cabinet-access-transport.ts
+@@ -0,0 +1,74 @@
++export type CabinetAccess = Readonly<{person_id:string;default_cabinet:'student'|'teacher'}>;
++
++type ReadInput=Readonly<{apiBaseUrl:string;fetcher:(request:Request)=>Promise<Response>;
++  personId:string;access:string;signal:AbortSignal}>;
++
++const responseLimit=2048;
++const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++const exact=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>{
++  if(value===null||typeof value!=='object'||Object.getPrototypeOf(value)!==Object.prototype)return false;
++  const actual=Reflect.ownKeys(value);
++  return actual.length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
++};
++function releaseBody(response:Response){
++  // Do not wait on an untrusted stream cancellation promise.
++  try{void response.body?.cancel().catch(()=>{});}catch{}
++}
++
++async function document(response:Response,signal:AbortSignal):Promise<unknown>{
++  const reader=response.body?.getReader();
++  if(!reader)return null;
++  const cancel=()=>{try{void reader.cancel().catch(()=>{});}catch{}};
++  signal.addEventListener('abort',cancel,{once:true});
++  const bytes=new Uint8Array(responseLimit);
++  let length=0,done=false;
++  try{
++    while(!signal.aborted){
++      const part=await reader.read();
++      if(signal.aborted)return null;
++      if(part.done){done=true;break;}
++      if(!part.value.byteLength||length+part.value.byteLength>responseLimit)return null;
++      bytes.set(part.value,length);
++      length+=part.value.byteLength;
++    }
++    if(!done||signal.aborted)return null;
++    return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(0,length)));
++  }finally{
++    signal.removeEventListener('abort',cancel);
++    if(!done)cancel();
++    try{reader.releaseLock();}catch{}
++  }
++}
++
++/**
++ * Private, optional read. The caller must hold the current opaque Student access
++ * proof and use the existing production-origin transport. Navigation is never
++ * authority. This candidate creates no mounted route, login or proof fallback.
++ */
++export async function readCabinetAccess({apiBaseUrl,fetcher,personId,access,signal}:ReadInput):Promise<CabinetAccess|null>{
++  try{
++    if(signal.aborted||!uuid.test(personId)||!/^[0-9a-f]{64}$/.test(access))return null;
++    const base=new URL(apiBaseUrl);
++    if(base.protocol!=='https:'||base.username||base.password||base.search||base.hash||
++      !['/api/v1','/api/v1/'].includes(base.pathname))return null;
++    const target=new URL('/api/v1/me/cabinet-access',base.origin).href;
++    const response=await fetcher(new Request(target,{method:'GET',signal,mode:'cors',
++      cache:'no-store',credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',
++      headers:{accept:'application/json',authorization:`Bearer ${access}`}}));
++    const cache=response.headers.get('cache-control')?.split(',').some(d=>d.trim().toLowerCase()==='no-store');
++    const ct=response.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase();
++    const length=response.headers.get('content-length');
++    if(signal.aborted||response.status!==200||response.redirected||response.url!==target||
++      !['basic','cors'].includes(response.type)||!cache||ct!=='application/json'||
++      (length!==null&&(!/^\d{1,4}$/.test(length)||Number(length)>responseLimit))){
++      releaseBody(response);
++      return null;
++    }
++    const body=await document(response,signal);
++    if(signal.aborted||!exact(body,['data']))return null;
++    const data=body.data;
++    if(!exact(data,['person_id','default_cabinet'])||data.person_id!==personId||
++      (data.default_cabinet!=='student'&&data.default_cabinet!=='teacher'))return null;
++    return Object.freeze({person_id:personId,default_cabinet:data.default_cabinet});
++  }catch{return null;} // Do not emit response body, proof, request, URL or error to logs.
++}
+diff --git a/apps/mini-app/src/owner-port.ts b/apps/mini-app/src/owner-port.ts
+index 2c12b2a9d63274bec45747175afd92f51793b2e4..ff916a5c8e155dbe9384c504f49ec27f5323a4c2 100644
+--- a/apps/mini-app/src/owner-port.ts
++++ b/apps/mini-app/src/owner-port.ts
+@@ -1,3 +1,4 @@
++import {readCabinetAccess} from "./cabinet-access-transport.ts";
+ import {createDeletionHttpPort} from './account-deletion-candidate/http-port.ts';
+ import {createPublicRecoveryStatus} from './account-deletion-candidate/recovery-status-port.ts';
+ import type {DeletionPort} from './account-deletion-candidate/controller.ts';
+@@ -143,6 +144,13 @@ export function createOwnerPort(options: OwnerPortOptions) {
+       if (!result?.data || result.data.ok !== true || Object.keys(result.data).length !== 1)
+         throw new StudentFailure('protocol', 'RESPONSE_INVARIANT_FAILED', null, true);
+     },
++    readCabinetAccess(input:Readonly<{personId:string;signal:AbortSignal}>) {
++      if(options.mode!=='production'||!['telegram_atomic','telegram_resume'].includes(options.loginMethod??''))
++        return Promise.resolve(null);
++      const signal=options.loginSignal?AbortSignal.any([input.signal,options.loginSignal]):input.signal;
++      return transport.readWithCurrentAccess(input.personId,signal,access=>
++        readCabinetAccess({apiBaseUrl:options.baseUrl,fetcher,personId:input.personId,access,signal}));
++    },
+     createDeletionPort(expectedPerson:string):DeletionPort {
+       const check=()=>{if(!expectedPerson||transport.person()!==expectedPerson)throw new StudentFailure('auth','ACCESS_SUPERSEDED',null,true)};
+       check();
+diff --git a/apps/mini-app/src/teacher-cabinet-entry-review.tsx b/apps/mini-app/src/teacher-cabinet-entry-review.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f65f618f183411a189eb6da85a11ea9fae1bf46
+--- /dev/null
++++ b/apps/mini-app/src/teacher-cabinet-entry-review.tsx
+@@ -0,0 +1,89 @@
++import {useEffect,useRef,useState} from 'react';
++import type {ReactElement} from 'react';
++
++type Input = Readonly<{personId:string;signal:AbortSignal}>;
++type PreparedTeacher = Readonly<{personId:string;view:ReactElement}>;
++
++// Review-only port. It has no default implementation or production configuration.
++// personId is an expected local identity, never URL/query/header authorization.
++// resolveAccess must derive identity and current role from the trusted session and
++// include authoritative server-side unfinished-attempt continuity across launches.
++// prepareTeacher must prove the same person in the destination independently and
++// return an unmounted view. Its preflight signal must not control that view's lifetime.
++// It must not navigate or exchange/clear Student proofs.
++// The Teacher server must still authorize every data read and mutation.
++export type TeacherCabinetReviewPort = Readonly<{
++  resolveAccess(input:Input):Promise<unknown>;
++  prepareTeacher(input:Input):Promise<PreparedTeacher|null>;
++}>;
++
++type Selection =
++  | {kind:'pending'}
++  | {kind:'student'}
++  | {kind:'stale'}
++  | {kind:'teacher';view:ReactElement};
++
++function permitsTeacher(value:unknown,personId:string):boolean {
++  if(value===null||typeof value!=='object'||Object.getPrototypeOf(value)!==Object.prototype)return false;
++  const keys=Reflect.ownKeys(value);
++  if(keys.length!==2||!keys.includes('person_id')||!keys.includes('default_cabinet'))return false;
++  return Object.getOwnPropertyDescriptor(value,'person_id')?.value===personId&&
++    Object.getOwnPropertyDescriptor(value,'default_cabinet')?.value==='teacher';
++}
++
++const DECISION_BUDGET_MS=650;
++
++export function TeacherCabinetEntryReview(props:{
++  personId:string;
++  identityKey:string;
++  port:TeacherCabinetReviewPort;
++  isCurrent():boolean;
++  student:ReactElement;
++}){
++  // Capture once per ready entry; current stable Clerk/runtime guards remain live.
++  const [entry]=useState(()=>({
++    personId:props.personId,identityKey:props.identityKey,port:props.port,isCurrent:props.isCurrent,
++  }));
++  const [selection,setSelection]=useState<Selection>({kind:'pending'});
++  const closed=useRef(false);
++  const stillCurrent=props.identityKey===entry.identityKey&&props.personId===entry.personId&&
++    props.port===entry.port&&entry.isCurrent();
++
++  useEffect(()=>{
++    if(!stillCurrent){closed.current=true;setSelection({kind:'stale'});return}
++    if(closed.current)return;
++    const abort=new AbortController();
++    const deadline=performance.now()+DECISION_BUDGET_MS;
++    const commit=(next:Selection)=>{
++      if(abort.signal.aborted||closed.current)return;
++      const result:Selection=!entry.isCurrent()?{kind:'stale'}:
++        next.kind==='teacher'&&performance.now()>=deadline?{kind:'student'}:next;
++      closed.current=true;
++      if(result.kind!=='teacher')abort.abort();
++      setSelection(current=>current.kind==='pending'?result:current);
++    };
++    const timer=setTimeout(()=>commit({kind:'student'}),DECISION_BUDGET_MS);
++    void (async()=>{
++      try{
++        const input={personId:entry.personId,signal:abort.signal};
++        const access=await entry.port.resolveAccess(input);
++        if(abort.signal.aborted)return;
++        if(!entry.isCurrent()||!permitsTeacher(access,entry.personId)){commit({kind:'student'});return}
++        const teacher=await entry.port.prepareTeacher(input);
++        if(teacher?.personId===entry.personId)commit({kind:'teacher',view:teacher.view});
++        else commit({kind:'student'});
++      }catch{commit({kind:'student'})}
++      finally{clearTimeout(timer)}
++    })();
++    return()=>{clearTimeout(timer);abort.abort()};
++  },[entry,stillCurrent]);
++
++  if(!stillCurrent||selection.kind==='stale')return <main className="shell"><section className="card">
++    <p role="status">Telegram botida /start orqali yangidan oching.</p>
++  </section></main>;
++  if(selection.kind==='pending')return <main className="shell"><section className="card">
++    <p role="status">Kabinet tekshirilmoqda…</p>
++  </section></main>;
++  if(selection.kind==='teacher')return selection.view;
++  return props.student;
++}
+diff --git a/apps/mini-app/src/telegram-atomic-entry.tsx b/apps/mini-app/src/telegram-atomic-entry.tsx
+index 120cc543bb2ba3a5076892b7497e50bbc1fe86a0..398b53cbc0498e95742fd14ec5ddf3ea3f76bb3c 100644
+--- a/apps/mini-app/src/telegram-atomic-entry.tsx
++++ b/apps/mini-app/src/telegram-atomic-entry.tsx
+@@ -7,10 +7,27 @@ import {createProductionOwnerConnection} from './production-connection.ts';
+ import {readTelegramBridge} from './telegram-bootstrap.ts';
+ import {createAtomicTelegramRuntime} from './telegram-atomic-runtime.ts';
+ import {StudentApp} from './student-app.tsx';
++import {TeacherCabinetEntryReview} from './teacher-cabinet-entry-review.tsx';
++import type {TeacherCabinetReviewPort} from './teacher-cabinet-entry-review.tsx';
+ const policy={level:'first_factor',afterMinutes:4} as const;
+-export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;scope:unknown}){
++const readyEntryKeys=new WeakMap<object,number>();
++let nextReadyEntryKey=0;
++function routeEntryKey(flow:object){
++  const existing=readyEntryKeys.get(flow);
++  if(existing!==undefined)return existing;
++  const key=++nextReadyEntryKey;
++  readyEntryKeys.set(flow,key);
++  return key;
++}
++type Session = ReturnType<typeof useClerk>['session'];
++function routeIdentityKey(session:Session|undefined){
++  return JSON.stringify(session ? [session.id,session.user.id,session.status,!!session.currentTask] : []);
++}
++export function AtomicTelegramEntry({config,scope,teacherRouting}:{
++  config:CommonEntryConfig;scope:unknown;teacherRouting?:TeacherCabinetReviewPort;
++}){
+   const clerk=useClerk(),{session}=useSession();
+-  const latest=useRef({clerk,scope});latest.current={clerk,scope};
++  const latest=useRef({clerk,scope,teacherRouting});latest.current={clerk,scope,teacherRouting};
+   // Official SDK hook only wraps a proof-producing callback. Atomic POST is outside
+   // the hook, preventing SDK automatic retries from replaying the mutation.
+   const verify=useReverification(async(expected:{userId:string;sessionId:string})=>{
+@@ -33,7 +50,17 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
+   useEffect(()=>{void runtime.resume();return()=>runtime.dispose()},[runtime]);
+   useEffect(()=>runtime.observe(),[runtime,session?.id,session?.status,session?.currentTask,session?.user.id]);
+   const active=session?.status==='active'&&!session.currentTask;
+-  if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
++  if(state.phase==='ready'&&state.flow){
++    const flow=state.flow,binding=runtime.deletionBinding();
++    const student=<AccountDeletionHost binding={binding} enabled={config.deletionEnabled} cabinetDisplayId={flow.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={flow} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
++    if(!teacherRouting||!binding)return student;
++    const identityKey=routeIdentityKey(session);
++    return <TeacherCabinetEntryReview key={routeEntryKey(flow)} personId={binding.personId} identityKey={identityKey}
++      port={teacherRouting} student={student}
++      isCurrent={()=>latest.current.teacherRouting===teacherRouting&&
++        routeIdentityKey(latest.current.clerk.session)===identityKey&&
++        runtime.snapshot().phase==='ready'&&runtime.snapshot().flow===flow&&binding.isCurrent()}/>;
++  }
+   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1>
+     {state.notice&&<p role="status">{state.notice}</p>}
+     {state.phase==='choose'?(active?<>
+diff --git a/apps/mini-app/src/telegram-atomic-runtime.ts b/apps/mini-app/src/telegram-atomic-runtime.ts
+index 8c21d226434d867e500d5689816279e5c1af7b68..2e84d1e99771149a8ac304d5c5883bc595d8ebf2 100644
+--- a/apps/mini-app/src/telegram-atomic-runtime.ts
++++ b/apps/mini-app/src/telegram-atomic-runtime.ts
+@@ -35,6 +35,17 @@ export function createAtomicTelegramRuntime(options:{
+       return{personId,port:target.auth.createDeletionPort(personId),isCurrent:()=>connection===target&&target.auth.person()===personId,
+         clearMatching:()=>{if(connection===target&&target.auth.person()===personId){target.auth.clearMatching(personId);clear()}}};
+     },
++    // Exposes only a nullable routing hint, not the underlying proof or transport.
++    // This is not selected by the production entrypoint in this candidate.
++    async readCabinetAccess(input:Readonly<{personId:string;signal:AbortSignal}>) {
++      const target=connection,capturedEpoch=epoch,capturedState=state,identity=anchor;
++      const current=()=>!disposed&&!input.signal.aborted&&capturedEpoch===epoch&&connection===target&&
++        state===capturedState&&state.phase==='ready'&&target?.auth.person()===input.personId&&
++        (!identity||same(options.identity(),identity));
++      if(!target||!current())return null;
++      const value=await target.auth.readCabinetAccess(input);
++      return current()?value:null;
++    },
+     snapshot:()=>state,subscribe(fn:()=>void){listeners.add(fn);return()=>{listeners.delete(fn)}},
+     async resume(){if(state.phase!=='new'||disposed)return;const n=++epoch;set({phase:'resuming'});
+       try{await open('telegram_resume',launch(),n)}catch(error){if(disposed||n!==epoch)return;const established=!!connection?.auth.person();connection?.auth.clear();connection=null;
+diff --git a/apps/mini-app/src/transport.ts b/apps/mini-app/src/transport.ts
+index 102bbbd28b5908c4a4ada9d2eadec8fc4f7dacf8..d915dd5b393aa18523b55ce86487988386b3f61e 100644
+--- a/apps/mini-app/src/transport.ts
++++ b/apps/mini-app/src/transport.ts
+@@ -132,6 +132,19 @@ export function createStudentTransport(options: {
+     rotating = task;
+     return task;
+   }
++  // Optional navigation only. Unlike withAccess(), this never rotates, retries,
++  // clears/replaces a session, or changes the epoch on a failed auxiliary read.
++  async function readWithCurrentAccess<T>(expectedPerson:string,signal:AbortSignal,
++    action:(access:string)=>Promise<T>):Promise<T|null> {
++    const captured=proof,epoch=authEpoch;
++    if(!captured||captured.person!==expectedPerson)return null;
++    const current=()=>!signal.aborted&&!rotating&&proof===captured&&authEpoch===epoch&&captured.expiresAt>now();
++    if(!current())return null;
++    try {
++      const value=await action(captured.access);
++      return current()?value:null;
++    } catch { return null; }
++  }
+   // Execute a Backend-owned client operation using this session's proof/epoch.
+   // No endpoint, wire DTO or response parser is duplicated here.
+   async function withAccess<T>(action: (access: string) => Promise<T>, mutation = false, retried = false): Promise<T> {
+@@ -204,6 +217,7 @@ export function createStudentTransport(options: {
+   }
+   return {
+     withAccess,
++    readWithCurrentAccess,
+     request,
+     // Local cancellation only. Retire pending login/read callbacks immediately;
+     // this is never a server logout ACK or an automatic exchange/refresh replay.
+diff --git a/apps/teacher-web/src/cabinet.mjs b/apps/teacher-web/src/cabinet.mjs
+index 285962d9c384c93b2f3374e08e282979e5bb098a..9807a11f8379591c85adc0938553e8be2ce1ebef 100644
+--- a/apps/teacher-web/src/cabinet.mjs
++++ b/apps/teacher-web/src/cabinet.mjs
+@@ -33,17 +33,17 @@ export class TeacherCabinet {
+   async leave(action) {
+     if (this.#leaving || this.#disposed || this.state.kind !== 'ready') return;
+     if (action !== 'student' && action !== 'signout') return;
+-    this.#leaving = true; ++this.#epoch; this.#abort?.abort();
++    this.#leaving = true; const epoch = ++this.#epoch; this.#abort?.abort();
+     this.#set({ kind: 'leaving', tab: 'overview' });
+     try {
+       await (action === 'student' ? this.#port.openStudent() : this.#port.signOut());
+-      this.#set({ kind: action === 'student' ? 'student' : 'signed-out', tab: 'overview' });
+-    } catch { this.#set({ kind: 'error', tab: 'overview' }); }
+-    finally { this.#leaving = false; }
++      if (epoch === this.#epoch) this.#set({ kind: action === 'student' ? 'student' : 'signed-out', tab: 'overview' });
++    } catch { if (epoch === this.#epoch) this.#set({ kind: 'error', tab: 'overview' }); }
++    finally { if (epoch === this.#epoch) this.#leaving = false; }
+   }
+   suspend() {
+     if (this.#disposed) return;
+-    ++this.#epoch; this.#abort?.abort();
++    ++this.#epoch; this.#abort?.abort(); this.#leaving = false;
+     this.#set({ kind: 'idle', tab: 'overview' });
+   }
+   dispose() { this.#disposed = true; ++this.#epoch; this.#abort?.abort(); }
+diff --git a/apps/teacher-web/src/main.mjs b/apps/teacher-web/src/main.mjs
+index 5e90fa29cda1adc8e8c18efc170095634c067392..5123dd802556a3395ce8612b3a64c159faca9410 100644
+--- a/apps/teacher-web/src/main.mjs
++++ b/apps/teacher-web/src/main.mjs
+@@ -1,16 +1,4 @@
+-import { TeacherCabinet, unconfiguredPort } from './cabinet.mjs';
+-import { renderCabinet } from './view.mjs';
+-const root = document.getElementById('app');
+-// Real Clerk/server adapter is intentionally not guessed from provisional API contracts.
+-const cabinet = new TeacherCabinet(unconfiguredPort, state => renderCabinet(root, state, {
+-  refresh: () => void cabinet.refresh(), select: tab => cabinet.select(tab),
+-  student: () => void cabinet.leave('student'), signout: () => void cabinet.leave('signout')
+-}));
+-void cabinet.refresh();
+-// Never restore a cached staff profile after Back/Forward or an auth change elsewhere.
+-addEventListener('pagehide', () => cabinet.suspend());
+-addEventListener('pageshow', event => { if (event.persisted) void cabinet.refresh(); });
+-document.addEventListener('visibilitychange', () => {
+-  if (document.visibilityState === 'hidden') cabinet.suspend();
+-  else void cabinet.refresh();
+-});
++import { mountTeacherCabinet } from './mount.mjs';
++
++// No identity provider or live API is configured by this review candidate.
++mountTeacherCabinet(document.getElementById('app'));
+diff --git a/apps/teacher-web/src/mount.mjs b/apps/teacher-web/src/mount.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..06f4a98b1e52ebeb4ea2fe8a9f7c309890ad3b51
+--- /dev/null
++++ b/apps/teacher-web/src/mount.mjs
+@@ -0,0 +1,54 @@
++import { TeacherCabinet, unconfiguredPort } from './cabinet.mjs';
++import { createVerifiedBrowserAdapter } from './verified-browser-adapter.mjs';
++import { renderCabinet } from './view.mjs';
++
++export function mountTeacherCabinet(root, integration) {
++  if (!root) return () => {};
++  let adapter;
++  try { adapter = integration ? createVerifiedBrowserAdapter(integration) : null; }
++  catch {
++    renderCabinet(root, { kind: 'unconfigured' }, {});
++    return () => {};
++  }
++  let disposed = false, subscribed = false;
++  const cabinet = new TeacherCabinet(adapter?.port ?? unconfiguredPort, state => renderCabinet(root, state, {
++    refresh: () => void refresh(), select: tab => cabinet.select(tab), signout: () => void cabinet.leave('signout')
++  }));
++  const suspend = () => { adapter?.invalidate(); cabinet.suspend(); };
++  const refresh = () => {
++    if (!disposed && document.visibilityState !== 'hidden') return cabinet.refresh();
++  };
++  const identityChanged = () => {
++    if (disposed || !subscribed) return;
++    suspend(); // Clears previously rendered profile and invalidates even a pending sign-out.
++    void refresh();
++  };
++  let unsubscribe;
++  try {
++    unsubscribe = adapter?.subscribe(identityChanged);
++    if (adapter && typeof unsubscribe !== 'function') throw new Error('identity subscription unavailable');
++    subscribed = true;
++  } catch {
++    disposed = true;
++    cabinet.dispose();
++    renderCabinet(root, { kind: 'unconfigured' }, {});
++    return () => {};
++  }
++  const pageshow = event => { if (event.persisted) void refresh(); };
++  const visibility = () => { if (document.visibilityState === 'hidden') suspend(); else void refresh(); };
++  addEventListener('pagehide', suspend);
++  addEventListener('pageshow', pageshow);
++  document.addEventListener('visibilitychange', visibility);
++  void refresh();
++  return () => {
++    if (disposed) return;
++    disposed = true;
++    cabinet.dispose();
++    adapter?.invalidate();
++    root.replaceChildren();
++    removeEventListener('pagehide', suspend);
++    removeEventListener('pageshow', pageshow);
++    document.removeEventListener('visibilitychange', visibility);
++    unsubscribe?.();
++  };
++}
+diff --git a/apps/teacher-web/src/port.d.ts b/apps/teacher-web/src/port.d.ts
+index 8bc9011550e21617562b5480c2b04cfa0027b3d8..73874ab69f14cfdcce05397f84137ec57f4d3027 100644
+--- a/apps/teacher-web/src/port.d.ts
++++ b/apps/teacher-web/src/port.d.ts
+@@ -13,3 +13,27 @@ export interface TeacherCabinetPort {
+   /** Use the configured Clerk instance; revoke local view immediately. */
+   signOut(): Promise<void>;
+ }
++
++/** Internal review integration. Do not wire to a provisional HTTP API. */
++export interface VerifiedBrowserIdentity {
++  readonly personId: string;
++  /** Opaque local provider-session generation, never a bearer token or URL field. */
++  readonly generation: string;
++}
++export interface TeacherBrowserReviewIntegration {
++  identity: {
++    /** Null means verified signed out; throw if identity state is unavailable. */
++    current(): VerifiedBrowserIdentity | null;
++    /** Report account/session changes and available server grant invalidations. */
++    subscribe(invalidate: () => void): () => void;
++    /** Compare the expected provider generation at dispatch. */
++    signOut(expected: VerifiedBrowserIdentity): Promise<void>;
++  };
++  transport: {
++    /** Take auth from verified provider integration, not this browser identity DTO. */
++    read(input: {
++      expected: VerifiedBrowserIdentity;
++      signal: AbortSignal;
++    }): Promise<{ status: number; data: unknown }>;
++  };
++}
+diff --git a/apps/teacher-web/src/verified-browser-adapter.mjs b/apps/teacher-web/src/verified-browser-adapter.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ccf37beeadadc00582d753453032264df3847bc
+--- /dev/null
++++ b/apps/teacher-web/src/verified-browser-adapter.mjs
+@@ -0,0 +1,103 @@
++// Review-only transport envelope. This is not a published, accepted API schema.
++function record(value, keys) {
++  if (value === null || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype ||
++      Reflect.ownKeys(value).length !== keys.length) throw new Error('invalid teacher response');
++  return Object.fromEntries(keys.map(key => {
++    const field = Object.getOwnPropertyDescriptor(value, key);
++    if (!field || !Object.hasOwn(field, 'value')) throw new Error('invalid teacher response');
++    return [key, field.value];
++  }));
++}
++
++function text(value) {
++  if (typeof value !== 'string' || !value.trim() || value.length > 200) throw new Error('invalid teacher response');
++  return value;
++}
++
++function list(value, max, map) {
++  if (!Array.isArray(value) || value.length > max) throw new Error('invalid teacher response');
++  const result = [];
++  for (let i = 0; i < value.length; i++) {
++    const field = Object.getOwnPropertyDescriptor(value, String(i));
++    if (!field || !Object.hasOwn(field, 'value')) throw new Error('invalid teacher response');
++    result.push(map(field.value));
++  }
++  return result;
++}
++
++function rows(value) {
++  const seen = new Set();
++  return list(value, 500, item => {
++    const row = record(item, ['id', 'title']);
++    const id = text(row.id);
++    if (seen.has(id)) throw new Error('invalid teacher response');
++    seen.add(id);
++    return { id, title: text(row.title) };
++  });
++}
++
++function ready(data, expectedPersonId) {
++  const view = record(data, ['person_id', 'name', 'access', 'subjects', 'groups', 'tests']);
++  if (text(view.person_id) !== expectedPersonId) return { kind: 'forbidden' };
++  const access = record(view.access, ['teacher', 'approved', 'enabled']);
++  if (Object.values(access).some(value => typeof value !== 'boolean')) throw new Error('invalid teacher response');
++  if (!access.teacher || !access.approved || !access.enabled) return { kind: 'forbidden' };
++  return {
++    kind: 'ready', personId: expectedPersonId, name: text(view.name), access,
++    subjects: list(view.subjects, 100, text), groups: rows(view.groups), tests: rows(view.tests)
++  };
++}
++
++function currentIdentity(source) {
++  const value = source.current();
++  if (value === null) return null;
++  if (!value || typeof value.personId !== 'string' || !value.personId || value.personId.length > 200 ||
++      typeof value.generation !== 'string' || !value.generation) throw new Error('verified identity unavailable');
++  return Object.freeze({ personId: value.personId, generation: value.generation });
++}
++
++const same = (a, b) => a !== null && b !== null && a.personId === b.personId && a.generation === b.generation;
++
++export function createVerifiedBrowserAdapter({ identity, transport }) {
++  if (typeof identity?.current !== 'function' || typeof identity.subscribe !== 'function' ||
++      typeof identity.signOut !== 'function' || typeof transport?.read !== 'function')
++    throw new Error('teacher browser integration unavailable');
++
++  let version = 0, lastVerified = null;
++  const invalidate = () => { version += 1; lastVerified = null; };
++  return Object.freeze({
++    invalidate,
++    subscribe(notify) {
++      // The injected source reports verified identity changes and available grant-revocation events.
++      return identity.subscribe(() => { invalidate(); notify(); });
++    },
++    port: Object.freeze({
++      async load({ signal }) {
++        invalidate();
++        const request = version;
++        if (signal.aborted) throw new Error('teacher read cancelled');
++        const expected = currentIdentity(identity);
++        if (!expected) return { kind: 'signed-out' };
++        const response = await transport.read({ expected, signal });
++        if (signal.aborted || request !== version || !same(expected, currentIdentity(identity)))
++          throw new Error('teacher identity changed');
++        const { status, data } = record(response, ['status', 'data']);
++        if (status === 401) return { kind: 'signed-out' };
++        if (status === 403) return { kind: 'forbidden' };
++        if (status !== 200) throw new Error('teacher read unavailable');
++        const result = ready(data, expected.personId);
++        if (result.kind === 'ready') lastVerified = expected;
++        return result;
++      },
++      async openStudent() { throw new Error('student switching is not enabled'); },
++      async signOut() {
++        const expected = lastVerified;
++        invalidate();
++        if (!same(expected, currentIdentity(identity))) throw new Error('teacher identity changed');
++        // The integration must compare the expected provider generation at dispatch,
++        // so an intervening account switch cannot sign out a different session.
++        await identity.signOut(expected);
++      }
++    })
++  });
++}
+diff --git a/apps/teacher-web/src/view.mjs b/apps/teacher-web/src/view.mjs
+index 27cbfeadecc743f4b67b806dae7950eb66e8cbe1..6311768e6290be1b1919a2967fae747f05c72741 100644
+--- a/apps/teacher-web/src/view.mjs
++++ b/apps/teacher-web/src/view.mjs
+@@ -33,7 +33,9 @@ export function renderCabinet(root, state, actions) {
+     frame.append(panel); return;
+   }
+   const account = element('div', undefined, 'account');
+-  account.append(element('span', state.name), button('O‘quvchi rejimi', actions.student), button('Chiqish', actions.signout)); header.append(account);
++  account.append(element('span', state.name));
++  if (typeof actions.student === 'function') account.append(button('O‘quvchi rejimi', actions.student));
++  account.append(button('Chiqish', actions.signout)); header.append(account);
+   const layout = element('div', undefined, 'layout'); frame.append(layout);
+   const nav = element('nav'); nav.setAttribute('aria-label', 'Kabinet bo‘limlari');
+   for (const [id, label] of [['overview', 'Umumiy'], ['groups', 'Guruhlar'], ['tests', 'Testlar']]) {
+diff --git a/runtime/cabinet-access-http.mjs b/runtime/cabinet-access-http.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e111575683f3056589b7ec0f1e10d2a4e33a7b4
+--- /dev/null
++++ b/runtime/cabinet-access-http.mjs
+@@ -0,0 +1,59 @@
++import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
++import {readAuthorizedCabinetEntry} from "../supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts";
++
++const path="/api/v1/me/cabinet-access";
++const token=/^Bearer ([0-9a-f]{64})$/i;
++function json(status,data,extra={}){
++  return new Response(JSON.stringify(data),{status,headers:{
++    "content-type":"application/json; charset=utf-8","cache-control":"no-store",
++    "cdn-cache-control":"no-store","cloudflare-cdn-cache-control":"no-store",...extra,
++  }});
++}
++function reject(code,status,extra){
++  return json(status,{error:{code,message:code,request_id:crypto.randomUUID()}},extra);
++}
++const unavailable=()=>reject("SERVICE_UNAVAILABLE",503);
++
++export function isCabinetAccessPath(request){
++  return new URL(request.url).pathname===path;
++}
++export function cabinetAccessRequestFault(request){
++  const url=new URL(request.url);
++  if(url.pathname!==path||url.search||request.url.includes("?"))return reject("NOT_FOUND",404);
++  if(request.method!=="GET")return reject("METHOD_NOT_ALLOWED",405,{allow:"GET, OPTIONS"});
++  return null;
++}
++
++/**
++ * Worker-private composition only. A future withCabinetReaders implementation
++ * must call read exactly once inside the canonical person-lock transaction,
++ * install the same opaque-access, Clerk liveness and phase-bound readers, and
++ * return only after successful lease recheck and commit. pool and clerk are
++ * request-owned; nothing selects a reader through HTTP, env or query values.
++ * Passing a callable is not a deployment approval or ACL verification.
++ */
++export async function handleCabinetAccess(request,{withCabinetReaders,pool,clerk}={}){
++  const routeFault=cabinetAccessRequestFault(request);
++  if(routeFault)return routeFault;
++  if(request.signal.aborted||typeof withCabinetReaders!=="function"||!pool||typeof clerk?.liveness!=="function")
++    return unavailable();
++  const accessToken=request.headers.get("authorization")?.match(token)?.[1];
++  if(!accessToken||accessToken!==accessToken.toLowerCase())return reject("SESSION_REVOKED",401);
++  let called=0,settled=false,decision,finished=false;
++  try{
++    const returned=await withCabinetReaders(Object.freeze({
++      accessToken,signal:request.signal,pool,clerk,request,
++    }),async readers=>{
++      if(finished||++called!==1||request.signal.aborted)throw Error("CABINET_READ_UNAVAILABLE");
++      decision=await readAuthorizedCabinetEntry(accessToken,request.signal,readers);
++      settled=true;
++      return decision;
++    });
++    if(request.signal.aborted||called!==1||!settled||returned!==decision)return unavailable();
++    if(decision===null)return reject("SESSION_REVOKED",401);
++    return json(200,{data:decision});
++  }catch(error){
++    return error instanceof ApiFault&&error.status===401?reject("SESSION_REVOKED",401):unavailable();
++  }
++  finally{finished=true;}
++}
+diff --git a/runtime/cloudflare-api.mjs b/runtime/cloudflare-api.mjs
+index d28843f341b806b971178c75c92f4bff7c9658ee..d2b87737da01ee6034fa8a38bcb1fd849e54efb5 100644
+--- a/runtime/cloudflare-api.mjs
++++ b/runtime/cloudflare-api.mjs
+@@ -4,6 +4,7 @@ import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
+ import {createVercelNodeFunction} from "./vercel-node.mjs";
+ import {createCloudflarePostgres} from "./cloudflare-postgres.mjs";
+ import {publicHttpsOrigin,withPublicCors} from "./local-cors.mjs";
++import {isCabinetAccessPath,handleCabinetAccess} from "./cabinet-access-http.mjs";
+ 
+ const unavailable=()=>new ApiFault("SERVICE_UNAVAILABLE",503);
+ const fault=(code="SERVICE_UNAVAILABLE",status=503)=>new Response(JSON.stringify({error:{code,message:code,request_id:crypto.randomUUID()}}),
+@@ -56,10 +57,12 @@ async function untilAborted(work,signal){
+  * its Clerk adapter is prepared by createClerkWorkerAdapter. No credentials,
+  * provider/DB probe, JWT bypass or browser-trusted flag is provided here.
+  */
+-export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,configuration}={}){
++export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,configuration,withCabinetReaders}={}){
+   return Object.freeze({async fetch(request){
+-    let resource,response,body;
++    let resource,response,body,cabinet=false;
+     try{
++      cabinet=isCabinetAccessPath(request);
++      if(cabinet&&new URL(request.url).origin!==publicHttpsOrigin(apiOrigin))return fault("MALFORMED_REQUEST",400);
+       let scoped;
+       if(configuration!==undefined){
+         if(configuration?.mode!=="production"||configuration.storage!==undefined)throw unavailable();
+@@ -72,13 +75,21 @@ export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,co
+             {signal:options?.signal?AbortSignal.any([request.signal,options.signal]):request.signal})};
+         }
+       }
+-      const api=createVercelNodeFunction({apiOrigin,allowedOrigins,configuration:scoped});
+-      body=ownBody(request);
+-      response=await untilAborted(()=>api.fetch(body.request),request.signal);
++      if(cabinet){
++        const handler=withPublicCors(incoming=>handleCabinetAccess(incoming,{
++          withCabinetReaders,pool:resource?.pool,clerk:scoped?.clerk,
++        }),allowedOrigins);
++        response=await untilAborted(()=>handler(request),request.signal);
++      }else{
++        const api=createVercelNodeFunction({apiOrigin,allowedOrigins,configuration:scoped});
++        body=ownBody(request);
++        response=await untilAborted(()=>api.fetch(body.request),request.signal);
++      }
+     }catch{response=await fallback(request,apiOrigin,allowedOrigins);}
+     finally{body?.close();}
+     // No ACK before owned client disposal; no retry on close/commit uncertainty.
+     try{await resource?.close();}catch{response=await fallback(request,apiOrigin,allowedOrigins);}
++    if(cabinet&&request.signal.aborted)response=await fallback(request,apiOrigin,allowedOrigins);
+     const headers=new Headers(response.headers);headers.set("cloudflare-cdn-cache-control","no-store");
+     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+   }});
+diff --git a/runtime/cloudflare-entry.mjs b/runtime/cloudflare-entry.mjs
+index 11fe5100c9c0d1d53536212201502338f91a86bd..3014772f5b3cac117a7747c04adc4c6e11d72c93 100644
+--- a/runtime/cloudflare-entry.mjs
++++ b/runtime/cloudflare-entry.mjs
+@@ -9,6 +9,7 @@ import {createCloudflareApi} from "./cloudflare-api.mjs";
+ import {createClerkWorkerAdapter} from "./clerk-worker-bindings.mjs";
+ import {publicEnvironmentOptions} from "./vercel-node.mjs";
+ import {withPublicCors} from "./local-cors.mjs";
++import {isCabinetAccessPath,cabinetAccessRequestFault} from "./cabinet-access-http.mjs";
+ 
+ const unavailable=()=>new ApiFault("SERVICE_UNAVAILABLE",503);
+ const deny=()=>{throw unavailable();};
+@@ -76,8 +77,9 @@ function registrationRoute(request){
+  * deployment gates; a syntactically valid binding does not establish them.
+  */
+ export function createCloudflareEntrypoint({loadClient=async()=>(await import("pg")).Client,
+-  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now}={}){
+-  if([loadClient,makeClerk,transport,now].some(v=>typeof v!=="function"))throw unavailable();
++  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now,withCabinetReaders}={}){
++  if([loadClient,makeClerk,transport,now].some(v=>typeof v!=="function")||
++    (withCabinetReaders!==undefined&&typeof withCabinetReaders!=="function"))throw unavailable();
+   return Object.freeze({async fetch(request,env){
+     let publics;
+     try{
+@@ -93,7 +95,12 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
+         if(scopedRequest.method==="GET"&&new URL(scopedRequest.url).pathname==="/health")
+           return new Response('{"status":"ok"}',{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
+         if(!new URL(scopedRequest.url).pathname.startsWith("/api/v1/"))return response("NOT_FOUND",404);
+-        if(!registrationRoute(scopedRequest))return isContractPath(new URL(scopedRequest.url).pathname)?response():response("NOT_FOUND",404);
++        const cabinet=isCabinetAccessPath(scopedRequest);
++        if(cabinet){
++          const reject=cabinetAccessRequestFault(scopedRequest);
++          if(reject)return reject;
++          if(withCabinetReaders===undefined)return response();
++        }else if(!registrationRoute(scopedRequest))return isContractPath(new URL(scopedRequest.url).pathname)?response():response("NOT_FOUND",404);
+         let clerk,result;
+         try{
+           if(scopedRequest.signal.aborted)throw unavailable();
+@@ -117,12 +124,13 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
+           const configuration={mode:"production",sessionPolicy:bindings.sessionPolicy,
+             numericPresentation:unavailableNumbers,now,...(telegram?{botToken:bindings.botToken}:{}),clerk:{verifier:clerk.verifier,liveness:clerk.liveness}};
+           // fetch awaits the accepted resource's end() before returning any ACK.
+-          result=await createCloudflareApi({...publics,Client,postgres:bindings.postgres,configuration}).fetch(scopedRequest);
++          result=await createCloudflareApi({...publics,Client,postgres:bindings.postgres,configuration,
++            ...(cabinet?{withCabinetReaders}:{})}).fetch(scopedRequest);
+         }catch{result=response();}
+         finally{
+           try{await clerk?.close();}catch{result=response();}
+         }
+-        return result;
++        return cabinet&&scopedRequest.signal.aborted?response():result;
+       },publics.allowedOrigins)(request);
+     }catch{return response();} // No raw exception, private binding, body or log.
+   }});
+diff --git a/supabase/functions/univeracademy-api/cabinet-entry-decision.ts b/supabase/functions/univeracademy-api/cabinet-entry-decision.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5d5c73751032e6c695b18b1485550c6e430922a2
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/cabinet-entry-decision.ts
+@@ -0,0 +1,113 @@
++// Review candidate. Not registered as an API route. Inputs are server-owned
++// projections from one validated and scoped read, never request/body fields.
++export type CabinetEntry = Readonly<{
++  person_id: string;
++  default_cabinet: "student" | "teacher";
++}>;
++
++export type CabinetStudentAuth = Readonly<{
++  personId: string;
++  person: Readonly<{
++    enabled: boolean;
++    profile: Readonly<{
++      person_id: string;
++      roles: readonly string[];
++      registration_complete: boolean;
++    }>;
++  }>;
++}>;
++
++export type CabinetStaff = Readonly<{
++  personId: string;
++  // True means the proof-bound server read verified the current enabled,
++  // approved teacher role with at least one active subject approval.
++  canOpenTeacher: boolean;
++}>;
++
++// "none" means the scoped server reader positively established no current
++// resumable attempt for this person. A missing store/read or client state is not
++// "none". The reader owns current generation and authoritative database time.
++export type AttemptContinuity = Readonly<{
++  personId: string;
++  state: "none" | "resumable" | "unknown";
++}>;
++
++const personIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++const maxTime = 8_640_000_000_000_000;
++const isId = (value: unknown): value is string =>
++  typeof value === "string" && value.length === 36 && personIdPattern.test(value);
++const isTime = (value: number): boolean =>
++  Number.isSafeInteger(value) && value >= 0 && value <= maxTime;
++
++export type CurrentAttemptRead = Readonly<{
++  demoId: string;
++  currentAttemptId: string;
++  generation: number;
++  attempt: Readonly<{
++    id: string;
++    personId: string;
++    demoId: string;
++    generation: number;
++    status: "in_progress" | "submitted" | "expired" | "forced" | "cancelled";
++    startedAt: number;
++    deadlineAt: number;
++  }> | null;
++}>;
++
++/**
++ * Call only with the complete current-series projection for the independently
++ * authorized person, bound to the same person lock/transaction and database time.
++ * null means a missing or untrusted projection; [] means a proven empty series.
++ * Do not pass an assignment, visible exam list, pagination or truncated results.
++ * This does not materialize expiry, inspect answers, or mutate attempt state.
++ */
++export function readAttemptContinuity(
++  personId: string,
++  atMs: number,
++  current: readonly CurrentAttemptRead[] | null,
++): AttemptContinuity {
++  const result = (state: AttemptContinuity["state"]): AttemptContinuity =>
++    Object.freeze({ personId, state });
++  if (!isId(personId) || !isTime(atMs) || !Array.isArray(current)) return result("unknown");
++  const series = new Set<string>();
++  let resumable = false;
++  for (const row of current as readonly CurrentAttemptRead[]) {
++    const a = row?.attempt;
++    if (!a || !isId(row.demoId) || !isId(row.currentAttemptId) || series.has(row.demoId) ||
++      a.id !== row.currentAttemptId || a.demoId !== row.demoId || a.personId !== personId ||
++      !Number.isSafeInteger(row.generation) || row.generation < 1 || a.generation !== row.generation ||
++      !isTime(a.startedAt) || !isTime(a.deadlineAt) || a.startedAt > atMs || a.deadlineAt <= a.startedAt)
++      return result("unknown");
++    series.add(row.demoId);
++    if (a.status === "in_progress") resumable ||= atMs < a.deadlineAt;
++    else if (!["submitted", "expired", "forced", "cancelled"].includes(a.status)) return result("unknown");
++  }
++  return result(resumable ? "resumable" : "none");
++}
++
++/**
++ * Produce a navigation hint only. Never issue credentials or grant staff rights.
++ * Return null when the caller cannot derive a current authenticated student
++ * identity. The HTTP composition must return its established auth failure then.
++ */
++export function decideCabinetEntry(
++  auth: CabinetStudentAuth | null,
++  staff: CabinetStaff | null,
++  continuity: AttemptContinuity | null,
++): CabinetEntry | null {
++  const profile = auth?.person.profile;
++  if (!auth || !profile || !isId(auth.personId) ||
++    auth.person.enabled !== true || profile.person_id !== auth.personId ||
++    !Array.isArray(profile.roles) || !profile.roles.includes("student")) return null;
++
++  const teacher = profile.registration_complete === true &&
++    profile.roles.includes("teacher") &&
++    staff?.personId === auth.personId &&
++    staff.canOpenTeacher === true &&
++    continuity?.personId === auth.personId && continuity.state === "none";
++
++  return Object.freeze({
++    person_id: auth.personId,
++    default_cabinet: teacher ? "teacher" : "student",
++  });
++}
+diff --git a/supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts b/supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c6db94f94ffa57b869a3383aef3f6f8261b77bf
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts
+@@ -0,0 +1,78 @@
++// Review candidate only: no routing, real reader, or DB privileges installed.
++import { decideCabinetEntry, readAttemptContinuity } from "./cabinet-entry-decision.ts";
++import type { CabinetEntry, CabinetStaff, CabinetStudentAuth, CurrentAttemptRead } from "./cabinet-entry-decision.ts";
++
++type Binding = Readonly<{
++  personId: string;
++  familyId: string;
++  issuer: string;
++  subject: string;
++  sessionId: string;
++}>;
++
++type Scope = Readonly<{
++  auth: CabinetStudentAuth;
++  binding: Binding;
++}>;
++
++type AuthorizedReaders = Readonly<{
++  // Existing Clerk-bound, current opaque-token authorization, same transaction
++  // and person lock. Must verify provider liveness and its current expiry lease,
++  // not read session identity or trust phase/person labels from a GUC.
++  verifyCurrent: (accessToken: string, signal: AbortSignal) => Promise<Scope | null>;
++  // A future proof-bound reader checks the raw token against current ledger rows.
++  // Expected binding is an additional equality assertion, not an authenticator.
++  // Only server-local staff evidence for this same tuple must be returned.
++  readStaff: (accessToken: string, expected: Binding, signal: AbortSignal) =>
++    Promise<Readonly<{ binding: Binding; staff: CabinetStaff }> | null>;
++  // Existing scoped domain-phase snapshot, not the visible Student exam list.
++  // Must not run if the canonical transaction context/lock is unavailable.
++  readCurrentSeries: (expected: Binding, signal: AbortSignal) =>
++    Promise<Readonly<{ personId: string; atMs: number; rows: readonly CurrentAttemptRead[] | null }>>;
++}>;
++
++const same = (a: Binding, b: Binding): boolean =>
++  a.personId === b.personId && a.familyId === b.familyId && a.issuer === b.issuer &&
++  a.subject === b.subject && a.sessionId === b.sessionId;
++
++/**
++ * Intended only inside the existing trusted Worker transaction composition.
++ * Do not pass any outward request-supplied identity values as a scope. Auth or
++ * read faults stay faults; the external client can safely retain Student.
++ * The composing transaction must still perform its own before-commit lease check.
++ */
++export async function readAuthorizedCabinetEntry(
++  accessToken: string,
++  signal: AbortSignal,
++  readers: AuthorizedReaders,
++): Promise<CabinetEntry | null> {
++  if (typeof accessToken !== "string" || accessToken.length !== 64 || !/^[0-9a-f]{64}$/.test(accessToken))
++    return null;
++  signal.throwIfAborted();
++  const initial = await readers.verifyCurrent(accessToken, signal);
++  signal.throwIfAborted();
++  if (!initial || initial.auth.personId !== initial.binding.personId ||
++    !decideCabinetEntry(initial.auth, null, null)) return null;
++
++  const expected = Object.freeze({ ...initial.binding });
++  let scopedStaff: CabinetStaff | null = null;
++  let continuity: ReturnType<typeof readAttemptContinuity> | null = null;
++  if (initial.auth.person.profile.registration_complete && initial.auth.person.profile.roles.includes("teacher")) {
++    const read = await readers.readStaff(accessToken, expected, signal);
++    signal.throwIfAborted();
++    if (read && same(read.binding, expected) && read.staff.personId === expected.personId) {
++      scopedStaff = read.staff;
++      if (scopedStaff.canOpenTeacher === true) {
++        const attempt = await readers.readCurrentSeries(expected, signal);
++        signal.throwIfAborted();
++        if (attempt.personId === expected.personId)
++          continuity = readAttemptContinuity(expected.personId, attempt.atMs, attempt.rows);
++      }
++    }
++  }
++
++  const latest = await readers.verifyCurrent(accessToken, signal);
++  signal.throwIfAborted();
++  if (!latest || !same(latest.binding, expected) || latest.auth.personId !== expected.personId) return null;
++  return decideCabinetEntry(latest.auth, scopedStaff, continuity);
++}
+diff --git a/supabase/functions/univeracademy-api/storage/cabinet-current-series.ts b/supabase/functions/univeracademy-api/storage/cabinet-current-series.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..72c883011deb1f2fa311b32097564d5cf26ec04a
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/cabinet-current-series.ts
+@@ -0,0 +1,105 @@
++// Review-only domain reader. It accepts a transaction held by the existing
++// trusted Worker, not an identity proof from an HTTP caller.
++import type { CurrentAttemptRead } from "../cabinet-entry-decision.ts";
++import { own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++
++const MAX_SERIES = 1_000;
++const maxTime = 8_640_000_000_000_000;
++const id = (x: unknown): x is string => typeof x === "string" && x.length === 36 &&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x);
++const time = (x: unknown): x is number =>
++  typeof x === "number" && Number.isSafeInteger(x) && x >= 0 && x <= maxTime;
++const positiveIntegerText = (x: unknown): number | null => {
++  if (typeof x !== "string" || !/^[1-9][0-9]{0,15}$/.test(x)) return null;
++  const n = Number(x);
++  return Number.isSafeInteger(n) ? n : null;
++};
++
++type Projection = Readonly<{
++  personId: string;
++  atMs: number;
++  rows: readonly CurrentAttemptRead[] | null;
++}>;
++
++// Clock and projections belong to one statement. The scoped-person anchor
++// distinguishes invalid transaction phase/identity from a proven empty result.
++// LEFT JOIN preserves missing or mismatched attempt evidence as unknown.
++const read = `
++WITH cabinet_scope AS MATERIALIZED (
++  SELECT p.id, floor(extract(epoch FROM pg_catalog.clock_timestamp())*1000)::text AS now_ms
++  FROM ua_private.people AS p
++  WHERE p.id = $1::uuid AND p.enabled IS TRUE
++    AND pg_catalog.current_setting('ua.phase', true) = 'domain'
++    AND pg_catalog.current_setting('ua.person_id', true) = p.id::text
++    AND pg_catalog.current_setting('ua.person_ids', true)::jsonb = pg_catalog.jsonb_build_array(p.id::text)
++    AND pg_catalog.current_setting('ua.telegram_id', true) = ''
++    AND pg_catalog.current_setting('ua.clerk_issuer', true) = $2
++    AND pg_catalog.current_setting('ua.clerk_subject', true) = $3
++    AND EXISTS (
++      SELECT 1 FROM ua_private.clerk_identities AS i
++      WHERE i.person_id = p.id AND i.issuer = $2 AND i.subject = $3 AND i.enabled IS TRUE
++    )
++)
++SELECT c.now_ms, s.id::text AS series_id, s.demo_id::text AS demo_id, s.current_attempt_id::text AS current_attempt_id,
++       s.generation::text AS series_generation,
++       a.id::text AS attempt_id, a.person_id::text AS attempt_person_id, a.demo_id::text AS attempt_demo_id,
++       a.generation::text AS attempt_generation,
++       a.body->>'id' AS body_id, a.body->>'personId' AS body_person_id,
++       a.body->'generation' AS body_generation, a.body->'startedAt' AS started_at,
++       a.body->'deadlineAt' AS deadline_at, a.body->>'status' AS attempt_status
++FROM cabinet_scope AS c
++LEFT JOIN ua_private.exam_series AS s ON s.person_id = c.id
++LEFT JOIN ua_private.attempts AS a ON a.id = s.current_attempt_id AND a.person_id = c.id
++LIMIT 1001`;
++
++type AttemptStatus = NonNullable<CurrentAttemptRead["attempt"]>["status"];
++const statuses: readonly AttemptStatus[] = ["in_progress", "submitted", "expired", "forced", "cancelled"];
++const isStatus = (x: unknown): x is AttemptStatus => (statuses as readonly unknown[]).includes(x);
++
++/**
++ * Mount only after verifying live role/policy parity for both series and
++ * attempts. Without that premise RLS can suppress rows and manufacture an
++ * empty result. Caller must already hold the canonical single-person
++ * transaction in domain phase after validated Clerk-bound family and current
++ * provider liveness. Context labels below check consistency, not authority.
++ */
++export async function readCabinetCurrentSeries(
++  tx: LockedTransaction,
++  binding: Readonly<{ personId: string; issuer: string; subject: string }>,
++  signal: AbortSignal,
++): Promise<Projection> {
++  const { personId, issuer, subject } = binding;
++  const unknown = (atMs = 0): Projection => ({ personId, atMs, rows: null });
++  signal.throwIfAborted();
++  if (!id(personId) || typeof issuer !== "string" || issuer.length > 512 ||
++    !/^https:\/\/[^/\s]+$/.test(issuer) || typeof subject !== "string" ||
++    subject.length > 256 || !/^user_[A-Za-z0-9]+$/.test(subject) ||
++    tx.personIds.length !== 1 || tx.personIds[0] !== personId) return unknown();
++  own(tx, personId);
++  const result = await query(tx, "ua_cabinet_current_series_v1", read, [personId, issuer, subject]);
++  signal.throwIfAborted();
++  const { rows } = result;
++  if (rows.length === 0 || rows.length > MAX_SERIES) return unknown();
++  const atMs = positiveIntegerText(rows[0].now_ms);
++  if (atMs === null || !time(atMs) || rows.some(row => row.now_ms !== rows[0].now_ms)) return unknown();
++  if (rows.length === 1 && rows[0].series_id === null &&
++    rows[0].demo_id === null && rows[0].current_attempt_id === null &&
++    rows[0].series_generation === null && rows[0].attempt_id === null) return { personId, atMs, rows: [] };
++
++  const projected: CurrentAttemptRead[] = [];
++  for (const row of rows) {
++    const generation = positiveIntegerText(row.series_generation);
++    const attemptGeneration = positiveIntegerText(row.attempt_generation);
++    if (!id(row.series_id) || !id(row.demo_id) || !id(row.current_attempt_id) ||
++      generation === null || attemptGeneration !== generation ||
++      row.attempt_id !== row.current_attempt_id || row.attempt_person_id !== personId ||
++      row.attempt_demo_id !== row.demo_id || row.body_id !== row.attempt_id ||
++      row.body_person_id !== personId || row.body_generation !== generation ||
++      !time(row.started_at) || !time(row.deadline_at) || !isStatus(row.attempt_status)) return unknown(atMs);
++    projected.push({ demoId: row.demo_id, currentAttemptId: row.current_attempt_id, generation,
++      attempt: { id: row.current_attempt_id, personId, demoId: row.demo_id, generation, status: row.attempt_status,
++        startedAt: row.started_at, deadlineAt: row.deadline_at } });
++  }
++  return { personId, atMs, rows: projected };
++}
+diff --git a/supabase/functions/univeracademy-api/storage/clerk-domain.ts b/supabase/functions/univeracademy-api/storage/clerk-domain.ts
+index 5461cde5f82a716f579443f4149a45ea1aadf347..d2a8da5c9784269b47775a50b6232365a9cde31c 100644
+--- a/supabase/functions/univeracademy-api/storage/clerk-domain.ts
++++ b/supabase/functions/univeracademy-api/storage/clerk-domain.ts
+@@ -18,6 +18,8 @@ import {StudentIdentityRows} from "./student-identity-rows.ts";
+ import {locateStudent,locateStudentAccessOnClient,locateStudentRefreshOnClient,studentSessionProofs,studentLogoutRefreshDigest} from "./student-scope.ts";
+ import {StaffAccessRows} from "./staff-access-rows.ts";
+ import {StaffFirstTestRows} from "./staff-first-test-rows.ts";
++import type {readAuthorizedCabinetEntry} from "../cabinet-entry-scoped-read.ts";
++import {readCabinetCurrentSeries} from "./cabinet-current-series.ts";
+ import {resetTrustedServerContext,setTrustedPhase,setTrustedClerk,closeTrustedServerContext} from "./trusted-server-context.ts";
+ 
+ function emptyStudent():StudentState{return{people:{},families:{},access:{},refresh:{},consumedInitData:{},grants:{},assignments:{},series:{},attempts:{},receipts:{},bonuses:{},cancellations:{}};}
+@@ -42,6 +44,139 @@ async function fresh(tx:LockedTransaction){
+ type Options={pool:PgPool;request:Request;botToken?:string;sessionPolicy:SessionPolicy;now:()=>number;liveness:ClerkLiveness;verifier?:ClerkVerifierConfiguration;
+   staff?:{validate:(name:string,value:unknown)=>boolean;newAssignmentId:()=>string}};
+ 
++type CabinetReaders=Parameters<typeof readAuthorizedCabinetEntry>[2];
++type CabinetScope=NonNullable<Awaited<ReturnType<CabinetReaders["verifyCurrent"]>>>;
++type CabinetBinding=CabinetScope["binding"];
++type CabinetHttpScope=Readonly<{request:Request;signal:AbortSignal;accessToken:string;pool:PgPool;
++  clerk:Readonly<{verifier:ClerkVerifierConfiguration;liveness:ClerkLiveness}>}>;
++type CabinetStaffRead=(tx:LockedTransaction,token:string,binding:CabinetBinding,signal:AbortSignal)=>
++  ReturnType<CabinetReaders["readStaff"]>;
++const sameCabinetBinding=(a:CabinetBinding,b:CabinetBinding)=>
++  a.personId===b.personId&&a.familyId===b.familyId&&a.issuer===b.issuer&&
++  a.subject===b.subject&&a.sessionId===b.sessionId;
++
++/**
++ * Unmounted Worker composition. Install only after the isolated staff capability
++ * reader's ACL and current series/attempt RLS policies are verified for the
++ * real connection. The flag is supplied by reviewed server composition, never
++ * env/request input. This module issues no SQL privileges or database writes.
++ */
++export function createCabinetReadersTransaction(options:{
++  readStaffCapability?:CabinetStaffRead;currentAttemptPolicyVerified?:true;
++}={}){
++  const readStaffCapability=options.readStaffCapability;
++  const policyVerified=options.currentAttemptPolicyVerified===true;
++  return async function withCabinetReaders<T>(
++    {request,signal,accessToken,pool,clerk}:CabinetHttpScope,
++    use:(readers:CabinetReaders)=>Promise<T>,
++  ):Promise<T>{
++    const url=new URL(request.url);
++    if(!policyVerified||typeof readStaffCapability!=="function"||request.method!=="GET"||
++      url.pathname!=="/api/v1/me/cabinet-access"||request.url.includes("?")||
++      typeof clerk?.verifier?.now!=="function"||typeof clerk?.liveness!=="function"||
++      typeof accessToken!=="string"||!/^[0-9a-f]{64}$/.test(accessToken)||bearer(request)!==accessToken)fail("SERVICE_UNAVAILABLE",503);
++    const assertActive=()=>{if(signal.aborted||request.signal.aborted)fail("SERVICE_UNAVAILABLE",503);};
++    assertActive();
++    const digest=await proofHash(accessToken);
++    assertActive();
++    let locked:LockedTransaction|undefined,checkedAt=0,providerExpiry:number|undefined,
++      appExpiry:number|undefined,verifiedCount=0,finished=false;
++    const checkLease=()=>{
++      assertActive();
++      const now=clerk.verifier.now();
++      if(!locked||!Number.isSafeInteger(now)||now<checkedAt||now<locked.now||
++        providerExpiry===undefined||appExpiry===undefined)fail("SERVICE_UNAVAILABLE",503);
++      if(now>=providerExpiry)fail("CLERK_SESSION_REVOKED",401);
++      if(now>=appExpiry)fail("APP_SESSION_EXPIRED",401);
++    };
++    const restrictProviderExpiry=(value:number)=>{
++      if(!Number.isSafeInteger(value)||value<0)fail("SERVICE_UNAVAILABLE",503);
++      providerExpiry=providerExpiry===undefined?value:Math.min(providerExpiry,value);
++    };
++    return new PostgresTransactions(pool).runPrepared({
++      prepare:async client=>{
++        assertActive();
++        const hint=await locateStudentAccessOnClient(client,digest);
++        assertActive();
++        if(hint.kind!=="person")fail("SESSION_REVOKED",401);
++        return [hint.personId];
++      },
++      beforeCommit:()=>{
++        if(!finished||verifiedCount!==2)fail("SERVICE_UNAVAILABLE",503);
++        checkLease();
++      },
++    },async tx=>{
++      locked=tx;
++      const personId=tx.personIds[0],rows=new ClerkAuthRows();
++      if(tx.personIds.length!==1)fail("RESPONSE_INVARIANT_FAILED",500);
++      let bound:CabinetBinding|undefined,inDomain=false,open=true,verifying=false;
++      const requireBinding=(expected:CabinetBinding,requestSignal:AbortSignal)=>{
++        if(!open||requestSignal!==signal||!inDomain||!bound||verifiedCount!==1||
++          !sameCabinetBinding(expected,bound))fail("SERVICE_UNAVAILABLE",503);
++        checkLease();
++        return bound;
++      };
++      try{
++        const value=await use({
++          verifyCurrent:async(token,requestSignal)=>{
++            if(!open||verifying||requestSignal!==signal||token!==accessToken||verifiedCount>=2)
++              fail("SERVICE_UNAVAILABLE",503);
++            verifying=true;
++            try{
++              assertActive();
++              const now=await fresh(tx);
++              const auth=await rows.load({client:tx.client,personId,existing:true,now});
++              const state=combined(auth);
++              const student=state.domain.student;
++              const current=await authenticate(student,token,await fresh(tx));
++              if(current.personId!==personId)fail("SESSION_REVOKED",401);
++              const family=student.families[current.familyId],identity=state.familyBindings[current.familyId];
++              if(family?.authProvider!=="clerk"||!identity)fail("SESSION_REVOKED",401);
++              const next=Object.freeze({personId,familyId:current.familyId,issuer:identity.issuer,
++                subject:identity.userId,sessionId:identity.sessionId});
++              if(bound&&!sameCabinetBinding(bound,next))fail("SESSION_REVOKED",401);
++              const access=student.access[digest];
++              if(!access||access.familyId!==current.familyId)fail("SESSION_REVOKED",401);
++              const expires=Math.min(family.expiresAt,access.expiresAt);
++              appExpiry=appExpiry===undefined?expires:Math.min(appExpiry,expires);
++              checkedAt=await guardBoundFamily({state,now:()=>tx.now,restrictProviderExpiry},request,"",{
++                verifier:clerk.verifier,liveness:(id,at)=>clerk.liveness(id,at,{signal}),signal,
++              });
++              await fresh(tx);checkLease();
++              if(!inDomain){
++                await setTrustedClerk(tx.client,next.issuer,next.subject);
++                await setTrustedPhase(tx.client,"domain");
++                await fresh(tx);checkLease();inDomain=true;
++              }
++              bound=next;verifiedCount++;
++              const person=student.people[personId];
++              if(!person)fail("SESSION_REVOKED",401);
++              return {auth:{personId,person},binding:next};
++            }finally{verifying=false;}
++          },
++          readStaff:async(token,expected,requestSignal)=>{
++            if(token!==accessToken)fail("SESSION_REVOKED",401);
++            const binding=requireBinding(expected,requestSignal);
++            const staff=await readStaffCapability(tx,token,binding,signal);
++            checkLease();
++            return staff;
++          },
++          readCurrentSeries:async(expected,requestSignal)=>{
++            const binding=requireBinding(expected,requestSignal);
++            const attempt=await readCabinetCurrentSeries(tx,binding,signal);
++            checkLease();
++            return attempt;
++          },
++        });
++        checkLease();
++        if(verifiedCount!==2)fail("SERVICE_UNAVAILABLE",503);
++        finished=true;
++        return value;
++      }finally{open=false;}
++    });
++  };
++}
++
+ // Request-scoped bridge for the existing handlers and relational row ports.
+ // No whole-database snapshot, RAM fallback, provider constructor or SQL execution
+ // outside the explicitly injected transaction client.
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-assigned-catalog.ts b/supabase/functions/univeracademy-api/storage/teacher-assigned-catalog.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..be97a02b3e95ea1b14a875a42ac41a6268814352
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/teacher-assigned-catalog.ts
+@@ -0,0 +1,109 @@
++// Review-only subset. Not a TeacherBootstrap metadata provider.
++import { fail } from "../fault.ts";
++import { own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++
++type VerifiedScope = Readonly<{
++  personId: string;
++  issuer: string;
++  subject: string;
++  groupIds: readonly string[];
++  subjectIds: readonly string[];
++}>;
++type Group = Readonly<{id:string;status:"active"|"archived"}>;
++type Assignment = Readonly<{assignmentId:string;groupId:string;demoId:string;versionId:string;subjectId:string;demoTitle:string}>;
++type PartialCatalog = Readonly<{
++  kind:"partial";
++  groups:readonly Group[];
++  assignedDemos:readonly Assignment[];
++  missing:readonly ["group_titles","subject_titles","teacher_listing_policy"];
++}>;
++
++const uuid=(v:unknown):v is string=>typeof v==="string"&&v.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
++const label=(v:unknown):v is string=>typeof v==="string"&&v.length<=200&&v.trim().length>0;
++const MAX_GROUPS=500, MAX_SUBJECTS=100, MAX_ASSIGNMENTS=500;
++
++// Active Clerk mapping, enabled person and approved Teacher are repeated as
++// consistency checks; this cannot replace the verified outer Clerk lease.
++const scopeSql=`
++WITH actor AS MATERIALIZED (
++  SELECT p.id FROM ua_private.people p
++  JOIN ua_private.clerk_identities i ON i.person_id=p.id
++  JOIN ua_private.staff_access a ON a.person_id=p.id
++  WHERE p.id=$1::uuid AND p.enabled IS TRUE AND i.enabled IS TRUE
++    AND i.issuer=$2 AND i.subject=$3 AND 'teacher'=ANY(p.roles) AND a.approved IS TRUE
++), owned AS MATERIALIZED (
++  SELECT s.group_id FROM ua_private.staff_group_scope s
++  JOIN actor ON actor.id=s.person_id WHERE s.revoked_at_ms IS NULL
++), approved AS MATERIALIZED (
++  SELECT s.subject_id FROM ua_private.teacher_subject_approvals s
++  JOIN actor ON actor.id=s.person_id WHERE s.approved IS TRUE AND s.revoked_at_ms IS NULL
++)
++SELECT
++  EXISTS(SELECT 1 FROM actor) AS has_actor,
++  ARRAY(SELECT g.group_id::text FROM owned g ORDER BY g.group_id LIMIT 501) AS actual_groups,
++  ARRAY(SELECT s.subject_id FROM approved s ORDER BY s.subject_id LIMIT 101) AS actual_subjects,
++  (SELECT coalesce(jsonb_agg(row_data),'[]'::jsonb) FROM (
++    SELECT o.group_id::text AS id, g.status FROM owned o
++    LEFT JOIN ua_private.groups g ON g.id=o.group_id ORDER BY o.group_id LIMIT 501
++  ) row_data) AS group_rows,
++  (SELECT coalesce(jsonb_agg(row_data),'[]'::jsonb) FROM (
++    SELECT a.id::text AS assignment_id,a.group_id::text AS group_id,a.demo_id::text AS demo_id,
++      a.version_id::text AS version_id,d.subject_id,d.title AS demo_title
++    FROM ua_private.assignments a JOIN owned o ON a.group_id=o.group_id
++    LEFT JOIN ua_private.demos d ON d.id=a.demo_id
++    WHERE d.id IS NULL OR EXISTS(SELECT 1 FROM approved s WHERE s.subject_id=d.subject_id)
++    ORDER BY a.id LIMIT 501
++  ) row_data) AS assignment_rows`;
++
++function bad():never { return fail("RESPONSE_INVARIANT_FAILED",500); }
++function sameSet(actual:unknown,expected:Set<string>):boolean {
++  return Array.isArray(actual)&&actual.length===expected.size&&new Set(actual).size===actual.length&&
++    actual.every(x=>typeof x==="string"&&expected.has(x));
++}
++
++/**
++ * Only an independently verified, live Clerk-backed Teacher reader may call
++ * this in the current single-person lock. Verify exact read-role/RLS behavior
++ * before wiring. An RLS-filtered assignment result is not proof of completeness.
++ * Even valid output is deliberately partial and never marks bootstrap ready.
++ */
++export async function readTeacherAssignedCatalog(tx:LockedTransaction,scope:VerifiedScope,
++  signal:AbortSignal):Promise<PartialCatalog> {
++  signal.throwIfAborted();
++  if(!uuid(scope.personId)||!label(scope.issuer)||!label(scope.subject)||
++     tx.personIds.length!==1||tx.personIds[0]!==scope.personId||
++     !Array.isArray(scope.groupIds)||!Array.isArray(scope.subjectIds)||
++     scope.groupIds.length>MAX_GROUPS||scope.subjectIds.length>MAX_SUBJECTS||!scope.subjectIds.length||
++     !scope.groupIds.every(uuid)||!scope.subjectIds.every(label)) bad();
++  own(tx,scope.personId);
++  const groupSet=new Set(scope.groupIds),subjectSet=new Set(scope.subjectIds);
++  if(groupSet.size!==scope.groupIds.length||subjectSet.size!==scope.subjectIds.length) bad();
++  const result=await query(tx,"ua_teacher_assigned_catalog_v1",scopeSql,[scope.personId,scope.issuer,scope.subject]);
++  signal.throwIfAborted();
++  if(result.rows.length!==1) return bad();
++  const row=result.rows[0];
++  if(row.has_actor!==true) fail("FORBIDDEN",403);
++  if(!sameSet(row.actual_groups,groupSet)||!sameSet(row.actual_subjects,subjectSet)||
++     !Array.isArray(row.group_rows)||row.group_rows.length!==groupSet.size||
++     !Array.isArray(row.assignment_rows)||row.assignment_rows.length>MAX_ASSIGNMENTS) return bad();
++  const groups:Group[]=[],assignedDemos:Assignment[]=[];
++  const seenGroups=new Set<string>(),seenAssignments=new Set<string>();
++  for(const g of row.group_rows as Record<string,unknown>[]) {
++    if(!g||!uuid(g.id)||!groupSet.has(g.id)||seenGroups.has(g.id)||
++       (g.status!=="active"&&g.status!=="archived")) return bad();
++    seenGroups.add(g.id);
++    groups.push(Object.freeze({id:g.id,status:g.status}));
++  }
++  for(const a of row.assignment_rows as Record<string,unknown>[]) {
++    if(!a||!uuid(a.assignment_id)||seenAssignments.has(a.assignment_id)||
++       !uuid(a.group_id)||!seenGroups.has(a.group_id)||!uuid(a.demo_id)||!uuid(a.version_id)||
++       !label(a.subject_id)||!subjectSet.has(a.subject_id)||!label(a.demo_title)) return bad();
++    seenAssignments.add(a.assignment_id);
++    assignedDemos.push(Object.freeze({assignmentId:a.assignment_id,groupId:a.group_id,demoId:a.demo_id,
++      versionId:a.version_id,subjectId:a.subject_id,demoTitle:a.demo_title}));
++  }
++  return Object.freeze({kind:"partial",groups:Object.freeze(groups),assignedDemos:Object.freeze(assignedDemos),
++    missing:Object.freeze(["group_titles","subject_titles","teacher_listing_policy"] as const)});
++}
+diff --git a/supabase/functions/univeracademy-api/teacher-cabinet-bootstrap.ts b/supabase/functions/univeracademy-api/teacher-cabinet-bootstrap.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..93d26f6234dd351505a2c479272b5ed21768669d
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-cabinet-bootstrap.ts
+@@ -0,0 +1,138 @@
++// Internal review adapter. No Worker mount or corresponding privileges exist here.
++import { checkClerkProof, requireLiveClerk } from "./clerk-auth.ts";
++import type { ClerkLiveness, ClerkProof } from "./clerk-auth.ts";
++import { fail } from "./fault.ts";
++import { currentStaff } from "./staff-state.ts";
++import type { StaffAccessRecord } from "./staff-state.ts";
++import { StaffAccessRows } from "./storage/staff-access-rows.ts";
++import type { LockedTransaction } from "./storage/postgres-transaction.ts";
++
++type Row = Readonly<{ id: string; title: string }>;
++type ScopedTest = Row & Readonly<{ groupId: string; subjectId: string }>;
++type ScopedMetadata = Readonly<{
++  personId: string;
++  complete: true;
++  name: string;
++  subjects: readonly Row[];
++  groups: readonly Row[];
++  tests: readonly ScopedTest[];
++}>;
++
++export type TeacherBootstrap = Readonly<{
++  person_id: string;
++  name: string;
++  access: Readonly<{ teacher: true; approved: true; enabled: true }>;
++  subjects: readonly string[];
++  groups: readonly Row[];
++  tests: readonly Row[];
++}>;
++
++type Scope = Readonly<{ personId: string; subjectIds: readonly string[]; groupIds: readonly string[] }>;
++
++type TrustedRead = Readonly<{
++  // Current, matching Clerk proof verified independently for this request.
++  // Never synthesize from Student bearer, cabinet-access, URL data or JWT roles.
++  proof: ClerkProof;
++  liveness: ClerkLiveness;
++  tx: LockedTransaction;
++  signal: AbortSignal;
++  // Uses DB time via the same canonical transaction (fresh on every call).
++  clock: () => Promise<number>;
++  // Outer runner enforces the minimum provider/token expiry at commit, as well
++  // as abort and successful fresh reauthorization. Until wired, mount nothing.
++  restrictLease: (expiresAt: number) => void;
++  // Required authorized storage port. It must prove a complete capped scoped
++  // projection; absence/uncertainty must fail, never be replaced with empty lists.
++  readMetadata: (scope: Scope, signal: AbortSignal) => Promise<ScopedMetadata | null>;
++}>;
++
++function label(x: unknown): x is string {
++  return typeof x === "string" && x.length <= 200 && x.trim().length > 0;
++}
++const uuid = (x: unknown): x is string => typeof x === "string" && x.length === 36 &&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x);
++function malformed(): never { return fail("RESPONSE_INVARIANT_FAILED", 500); }
++
++function scopeFor(s: StaffAccessRecord): Scope {
++  if (!s.roles.includes("teacher") || !s.approvedSubjectIds.length) fail("FORBIDDEN",403);
++  if (!uuid(s.personId) || s.approvedSubjectIds.length > 100 || s.scope.group_ids.length > 500 ||
++    s.approvedSubjectIds.some(id => !label(id)) || s.scope.group_ids.some(id => !uuid(id))) malformed();
++  // Teacher cabinet never promotes another role's owner/all-groups authority.
++  return Object.freeze({personId:s.personId,
++    subjectIds:Object.freeze([...new Set(s.approvedSubjectIds)].sort()),
++    groupIds:Object.freeze([...new Set(s.scope.group_ids)].sort())});
++}
++
++function sameScope(a: Scope, b: Scope): boolean {
++  return a.personId === b.personId && a.subjectIds.length === b.subjectIds.length &&
++    a.groupIds.length === b.groupIds.length && a.subjectIds.every((id, i) => id === b.subjectIds[i]) &&
++    a.groupIds.every((id, i) => id === b.groupIds[i]);
++}
++
++function project(meta: ScopedMetadata, scope: Scope): TeacherBootstrap {
++  if (meta.complete !== true || meta.personId !== scope.personId || !label(meta.name) || !Array.isArray(meta.subjects) ||
++    !Array.isArray(meta.groups) || !Array.isArray(meta.tests) || meta.subjects.length !== scope.subjectIds.length ||
++    meta.groups.length !== scope.groupIds.length || meta.tests.length > 500) malformed();
++
++  const approved = new Set(scope.subjectIds), intendedGroups = new Set(scope.groupIds);
++  const seenSubjects = new Set<string>(), seenGroups = new Set<string>(), seenTests = new Set<string>();
++  const subjects = (meta.subjects as readonly Row[]).map(s => {
++    if (!s || !approved.has(s.id) || seenSubjects.has(s.id) || !label(s.title)) return malformed();
++    seenSubjects.add(s.id);
++    return s.title;
++  });
++  const groups = (meta.groups as readonly Row[]).map(g => {
++    if (!g || !intendedGroups.has(g.id) || seenGroups.has(g.id) || !label(g.title)) return malformed();
++    seenGroups.add(g.id);
++    return Object.freeze({id:g.id,title:g.title});
++  });
++  const tests = (meta.tests as readonly ScopedTest[]).map(t => {
++    if (!t || !uuid(t.id) || seenTests.has(t.id) || !seenGroups.has(t.groupId) ||
++      !approved.has(t.subjectId) || !label(t.title)) return malformed();
++    seenTests.add(t.id);
++    return Object.freeze({id:t.id,title:t.title});
++  });
++  return Object.freeze({person_id:scope.personId,name:meta.name,
++    access:Object.freeze({teacher:true as const,approved:true as const,enabled:true as const}),
++    subjects:Object.freeze(subjects),groups:Object.freeze(groups),tests:Object.freeze(tests)});
++}
++
++export async function readTeacherCabinetBootstrap(deps: TrustedRead): Promise<TeacherBootstrap> {
++  const {proof,tx,signal}=deps;
++  const personId=tx.personIds[0];
++  if (tx.personIds.length !== 1 || !uuid(personId)) fail("SERVICE_UNAVAILABLE",503);
++  const authRows=new StaffAccessRows();
++  let lastClock=-1, deadline=proof.expiresAt;
++  const now=async()=>{
++    signal.throwIfAborted();
++    const value=await deps.clock();
++    signal.throwIfAborted();
++    if (!Number.isSafeInteger(value) || value < tx.now || value < lastClock) fail("SERVICE_UNAVAILABLE",503);
++    lastClock=value;
++    checkClerkProof(proof,value);
++    if(value>=deadline) fail("CLERK_SESSION_REVOKED",401);
++    return value;
++  };
++  const verify=async()=>{
++    const checkedAt=await now();
++    const expires=await requireLiveClerk(proof,checkedAt,(identity,t)=>deps.liveness(identity,t,{signal}));
++    signal.throwIfAborted();
++    deadline=Math.min(deadline,expires);
++    deps.restrictLease(deadline);
++    const dbStaff=await authRows.load(tx,{issuer:proof.issuer,subject:proof.userId},personId,"clerk");
++    const staff=currentStaff({staff:{[proof.userId]:dbStaff}},
++      {kind:"staff_verified",subject:proof.userId,notBefore:proof.notBefore,expiresAt:proof.expiresAt},await now());
++    if(staff.personId!==personId) malformed();
++    return scopeFor(staff);
++  };
++  const scoped=await verify();
++  const meta=await deps.readMetadata(scoped,signal);
++  signal.throwIfAborted();
++  if(!meta) fail("SERVICE_UNAVAILABLE",503);
++  // Detach only presentational fields before another await; never propagate raw SQL rows.
++  const response=project(meta,scoped);
++  const current=await verify();
++  if(!sameScope(scoped,current)) fail("FORBIDDEN",403);
++  await now();
++  return response;
++}

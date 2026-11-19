@@ -1,0 +1,131 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts b/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts
+new file mode 100644
+index 0000000..5b20902
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts
+@@ -0,0 +1,125 @@
++// Unmounted single-group pilot only. No transport, storage writer or group creation.
++import { fail } from "./fault.ts";
++import { currentStaff, nextRevision } from "./staff-state.ts";
++import type { StaffState, VerifiedStaffProof } from "./staff-state.ts";
++
++type Target=Readonly<{id:string;revision:number;status:"active"|"archived"}>;
++type Snapshot=Readonly<{
++  personId:string;publicId:string;enabled:boolean;registeredStudent:boolean;
++  membership:Readonly<{affinityGroupId:string|null;active:boolean;revision:number;epoch:number}>;
++  profileActiveGroupId:string|null;activeGroupName:string|null;
++  grantEvidence:"none"|"present"|"unknown";liveAttempt:"none"|"present"|"unknown";
++}>;
++type Context=Readonly<{
++  state:Pick<StaffState,"staff">;proof:VerifiedStaffProof;nowMs:number;
++  lockedPersonIds:readonly string[];lockedGroupIds:readonly string[];
++  // Existing real pilot group configured explicitly by Owner, never derived
++  // from a default, browser choice, subject label or input ID alone.
++  configuredPilotGroupId:string; configuredPilotSubjectId:string; target:Target;
++}>;
++type Confirmation=Readonly<{
++  actorId:string;studentId:string;groupId:string;expiresAt:number;
++  groupRevision:number;membershipRevision:number;membershipEpoch:number;
++}>;
++type PreviewPorts=Readonly<{
++  consumeLookupQuota(actorId:string,signal:AbortSignal):Promise<void>;
++  readExactPublicId(id:string,signal:AbortSignal):Promise<Snapshot|null>;
++  issueOpaqueConfirmation(binding:Confirmation,signal:AbortSignal):Promise<string>;
++}>;
++type ConfirmPorts=Readonly<{
++  verifyOpaqueConfirmation(handle:string,signal:AbortSignal):Promise<Confirmation|null>;
++  readCurrentLockedStudent(personId:string,signal:AbortSignal):Promise<Snapshot|null>;
++}>;
++type Decision=Readonly<{kind:"already_member"}>|Readonly<{
++  kind:"initial_membership";studentId:string;groupId:string;
++  expected:Readonly<{groupRevision:number;membershipRevision:number;membershipEpoch:number}>;
++  next:Readonly<{groupRevision:number;membershipRevision:number;membershipEpoch:number;
++    affinityGroupId:string;active:true;profileActiveGroupId:string}>;
++}>;
++
++const uuid=(v:unknown):v is string=>typeof v==="string"&&v.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
++const counter=(v:unknown):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0;
++const label=(v:unknown):v is string=>typeof v==="string"&&v.length<=200&&!!v.trim()&&
++  !/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(v);
++const handle=(v:unknown):v is string=>typeof v==="string"&&v.length===43&&!/[^A-Za-z0-9_-]/.test(v);
++const unavailable=():never=>fail("SERVICE_UNAVAILABLE",503);
++
++function publicId(input:unknown):string{
++  const value=typeof input==="number"&&Number.isSafeInteger(input)&&input>=1_000_000_000&&input<=9_999_999_999
++    ?String(input):input;
++  if(typeof value!=="string"||value.length!==10||/[^0-9]/.test(value)) fail("NOT_FOUND",404);
++  return value;
++}
++
++function currentTeacher(c:Context):string{
++  if(!counter(c.nowMs)||!uuid(c.configuredPilotGroupId)||!label(c.configuredPilotSubjectId)||
++    c.configuredPilotSubjectId!==c.configuredPilotSubjectId.trim()) return unavailable();
++  const a=currentStaff(c.state,c.proof,c.nowMs);
++  if(!a.roles.includes("teacher")||!a.approvedSubjectIds.includes(c.configuredPilotSubjectId)) fail("FORBIDDEN",403);
++  const group=c.target?.id;
++  if(group!==c.configuredPilotGroupId||!a.scope.group_ids.includes(group)||c.target.status!=="active")
++    fail("NOT_FOUND",404);
++  if(!uuid(a.personId)||!c.lockedPersonIds.includes(a.personId)||!c.lockedGroupIds.includes(group)||
++    !counter(c.target.revision)) return unavailable();
++  return a.personId;
++}
++
++function canonical(s:Snapshot|null,expectedPerson?:string):Snapshot{
++  if(!s||s.enabled!==true||s.registeredStudent!==true) fail("NOT_FOUND",404);
++  if(!uuid(s.personId)||(expectedPerson!==undefined&&expectedPerson!==s.personId)||!s.membership)
++    return unavailable();
++  const {affinityGroupId,active,revision,epoch}=s.membership;
++  if(typeof active!=="boolean"||!counter(revision)||!counter(epoch)||
++    (affinityGroupId!==null&&!uuid(affinityGroupId))||(active&&affinityGroupId===null)||
++    s.profileActiveGroupId!==(active?affinityGroupId:null)||
++    (active&&!label(s.activeGroupName))||(!active&&s.activeGroupName!==null)) return unavailable();
++  return s;
++}
++
++export async function previewTeacherPilotAdd(value:unknown,c:Context,signal:AbortSignal,ports?:PreviewPorts):
++  Promise<Readonly<{group_names:readonly string[];confirmation:string|null}>>{
++  signal.throwIfAborted();
++  if(!ports) return unavailable();
++  const actorId=currentTeacher(c),{id:groupId,revision:groupRevision}=c.target;
++  await ports.consumeLookupQuota(actorId,signal);signal.throwIfAborted();
++  const exact=publicId(value);
++  const selected=await ports.readExactPublicId(exact,signal);signal.throwIfAborted();
++  if(!selected||selected.publicId!==exact) fail("NOT_FOUND",404);
++  const s=canonical(selected);
++  const names=Object.freeze(s.activeGroupName===null?[]:[s.activeGroupName]);
++  // Do not mint permission to transfer or re-add a previously placed Student.
++  if(s.membership.affinityGroupId!==null||s.grantEvidence!=="none"||s.liveAttempt!=="none")
++    return Object.freeze({group_names:names,confirmation:null});
++  const expiresAt=c.nowMs+120_000;
++  if(!counter(expiresAt)) return unavailable();
++  const confirmation=await ports.issueOpaqueConfirmation(Object.freeze({actorId,studentId:s.personId,groupId,
++    expiresAt,groupRevision,membershipRevision:s.membership.revision,membershipEpoch:s.membership.epoch}),signal);
++  signal.throwIfAborted();
++  if(!handle(confirmation)) return unavailable();
++  return Object.freeze({group_names:names,confirmation});
++}
++
++export async function recheckTeacherPilotAdd(value:unknown,c:Context,signal:AbortSignal,ports?:ConfirmPorts):Promise<Decision>{
++  signal.throwIfAborted();
++  if(!ports) return unavailable();
++  const actorId=currentTeacher(c);
++  if(!handle(value)) fail("NOT_FOUND",404);
++  const permit=await ports.verifyOpaqueConfirmation(value,signal);signal.throwIfAborted();
++  if(!permit||permit.actorId!==actorId||permit.groupId!==c.target.id||!uuid(permit.studentId)||
++    !counter(permit.expiresAt)||c.nowMs>=permit.expiresAt||!c.lockedPersonIds.includes(permit.studentId))
++    fail("NOT_FOUND",404);
++  const s=canonical(await ports.readCurrentLockedStudent(permit.studentId,signal),permit.studentId);
++  signal.throwIfAborted();
++  const m=s.membership;
++  if(m.active&&m.affinityGroupId===permit.groupId) return Object.freeze({kind:"already_member"});
++  if(m.active||m.affinityGroupId!==null) fail("MEMBERSHIP_STATE_CONFLICT",409);
++  if(m.revision!==permit.membershipRevision||m.epoch!==permit.membershipEpoch||
++    c.target.revision!==permit.groupRevision) fail("STATE_REVISION_CONFLICT",409);
++  if(s.grantEvidence!=="none"||s.liveAttempt!=="none") return unavailable();
++  return Object.freeze({kind:"initial_membership",studentId:s.personId,groupId:permit.groupId,
++    expected:Object.freeze({groupRevision:permit.groupRevision,membershipRevision:m.revision,membershipEpoch:m.epoch}),
++    next:Object.freeze({groupRevision:nextRevision(c.target.revision),membershipRevision:nextRevision(m.revision),
++      membershipEpoch:nextRevision(m.epoch),affinityGroupId:permit.groupId,active:true as const,
++      profileActiveGroupId:permit.groupId})});
++}

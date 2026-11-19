@@ -1,0 +1,55 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-pilot-create-draft.ts b/supabase/functions/univeracademy-api/teacher-pilot-create-draft.ts
+new file mode 100644
+index 0000000..82c25af
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-pilot-create-draft.ts
+@@ -0,0 +1,49 @@
++import { fail } from "./fault.ts";
++import type { DraftRecord, StaffAccessRecord, Version } from "./staff-state.ts";
++
++const serverUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
++
++export type FirstDraftIntent = {
++  demo: { id: string; subjectId: string; title: string };
++  draft: DraftRecord;
++};
++
++// Unmounted. Load current Teacher under the existing live Clerk/person lock.
++// Resolve the exact pilot subject from trusted owner config, never from the form.
++// Check the authoritative receipt before allocating server UUIDs; only call this
++// for a new command, in the same transaction that would persist its receipt.
++export function prepareTeacherPilotFirstDraft(
++  actor: StaffAccessRecord,
++  pilotSubjectId: string | undefined,
++  reservedServerIds: Readonly<{ demoId: string; versionId: string }>,
++  input: unknown,
++  validateVersion: (schema: "Version", wire: Version) => boolean,
++): FirstDraftIntent {
++  if (!pilotSubjectId || pilotSubjectId.trim() !== pilotSubjectId) fail("SERVICE_UNAVAILABLE", 503);
++  if (!actor.enabled || !actor.approved || !actor.roles.includes("teacher") ||
++      !actor.approvedSubjectIds.includes(pilotSubjectId)) fail("FORBIDDEN", 403);
++  if (!input || typeof input !== "object" || Array.isArray(input)) fail("VALIDATION_ERROR", 422);
++  const payload = input as Record<string, unknown>;
++  if (Object.keys(payload).length !== 3 || !Object.hasOwn(payload, "title") ||
++      !Object.hasOwn(payload, "duration_seconds") || !Object.hasOwn(payload, "individual_enabled") ||
++      typeof payload.title !== "string" || typeof payload.duration_seconds !== "number" ||
++      !Number.isSafeInteger(payload.duration_seconds) || payload.duration_seconds <= 0 ||
++      !Number.isSafeInteger(payload.duration_seconds * 1000) || payload.individual_enabled !== false)
++    fail("VALIDATION_ERROR", 422);
++  const title = payload.title.trim();
++  if (!title || Array.from(title).length > 160 || /[\p{Cc}\p{Cs}]/u.test(title)) fail("VALIDATION_ERROR", 422);
++
++  const { demoId, versionId } = reservedServerIds;
++  if (!serverUuid.test(demoId) || !serverUuid.test(versionId) || demoId === versionId)
++    fail("RESPONSE_INVARIANT_FAILED", 500);
++  const wire: Version = {
++    id: versionId, demo_id: demoId, version_no: 1, status: "draft", revision: 1,
++    duration_seconds: payload.duration_seconds, instructions_blocks: [],
++    grading_config: { individual_enabled: false },
++  };
++  if (!validateVersion("Version", wire)) fail("VALIDATION_ERROR", 422);
++  return {
++    demo: { id: demoId, subjectId: pilotSubjectId, title },
++    draft: { subjectId: pilotSubjectId, wire, questionIds: [], questions: {} },
++  };
++}

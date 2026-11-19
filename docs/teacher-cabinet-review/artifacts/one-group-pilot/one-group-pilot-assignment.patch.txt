@@ -1,0 +1,98 @@
+diff --git a/supabase/functions/univeracademy-api/pilot-provisioning.ts b/supabase/functions/univeracademy-api/pilot-provisioning.ts
+index 1a4374bf0fae7a8d45c0ce4a1d7a03f593fb56dc..80ea00aa56e597902cefa4e3e4b8316788a45a89 100644
+--- a/supabase/functions/univeracademy-api/pilot-provisioning.ts
++++ b/supabase/functions/univeracademy-api/pilot-provisioning.ts
+@@ -1,5 +1,5 @@
+ import { fail } from "./fault.ts";
+-import { groupScope, nextRevision, owner, requireRosterAuthority } from "./staff-state.ts";
++import { groupScope, nextRevision, requirePilotAssignmentAuthority, requireRosterAuthority } from "./staff-state.ts";
+ import type { Assignment, AssignmentCreate, DraftRecord, MemberWrite, MembershipMutation, StaffAccessRecord, StaffState } from "./staff-state.ts";
+ import type { AssignmentRecord } from "./student-state.ts";
+ 
+@@ -86,15 +86,11 @@ export function isProtectedNextMidnight(opensAt: number, closesAt: number, timez
+ 
+ export function createPilotAssignment(state: StaffState, staff: StaffAccessRecord, body: AssignmentCreate,
+   key: string, payload: string, now: number, assignmentId: () => string): Assignment {
+-  // User-confirmed policy A: test management authorizes assignment; roster is separate.
+-  if (!owner(staff)) {
+-    if (!staff.roles.includes("admin")) fail("SERVICE_UNAVAILABLE", 503); // Teacher delegation is a later step.
+-    if (!staff.capabilities.manage_content) fail("CAPABILITY_REQUIRED", 403);
+-  }
++  // Test management grants assignment only. Roster operations stay separate.
+   const group = state.groups[body.group_id], version = state.versions[body.version_id];
+-  if (!group || group.status !== "active" || !version || version.wire.demo_id !== body.demo_id ||
+-      !groupScope(staff, body.group_id) || (!owner(staff) && !staff.scope.all_subjects &&
+-      !staff.scope.subject_ids.includes(version.subjectId))) fail("NOT_FOUND", 404);
++  if (!group || group.status !== "active" || !version || version.wire.demo_id !== body.demo_id)
++    fail("NOT_FOUND", 404);
++  const assignmentAuthority = requirePilotAssignmentAuthority(staff, body.group_id, version.subjectId);
+   const prior = state.receipts[key];
+   if (prior) {
+     if (prior.payload !== payload) fail("IDEMPOTENCY_CONFLICT", 409);
+@@ -102,8 +98,11 @@ export function createPilotAssignment(state: StaffState, staff: StaffAccessRecor
+     return structuredClone(prior.assignment);
+   }
+   if (version.wire.status !== "published") fail("VERSION_FROZEN", 409);
++  if (assignmentAuthority === "teacher" && !version.publishedSnapshot)
++    fail("SERVICE_UNAVAILABLE", 503);
+   const opensAt = Date.parse(body.opens_at), closesAt = Date.parse(body.closes_at);
+-  if (!isProtectedNextMidnight(opensAt, closesAt, body.timezone)) fail("INVALID_TIME_WINDOW", 422);
++  if ((assignmentAuthority === "teacher" && body.timezone !== "Asia/Tashkent") ||
++      !isProtectedNextMidnight(opensAt, closesAt, body.timezone)) fail("INVALID_TIME_WINDOW", 422);
+   if (body.reminder_lead_seconds !== null || body.review_policy !== "teacher_approval") fail("SERVICE_UNAVAILABLE", 503);
+   if (new Set(body.student_ids.map((v) => v.toLowerCase())).size !== body.student_ids.length) fail("VALIDATION_ERROR", 422);
+   for (const id of body.student_ids) {
+diff --git a/supabase/functions/univeracademy-api/staff-state.ts b/supabase/functions/univeracademy-api/staff-state.ts
+index 120ac3d123bcecab73f85243d0f7d582fee28542..c0661fc3d0c9291e92ae29a0c06a65094bef3f41 100644
+--- a/supabase/functions/univeracademy-api/staff-state.ts
++++ b/supabase/functions/univeracademy-api/staff-state.ts
+@@ -88,6 +88,22 @@ export function canWriteContent(staff: StaffAccessRecord, subjectId: string): bo
+     (staff.roles.includes("admin") && staff.capabilities.manage_content &&
+       (staff.scope.all_subjects || staff.scope.subject_ids.includes(subjectId)));
+ }
++// One-group pilot, after current staff authentication. Existing Admin/Owner
++// authority stays independent. Teacher needs an explicit own-group grant and
++// approved subject; tenant-wide scope flags never replace that Teacher grant.
++export function requirePilotAssignmentAuthority(staff: StaffAccessRecord, groupId: string,
++  subjectId: string): "owner" | "admin" | "teacher" {
++  if (!staff.enabled || !staff.approved) fail("FORBIDDEN", 403);
++  if (owner(staff)) return "owner";
++  const admin = staff.roles.includes("admin"), teacher = staff.roles.includes("teacher");
++  if (admin && staff.capabilities.manage_content && groupScope(staff, groupId) &&
++      (staff.scope.all_subjects || staff.scope.subject_ids.includes(subjectId))) return "admin";
++  if (teacher && staff.scope.group_ids.includes(groupId) &&
++      staff.approvedSubjectIds.includes(subjectId)) return "teacher";
++  if (!admin && !teacher) fail("FORBIDDEN", 403);
++  if (admin && !staff.capabilities.manage_content) fail("CAPABILITY_REQUIRED", 403);
++  return fail("NOT_FOUND", 404);
++}
+ export function nextRevision(value: number): number {
+   if (!Number.isSafeInteger(value) || value < 0 || value === Number.MAX_SAFE_INTEGER) fail("SERVICE_UNAVAILABLE", 503);
+   return value + 1;
+diff --git a/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts b/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts
+index d2e067d0d9e0a2d43eca9bdaefa8012a67cf0c69..d3e93160cd1e848a0cc29b0457e9bd51ff7debb9 100644
+--- a/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts
++++ b/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts
+@@ -1,6 +1,6 @@
+ import { fail } from "../fault.ts";
+ import { parseStaffJson } from "../staff-json.ts";
+-import { canWriteContent, groupScope, owner, requireRosterAuthority } from "../staff-state.ts";
++import { canWriteContent, groupScope, owner, requirePilotAssignmentAuthority, requireRosterAuthority } from "../staff-state.ts";
+ import type { AuthoredQuestion, DraftRecord, StaffAccessRecord, StaffState, Version } from "../staff-state.ts";
+ import type { AssignmentRecord, Person, StudentState } from "../student-state.ts";
+ import { decodePublished, encodePublished } from "./attempt-rows.ts";
+@@ -86,11 +86,9 @@ FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE
+     const c = this.command, subject = this.version?.subject_id as string;
+     if (c.kind === "member") requireRosterAuthority(actor);
+     else if (c.kind === "assignment") {
+-      if (!owner(actor)) {
+-        if (!actor.roles.includes("admin")) fail("SERVICE_UNAVAILABLE", 503);
+-        if (!actor.capabilities.manage_content) fail("CAPABILITY_REQUIRED", 403);
+-        if (!actor.scope.all_subjects && !actor.scope.subject_ids.includes(subject)) fail("NOT_FOUND", 404);
+-      }
++      if (!c.groupId || !this.group || this.group.status !== "active" ||
++          typeof subject !== "string" || !subject) fail("NOT_FOUND", 404);
++      requirePilotAssignmentAuthority(actor, c.groupId, subject);
+     } else if (c.kind === "metadata") {
+       if (!canWriteContent(actor, subject)) fail("NOT_FOUND", 404);
+     } else if (!owner(actor)) {

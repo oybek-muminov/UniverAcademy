@@ -1,0 +1,157 @@
+diff --git a/apps/mini-app/src/cabinet-access-transport.ts b/apps/mini-app/src/cabinet-access-transport.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5af4d7fc2ce5e1c2802783bc4b93fd76a01904c
+--- /dev/null
++++ b/apps/mini-app/src/cabinet-access-transport.ts
+@@ -0,0 +1,74 @@
++export type CabinetAccess = Readonly<{person_id:string;default_cabinet:'student'|'teacher'}>;
++
++type ReadInput=Readonly<{apiBaseUrl:string;fetcher:(request:Request)=>Promise<Response>;
++  personId:string;access:string;signal:AbortSignal}>;
++
++const responseLimit=2048;
++const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++const exact=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>{
++  if(value===null||typeof value!=='object'||Object.getPrototypeOf(value)!==Object.prototype)return false;
++  const actual=Reflect.ownKeys(value);
++  return actual.length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
++};
++function releaseBody(response:Response){
++  // Do not wait on an untrusted stream cancellation promise.
++  try{void response.body?.cancel().catch(()=>{});}catch{}
++}
++
++async function document(response:Response,signal:AbortSignal):Promise<unknown>{
++  const reader=response.body?.getReader();
++  if(!reader)return null;
++  const cancel=()=>{try{void reader.cancel().catch(()=>{});}catch{}};
++  signal.addEventListener('abort',cancel,{once:true});
++  const bytes=new Uint8Array(responseLimit);
++  let length=0,done=false;
++  try{
++    while(!signal.aborted){
++      const part=await reader.read();
++      if(signal.aborted)return null;
++      if(part.done){done=true;break;}
++      if(!part.value.byteLength||length+part.value.byteLength>responseLimit)return null;
++      bytes.set(part.value,length);
++      length+=part.value.byteLength;
++    }
++    if(!done||signal.aborted)return null;
++    return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(0,length)));
++  }finally{
++    signal.removeEventListener('abort',cancel);
++    if(!done)cancel();
++    try{reader.releaseLock();}catch{}
++  }
++}
++
++/**
++ * Private, optional read. The caller must hold the current opaque Student access
++ * proof and use the existing production-origin transport. Navigation is never
++ * authority. This candidate creates no mounted route, login or proof fallback.
++ */
++export async function readCabinetAccess({apiBaseUrl,fetcher,personId,access,signal}:ReadInput):Promise<CabinetAccess|null>{
++  try{
++    if(signal.aborted||!uuid.test(personId)||!/^[0-9a-f]{64}$/.test(access))return null;
++    const base=new URL(apiBaseUrl);
++    if(base.protocol!=='https:'||base.username||base.password||base.search||base.hash||
++      !['/api/v1','/api/v1/'].includes(base.pathname))return null;
++    const target=new URL('/api/v1/me/cabinet-access',base.origin).href;
++    const response=await fetcher(new Request(target,{method:'GET',signal,mode:'cors',
++      cache:'no-store',credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',
++      headers:{accept:'application/json',authorization:`Bearer ${access}`}}));
++    const cache=response.headers.get('cache-control')?.split(',').some(d=>d.trim().toLowerCase()==='no-store');
++    const ct=response.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase();
++    const length=response.headers.get('content-length');
++    if(signal.aborted||response.status!==200||response.redirected||response.url!==target||
++      !['basic','cors'].includes(response.type)||!cache||ct!=='application/json'||
++      (length!==null&&(!/^\d{1,4}$/.test(length)||Number(length)>responseLimit))){
++      releaseBody(response);
++      return null;
++    }
++    const body=await document(response,signal);
++    if(signal.aborted||!exact(body,['data']))return null;
++    const data=body.data;
++    if(!exact(data,['person_id','default_cabinet'])||data.person_id!==personId||
++      (data.default_cabinet!=='student'&&data.default_cabinet!=='teacher'))return null;
++    return Object.freeze({person_id:personId,default_cabinet:data.default_cabinet});
++  }catch{return null;} // Do not emit response body, proof, request, URL or error to logs.
++}
+diff --git a/apps/mini-app/src/owner-port.ts b/apps/mini-app/src/owner-port.ts
+index 2c12b2a9d63274bec45747175afd92f51793b2e4..ff916a5c8e155dbe9384c504f49ec27f5323a4c2 100644
+--- a/apps/mini-app/src/owner-port.ts
++++ b/apps/mini-app/src/owner-port.ts
+@@ -1,3 +1,4 @@
++import {readCabinetAccess} from "./cabinet-access-transport.ts";
+ import {createDeletionHttpPort} from './account-deletion-candidate/http-port.ts';
+ import {createPublicRecoveryStatus} from './account-deletion-candidate/recovery-status-port.ts';
+ import type {DeletionPort} from './account-deletion-candidate/controller.ts';
+@@ -143,6 +144,13 @@ export function createOwnerPort(options: OwnerPortOptions) {
+       if (!result?.data || result.data.ok !== true || Object.keys(result.data).length !== 1)
+         throw new StudentFailure('protocol', 'RESPONSE_INVARIANT_FAILED', null, true);
+     },
++    readCabinetAccess(input:Readonly<{personId:string;signal:AbortSignal}>) {
++      if(options.mode!=='production'||!['telegram_atomic','telegram_resume'].includes(options.loginMethod??''))
++        return Promise.resolve(null);
++      const signal=options.loginSignal?AbortSignal.any([input.signal,options.loginSignal]):input.signal;
++      return transport.readWithCurrentAccess(input.personId,signal,access=>
++        readCabinetAccess({apiBaseUrl:options.baseUrl,fetcher,personId:input.personId,access,signal}));
++    },
+     createDeletionPort(expectedPerson:string):DeletionPort {
+       const check=()=>{if(!expectedPerson||transport.person()!==expectedPerson)throw new StudentFailure('auth','ACCESS_SUPERSEDED',null,true)};
+       check();
+diff --git a/apps/mini-app/src/telegram-atomic-runtime.ts b/apps/mini-app/src/telegram-atomic-runtime.ts
+index 8c21d226434d867e500d5689816279e5c1af7b68..2e84d1e99771149a8ac304d5c5883bc595d8ebf2 100644
+--- a/apps/mini-app/src/telegram-atomic-runtime.ts
++++ b/apps/mini-app/src/telegram-atomic-runtime.ts
+@@ -35,6 +35,17 @@ export function createAtomicTelegramRuntime(options:{
+       return{personId,port:target.auth.createDeletionPort(personId),isCurrent:()=>connection===target&&target.auth.person()===personId,
+         clearMatching:()=>{if(connection===target&&target.auth.person()===personId){target.auth.clearMatching(personId);clear()}}};
+     },
++    // Exposes only a nullable routing hint, not the underlying proof or transport.
++    // This is not selected by the production entrypoint in this candidate.
++    async readCabinetAccess(input:Readonly<{personId:string;signal:AbortSignal}>) {
++      const target=connection,capturedEpoch=epoch,capturedState=state,identity=anchor;
++      const current=()=>!disposed&&!input.signal.aborted&&capturedEpoch===epoch&&connection===target&&
++        state===capturedState&&state.phase==='ready'&&target?.auth.person()===input.personId&&
++        (!identity||same(options.identity(),identity));
++      if(!target||!current())return null;
++      const value=await target.auth.readCabinetAccess(input);
++      return current()?value:null;
++    },
+     snapshot:()=>state,subscribe(fn:()=>void){listeners.add(fn);return()=>{listeners.delete(fn)}},
+     async resume(){if(state.phase!=='new'||disposed)return;const n=++epoch;set({phase:'resuming'});
+       try{await open('telegram_resume',launch(),n)}catch(error){if(disposed||n!==epoch)return;const established=!!connection?.auth.person();connection?.auth.clear();connection=null;
+diff --git a/apps/mini-app/src/transport.ts b/apps/mini-app/src/transport.ts
+index 102bbbd28b5908c4a4ada9d2eadec8fc4f7dacf8..d915dd5b393aa18523b55ce86487988386b3f61e 100644
+--- a/apps/mini-app/src/transport.ts
++++ b/apps/mini-app/src/transport.ts
+@@ -132,6 +132,19 @@ export function createStudentTransport(options: {
+     rotating = task;
+     return task;
+   }
++  // Optional navigation only. Unlike withAccess(), this never rotates, retries,
++  // clears/replaces a session, or changes the epoch on a failed auxiliary read.
++  async function readWithCurrentAccess<T>(expectedPerson:string,signal:AbortSignal,
++    action:(access:string)=>Promise<T>):Promise<T|null> {
++    const captured=proof,epoch=authEpoch;
++    if(!captured||captured.person!==expectedPerson)return null;
++    const current=()=>!signal.aborted&&!rotating&&proof===captured&&authEpoch===epoch&&captured.expiresAt>now();
++    if(!current())return null;
++    try {
++      const value=await action(captured.access);
++      return current()?value:null;
++    } catch { return null; }
++  }
+   // Execute a Backend-owned client operation using this session's proof/epoch.
+   // No endpoint, wire DTO or response parser is duplicated here.
+   async function withAccess<T>(action: (access: string) => Promise<T>, mutation = false, retried = false): Promise<T> {
+@@ -204,6 +217,7 @@ export function createStudentTransport(options: {
+   }
+   return {
+     withAccess,
++    readWithCurrentAccess,
+     request,
+     // Local cancellation only. Retire pending login/read callbacks immediately;
+     // this is never a server logout ACK or an automatic exchange/refresh replay.

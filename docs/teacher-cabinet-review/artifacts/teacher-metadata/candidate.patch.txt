@@ -1,0 +1,115 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-assigned-catalog.ts b/supabase/functions/univeracademy-api/storage/teacher-assigned-catalog.ts
+new file mode 100644
+index 0000000..be97a02
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/teacher-assigned-catalog.ts
+@@ -0,0 +1,109 @@
++// Review-only subset. Not a TeacherBootstrap metadata provider.
++import { fail } from "../fault.ts";
++import { own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++
++type VerifiedScope = Readonly<{
++  personId: string;
++  issuer: string;
++  subject: string;
++  groupIds: readonly string[];
++  subjectIds: readonly string[];
++}>;
++type Group = Readonly<{id:string;status:"active"|"archived"}>;
++type Assignment = Readonly<{assignmentId:string;groupId:string;demoId:string;versionId:string;subjectId:string;demoTitle:string}>;
++type PartialCatalog = Readonly<{
++  kind:"partial";
++  groups:readonly Group[];
++  assignedDemos:readonly Assignment[];
++  missing:readonly ["group_titles","subject_titles","teacher_listing_policy"];
++}>;
++
++const uuid=(v:unknown):v is string=>typeof v==="string"&&v.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
++const label=(v:unknown):v is string=>typeof v==="string"&&v.length<=200&&v.trim().length>0;
++const MAX_GROUPS=500, MAX_SUBJECTS=100, MAX_ASSIGNMENTS=500;
++
++// Active Clerk mapping, enabled person and approved Teacher are repeated as
++// consistency checks; this cannot replace the verified outer Clerk lease.
++const scopeSql=`
++WITH actor AS MATERIALIZED (
++  SELECT p.id FROM ua_private.people p
++  JOIN ua_private.clerk_identities i ON i.person_id=p.id
++  JOIN ua_private.staff_access a ON a.person_id=p.id
++  WHERE p.id=$1::uuid AND p.enabled IS TRUE AND i.enabled IS TRUE
++    AND i.issuer=$2 AND i.subject=$3 AND 'teacher'=ANY(p.roles) AND a.approved IS TRUE
++), owned AS MATERIALIZED (
++  SELECT s.group_id FROM ua_private.staff_group_scope s
++  JOIN actor ON actor.id=s.person_id WHERE s.revoked_at_ms IS NULL
++), approved AS MATERIALIZED (
++  SELECT s.subject_id FROM ua_private.teacher_subject_approvals s
++  JOIN actor ON actor.id=s.person_id WHERE s.approved IS TRUE AND s.revoked_at_ms IS NULL
++)
++SELECT
++  EXISTS(SELECT 1 FROM actor) AS has_actor,
++  ARRAY(SELECT g.group_id::text FROM owned g ORDER BY g.group_id LIMIT 501) AS actual_groups,
++  ARRAY(SELECT s.subject_id FROM approved s ORDER BY s.subject_id LIMIT 101) AS actual_subjects,
++  (SELECT coalesce(jsonb_agg(row_data),'[]'::jsonb) FROM (
++    SELECT o.group_id::text AS id, g.status FROM owned o
++    LEFT JOIN ua_private.groups g ON g.id=o.group_id ORDER BY o.group_id LIMIT 501
++  ) row_data) AS group_rows,
++  (SELECT coalesce(jsonb_agg(row_data),'[]'::jsonb) FROM (
++    SELECT a.id::text AS assignment_id,a.group_id::text AS group_id,a.demo_id::text AS demo_id,
++      a.version_id::text AS version_id,d.subject_id,d.title AS demo_title
++    FROM ua_private.assignments a JOIN owned o ON a.group_id=o.group_id
++    LEFT JOIN ua_private.demos d ON d.id=a.demo_id
++    WHERE d.id IS NULL OR EXISTS(SELECT 1 FROM approved s WHERE s.subject_id=d.subject_id)
++    ORDER BY a.id LIMIT 501
++  ) row_data) AS assignment_rows`;
++
++function bad():never { return fail("RESPONSE_INVARIANT_FAILED",500); }
++function sameSet(actual:unknown,expected:Set<string>):boolean {
++  return Array.isArray(actual)&&actual.length===expected.size&&new Set(actual).size===actual.length&&
++    actual.every(x=>typeof x==="string"&&expected.has(x));
++}
++
++/**
++ * Only an independently verified, live Clerk-backed Teacher reader may call
++ * this in the current single-person lock. Verify exact read-role/RLS behavior
++ * before wiring. An RLS-filtered assignment result is not proof of completeness.
++ * Even valid output is deliberately partial and never marks bootstrap ready.
++ */
++export async function readTeacherAssignedCatalog(tx:LockedTransaction,scope:VerifiedScope,
++  signal:AbortSignal):Promise<PartialCatalog> {
++  signal.throwIfAborted();
++  if(!uuid(scope.personId)||!label(scope.issuer)||!label(scope.subject)||
++     tx.personIds.length!==1||tx.personIds[0]!==scope.personId||
++     !Array.isArray(scope.groupIds)||!Array.isArray(scope.subjectIds)||
++     scope.groupIds.length>MAX_GROUPS||scope.subjectIds.length>MAX_SUBJECTS||!scope.subjectIds.length||
++     !scope.groupIds.every(uuid)||!scope.subjectIds.every(label)) bad();
++  own(tx,scope.personId);
++  const groupSet=new Set(scope.groupIds),subjectSet=new Set(scope.subjectIds);
++  if(groupSet.size!==scope.groupIds.length||subjectSet.size!==scope.subjectIds.length) bad();
++  const result=await query(tx,"ua_teacher_assigned_catalog_v1",scopeSql,[scope.personId,scope.issuer,scope.subject]);
++  signal.throwIfAborted();
++  if(result.rows.length!==1) return bad();
++  const row=result.rows[0];
++  if(row.has_actor!==true) fail("FORBIDDEN",403);
++  if(!sameSet(row.actual_groups,groupSet)||!sameSet(row.actual_subjects,subjectSet)||
++     !Array.isArray(row.group_rows)||row.group_rows.length!==groupSet.size||
++     !Array.isArray(row.assignment_rows)||row.assignment_rows.length>MAX_ASSIGNMENTS) return bad();
++  const groups:Group[]=[],assignedDemos:Assignment[]=[];
++  const seenGroups=new Set<string>(),seenAssignments=new Set<string>();
++  for(const g of row.group_rows as Record<string,unknown>[]) {
++    if(!g||!uuid(g.id)||!groupSet.has(g.id)||seenGroups.has(g.id)||
++       (g.status!=="active"&&g.status!=="archived")) return bad();
++    seenGroups.add(g.id);
++    groups.push(Object.freeze({id:g.id,status:g.status}));
++  }
++  for(const a of row.assignment_rows as Record<string,unknown>[]) {
++    if(!a||!uuid(a.assignment_id)||seenAssignments.has(a.assignment_id)||
++       !uuid(a.group_id)||!seenGroups.has(a.group_id)||!uuid(a.demo_id)||!uuid(a.version_id)||
++       !label(a.subject_id)||!subjectSet.has(a.subject_id)||!label(a.demo_title)) return bad();
++    seenAssignments.add(a.assignment_id);
++    assignedDemos.push(Object.freeze({assignmentId:a.assignment_id,groupId:a.group_id,demoId:a.demo_id,
++      versionId:a.version_id,subjectId:a.subject_id,demoTitle:a.demo_title}));
++  }
++  return Object.freeze({kind:"partial",groups:Object.freeze(groups),assignedDemos:Object.freeze(assignedDemos),
++    missing:Object.freeze(["group_titles","subject_titles","teacher_listing_policy"] as const)});
++}

@@ -1,0 +1,148 @@
+diff --git a/apps/mini-app/src/teacher-cabinet-entry-review.tsx b/apps/mini-app/src/teacher-cabinet-entry-review.tsx
+new file mode 100644
+index 0000000..0f65f61
+--- /dev/null
++++ b/apps/mini-app/src/teacher-cabinet-entry-review.tsx
+@@ -0,0 +1,89 @@
++import {useEffect,useRef,useState} from 'react';
++import type {ReactElement} from 'react';
++
++type Input = Readonly<{personId:string;signal:AbortSignal}>;
++type PreparedTeacher = Readonly<{personId:string;view:ReactElement}>;
++
++// Review-only port. It has no default implementation or production configuration.
++// personId is an expected local identity, never URL/query/header authorization.
++// resolveAccess must derive identity and current role from the trusted session and
++// include authoritative server-side unfinished-attempt continuity across launches.
++// prepareTeacher must prove the same person in the destination independently and
++// return an unmounted view. Its preflight signal must not control that view's lifetime.
++// It must not navigate or exchange/clear Student proofs.
++// The Teacher server must still authorize every data read and mutation.
++export type TeacherCabinetReviewPort = Readonly<{
++  resolveAccess(input:Input):Promise<unknown>;
++  prepareTeacher(input:Input):Promise<PreparedTeacher|null>;
++}>;
++
++type Selection =
++  | {kind:'pending'}
++  | {kind:'student'}
++  | {kind:'stale'}
++  | {kind:'teacher';view:ReactElement};
++
++function permitsTeacher(value:unknown,personId:string):boolean {
++  if(value===null||typeof value!=='object'||Object.getPrototypeOf(value)!==Object.prototype)return false;
++  const keys=Reflect.ownKeys(value);
++  if(keys.length!==2||!keys.includes('person_id')||!keys.includes('default_cabinet'))return false;
++  return Object.getOwnPropertyDescriptor(value,'person_id')?.value===personId&&
++    Object.getOwnPropertyDescriptor(value,'default_cabinet')?.value==='teacher';
++}
++
++const DECISION_BUDGET_MS=650;
++
++export function TeacherCabinetEntryReview(props:{
++  personId:string;
++  identityKey:string;
++  port:TeacherCabinetReviewPort;
++  isCurrent():boolean;
++  student:ReactElement;
++}){
++  // Capture once per ready entry; current stable Clerk/runtime guards remain live.
++  const [entry]=useState(()=>({
++    personId:props.personId,identityKey:props.identityKey,port:props.port,isCurrent:props.isCurrent,
++  }));
++  const [selection,setSelection]=useState<Selection>({kind:'pending'});
++  const closed=useRef(false);
++  const stillCurrent=props.identityKey===entry.identityKey&&props.personId===entry.personId&&
++    props.port===entry.port&&entry.isCurrent();
++
++  useEffect(()=>{
++    if(!stillCurrent){closed.current=true;setSelection({kind:'stale'});return}
++    if(closed.current)return;
++    const abort=new AbortController();
++    const deadline=performance.now()+DECISION_BUDGET_MS;
++    const commit=(next:Selection)=>{
++      if(abort.signal.aborted||closed.current)return;
++      const result:Selection=!entry.isCurrent()?{kind:'stale'}:
++        next.kind==='teacher'&&performance.now()>=deadline?{kind:'student'}:next;
++      closed.current=true;
++      if(result.kind!=='teacher')abort.abort();
++      setSelection(current=>current.kind==='pending'?result:current);
++    };
++    const timer=setTimeout(()=>commit({kind:'student'}),DECISION_BUDGET_MS);
++    void (async()=>{
++      try{
++        const input={personId:entry.personId,signal:abort.signal};
++        const access=await entry.port.resolveAccess(input);
++        if(abort.signal.aborted)return;
++        if(!entry.isCurrent()||!permitsTeacher(access,entry.personId)){commit({kind:'student'});return}
++        const teacher=await entry.port.prepareTeacher(input);
++        if(teacher?.personId===entry.personId)commit({kind:'teacher',view:teacher.view});
++        else commit({kind:'student'});
++      }catch{commit({kind:'student'})}
++      finally{clearTimeout(timer)}
++    })();
++    return()=>{clearTimeout(timer);abort.abort()};
++  },[entry,stillCurrent]);
++
++  if(!stillCurrent||selection.kind==='stale')return <main className="shell"><section className="card">
++    <p role="status">Telegram botida /start orqali yangidan oching.</p>
++  </section></main>;
++  if(selection.kind==='pending')return <main className="shell"><section className="card">
++    <p role="status">Kabinet tekshirilmoqda…</p>
++  </section></main>;
++  if(selection.kind==='teacher')return selection.view;
++  return props.student;
++}
+diff --git a/apps/mini-app/src/telegram-atomic-entry.tsx b/apps/mini-app/src/telegram-atomic-entry.tsx
+index 120cc54..398b53c 100644
+--- a/apps/mini-app/src/telegram-atomic-entry.tsx
++++ b/apps/mini-app/src/telegram-atomic-entry.tsx
+@@ -7,10 +7,27 @@ import {createProductionOwnerConnection} from './production-connection.ts';
+ import {readTelegramBridge} from './telegram-bootstrap.ts';
+ import {createAtomicTelegramRuntime} from './telegram-atomic-runtime.ts';
+ import {StudentApp} from './student-app.tsx';
++import {TeacherCabinetEntryReview} from './teacher-cabinet-entry-review.tsx';
++import type {TeacherCabinetReviewPort} from './teacher-cabinet-entry-review.tsx';
+ const policy={level:'first_factor',afterMinutes:4} as const;
+-export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;scope:unknown}){
++const readyEntryKeys=new WeakMap<object,number>();
++let nextReadyEntryKey=0;
++function routeEntryKey(flow:object){
++  const existing=readyEntryKeys.get(flow);
++  if(existing!==undefined)return existing;
++  const key=++nextReadyEntryKey;
++  readyEntryKeys.set(flow,key);
++  return key;
++}
++type Session = ReturnType<typeof useClerk>['session'];
++function routeIdentityKey(session:Session|undefined){
++  return JSON.stringify(session ? [session.id,session.user.id,session.status,!!session.currentTask] : []);
++}
++export function AtomicTelegramEntry({config,scope,teacherRouting}:{
++  config:CommonEntryConfig;scope:unknown;teacherRouting?:TeacherCabinetReviewPort;
++}){
+   const clerk=useClerk(),{session}=useSession();
+-  const latest=useRef({clerk,scope});latest.current={clerk,scope};
++  const latest=useRef({clerk,scope,teacherRouting});latest.current={clerk,scope,teacherRouting};
+   // Official SDK hook only wraps a proof-producing callback. Atomic POST is outside
+   // the hook, preventing SDK automatic retries from replaying the mutation.
+   const verify=useReverification(async(expected:{userId:string;sessionId:string})=>{
+@@ -33,7 +50,17 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
+   useEffect(()=>{void runtime.resume();return()=>runtime.dispose()},[runtime]);
+   useEffect(()=>runtime.observe(),[runtime,session?.id,session?.status,session?.currentTask,session?.user.id]);
+   const active=session?.status==='active'&&!session.currentTask;
+-  if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
++  if(state.phase==='ready'&&state.flow){
++    const flow=state.flow,binding=runtime.deletionBinding();
++    const student=<AccountDeletionHost binding={binding} enabled={config.deletionEnabled} cabinetDisplayId={flow.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={flow} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
++    if(!teacherRouting||!binding)return student;
++    const identityKey=routeIdentityKey(session);
++    return <TeacherCabinetEntryReview key={routeEntryKey(flow)} personId={binding.personId} identityKey={identityKey}
++      port={teacherRouting} student={student}
++      isCurrent={()=>latest.current.teacherRouting===teacherRouting&&
++        routeIdentityKey(latest.current.clerk.session)===identityKey&&
++        runtime.snapshot().phase==='ready'&&runtime.snapshot().flow===flow&&binding.isCurrent()}/>;
++  }
+   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1>
+     {state.notice&&<p role="status">{state.notice}</p>}
+     {state.phase==='choose'?(active?<>

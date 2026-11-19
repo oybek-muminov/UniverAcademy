@@ -1,0 +1,30 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts b/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
+index df03577..8979e9f 100644
+--- a/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
++++ b/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
+@@ -70,17 +70,20 @@ export async function attachInitialTeacherPilotStudentRows(
+   if (now >= p.expiresAt || now > 8_640_000_000_000_000) fail("NOT_FOUND", 404);
+ 
+   const receiptKey = `${actor.personId}/POST/teacher/groups/${pilot.groupId}/initial-member/${key}`;
+-  const payload = JSON.stringify([p.studentId,p.subjectId,p.groupRevision,p.membershipRevision,p.membershipEpoch]);
++  // Person identity belongs only in the paired audit target, not the receipt payload.
++  const payload = JSON.stringify([p.subjectId,p.groupRevision,p.membershipRevision,p.membershipEpoch]);
+   const receipts = await query(tx, "ua_attach_receipt_read", `SELECT r.payload,r.response,a.action,
+-    a.target_id::text,a.revision::text FROM ua_private.staff_receipts r LEFT JOIN ua_private.staff_audit a
+-      ON a.actor_id=r.actor_id AND a.command_key=r.key WHERE r.actor_id=$1 AND r.key=$2`,
++    a.target_id::text,a.revision::text FROM ua_private.staff_receipts r JOIN ua_private.staff_audit a
++      ON a.actor_id=r.actor_id AND a.command_key=r.key WHERE r.actor_id=$1 AND r.key=$2
++      FOR SHARE OF r,a`,
+     [actor.personId,receiptKey]);
+   if (receipts.rows.length > 1) fail("RESPONSE_INVARIANT_FAILED", 500);
+   const prior = receipts.rows[0];
+   if (prior) {
+-    if (prior.payload !== payload) fail("IDEMPOTENCY_CONFLICT", 409);
++    // Exact string comparison also rejects older/different payload shapes.
++    if (prior.payload !== payload || prior.target_id !== p.studentId) fail("IDEMPOTENCY_CONFLICT", 409);
+     const result = exactResult(prior.response);
+-    if (prior.action !== "initial_membership" || prior.target_id !== p.studentId ||
++    if (prior.action !== "initial_membership" ||
+         integer(prior.revision) !== result.membershipRevision ||
+         result.groupRevision !== nextRevision(p.groupRevision) ||
+         result.membershipRevision !== nextRevision(p.membershipRevision))

@@ -1,0 +1,92 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-own-group-roster.ts b/supabase/functions/univeracademy-api/storage/teacher-own-group-roster.ts
+new file mode 100644
+index 0000000..9929d81
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/teacher-own-group-roster.ts
+@@ -0,0 +1,86 @@
++// Local and unmounted roster reader. Does not expose lookup or mutation.
++import { fail } from "../fault.ts";
++import type { StaffAccessRecord } from "../staff-state.ts";
++import { own, query } from "./postgres-transaction.ts";
++import type { LockedTransaction } from "./postgres-transaction.ts";
++
++type Member=Readonly<{person_id:string;first_name:string;last_name:string}>;
++type Roster=Readonly<{group_id:string;members:readonly Member[]}>;
++type Dependencies=Readonly<{
++  tx:LockedTransaction;
++  signal:AbortSignal;
++  // Same canonical verified Clerk person, current approval/explicit group scope
++  // and uncached provider liveness as the Teacher bootstrap. Not input flags.
++  authorizeCurrent:()=>Promise<StaffAccessRecord>;
++}>;
++
++const maxMembers=100;
++const uuid=(v:unknown):v is string=>typeof v==="string"&&v.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
++const name=(v:unknown):v is string=>typeof v==="string"&&v.length<=200&&
++  !/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(v);
++
++const sql=`
++WITH own_group AS MATERIALIZED (
++  SELECT g.id
++  FROM ua_private.staff_group_scope s
++    JOIN ua_private.groups g ON g.id=s.group_id
++    JOIN ua_private.people actor ON actor.id=s.person_id
++    JOIN ua_private.staff_access a ON a.person_id=actor.id
++  WHERE s.person_id=$1::uuid AND g.id=$2::uuid AND g.status='active'
++    AND s.revoked_at_ms IS NULL AND actor.enabled IS TRUE AND 'teacher'=ANY(actor.roles)
++    AND a.approved IS TRUE
++    AND pg_catalog.current_setting('ua.phase',true)='domain'
++    AND pg_catalog.current_setting('ua.person_id',true)=actor.id::text
++)
++SELECT g.id::text AS group_id,
++  (SELECT coalesce(jsonb_agg(rows),'[]'::jsonb) FROM (
++    SELECT m.person_id::text AS person_id,p.enabled,('student'=ANY(p.roles)) AS is_student,
++      p.profile->>'person_id' AS profile_id,p.profile->>'active_group_id' AS profile_group_id,
++      p.profile->>'first_name' AS first_name,p.profile->>'last_name' AS last_name
++    FROM ua_private.memberships m
++      LEFT JOIN ua_private.people p ON p.id=m.person_id
++    WHERE m.affinity_group_id=g.id AND m.active IS TRUE
++    ORDER BY m.person_id LIMIT 101
++  ) rows) AS members
++FROM own_group g`;
++
++function checkStaff(staff:StaffAccessRecord,personId:string,groupId:string):void{
++  if(staff.personId!==personId||!staff.enabled||!staff.approved||!staff.roles.includes("teacher"))
++    fail("FORBIDDEN",403);
++  // Ownership is explicit and current; never infer it from all_groups or Owner.
++  if(!staff.scope.group_ids.includes(groupId)) fail("NOT_FOUND",404);
++}
++
++/**
++ * The injected transaction must already be authorized to enumerate exactly
++ * the active members for this Teacher's group. Student RLS can suppress rows;
++ * separately verify the scoped Teacher read role before enabling this port.
++ */
++export async function readTeacherOwnGroupRoster(groupId:unknown,deps:Dependencies):Promise<Roster>{
++  const {tx,signal}=deps,personId=tx.personIds[0];
++  signal.throwIfAborted();
++  if(!uuid(groupId)) fail("NOT_FOUND",404);
++  if(tx.personIds.length!==1||!uuid(personId)) fail("SERVICE_UNAVAILABLE",503);
++  own(tx,personId);
++  checkStaff(await deps.authorizeCurrent(),personId,groupId);
++  signal.throwIfAborted();
++  const result=await query(tx,"ua_teacher_own_group_roster_v1",sql,[personId,groupId]);
++  signal.throwIfAborted();
++  if(result.rows.length===0) fail("NOT_FOUND",404);
++  const row=result.rows[0];
++  if(result.rows.length!==1||row.group_id!==groupId||!Array.isArray(row.members)||row.members.length>maxMembers)
++    fail("SERVICE_UNAVAILABLE",503);
++  const ids=new Set<string>(),members:Member[]=[];
++  for(const p of row.members as Record<string,unknown>[]){
++    if(!p||!uuid(p.person_id)||ids.has(p.person_id)||p.profile_id!==p.person_id||
++       p.profile_group_id!==groupId||typeof p.enabled!=="boolean"||p.is_student!==true||
++       !name(p.first_name)||!name(p.last_name)||!(p.first_name.trim()||p.last_name.trim()))
++      fail("RESPONSE_INVARIANT_FAILED",500);
++    ids.add(p.person_id);
++    if(p.enabled) members.push(Object.freeze({person_id:p.person_id,first_name:p.first_name,last_name:p.last_name}));
++  }
++  checkStaff(await deps.authorizeCurrent(),personId,groupId);
++  signal.throwIfAborted();
++  return Object.freeze({group_id:groupId,members:Object.freeze(members)});
++}

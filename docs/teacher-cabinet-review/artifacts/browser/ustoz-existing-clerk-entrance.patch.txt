@@ -1,0 +1,136 @@
+diff --git a/apps/mini-app/teacher-entrance/entry.mjs b/apps/mini-app/teacher-entrance/entry.mjs
+new file mode 100644
+index 0000000..c664bec
+--- /dev/null
++++ b/apps/mini-app/teacher-entrance/entry.mjs
+@@ -0,0 +1,98 @@
++// Isolated existing-account entrance. Does not call UniverAcademy APIs,
++// declare platform authority, exchange sessions, create accounts or redirect.
++import { createElement as h, useRef, useState } from 'react';
++import { createRoot } from 'react-dom/client';
++import { ClerkProvider, ClerkFailed, ClerkLoaded, ClerkLoading, useSession, useSignIn } from '@clerk/react';
++
++const origin = 'https://ustoz.univeracademy.uz';
++const unavailable = 'Kirish hozircha mavjud emas.';
++const product = 'O‘qituvchi kabinetiga kirish';
++const heading = (body) => h('section', null, h('h1', null, product), body);
++const message = (value) => h('p', { role: 'status' }, value);
++
++function matchingPublishingKey(key) {
++  if (typeof key !== 'string' || !/^pk_live_[A-Za-z0-9+/]+={0,2}$/.test(key)) return false;
++  try { return atob(key.slice('pk_live_'.length)) === 'clerk.univeracademy.uz$'; }
++  catch { return false; }
++}
++
++function PasswordEntrance() {
++  const { isLoaded, isSignedIn, session } = useSession();
++  const { signIn } = useSignIn();
++  const running = useRef(false), [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
++  const [emailChallenge, setEmailChallenge] = useState(false);
++  if (!isLoaded) return heading(message('Kirish oynasi tayyorlanmoqda…'));
++  if (isSignedIn) return heading(message(session?.status === 'active' && !session.currentTask
++    ? 'Clerk hisobingizga kirdingiz. Kabinetga ruxsatni tekshirish va kabinet ma’lumotlari hozircha ulanmagan.'
++    : 'Kirishni yakunlash uchun hisobingizda qo‘shimcha tasdiqlash kerak.'));
++  if (!signIn || typeof signIn.password !== 'function') return heading(message(unavailable));
++
++  async function finalize() {
++    const { error } = await signIn.finalize({ navigate: () => {} });
++    if (error) setNotice('Kirishni yakunlab bo‘lmadi.');
++  }
++
++  async function submit(event) {
++    event.preventDefault();
++    if (running.current) return;
++    const fields = new FormData(event.currentTarget);
++    const emailAddress = fields.get('email'), password = fields.get('password'), code = fields.get('code');
++    const passwordField = event.currentTarget.elements.namedItem('password');
++    const codeField = event.currentTarget.elements.namedItem('code');
++    if (passwordField instanceof HTMLInputElement) passwordField.value = '';
++    if (codeField instanceof HTMLInputElement) codeField.value = '';
++    fields.delete('password'); fields.delete('code');
++    if (emailChallenge ? (typeof code !== 'string' || !code.trim()) :
++        (typeof emailAddress !== 'string' || typeof password !== 'string' || !emailAddress || !password)) return;
++    running.current = true;
++    setBusy(true);
++    setNotice('');
++    try {
++      if (emailChallenge) {
++        if (!['needs_client_trust', 'needs_second_factor'].includes(signIn.status) ||
++            typeof signIn.mfa?.verifyEmailCode !== 'function') throw new Error();
++        const { error } = await signIn.mfa.verifyEmailCode({ code: code.trim() });
++        if (error || signIn.status !== 'complete') { setNotice('Kod tasdiqlanmadi.'); return; }
++        await finalize();
++        return;
++      }
++      const { error } = await signIn.password({ emailAddress, password });
++      if (error) { setNotice('Kirish tasdiqlanmadi. Mavjud hisobingizdagi ma’lumotlarni tekshiring.'); return; }
++      if (signIn.status === 'complete') { await finalize(); return; }
++      if (['needs_client_trust', 'needs_second_factor'].includes(signIn.status) &&
++          signIn.supportedSecondFactors?.some(factor => factor.strategy === 'email_code') &&
++          typeof signIn.mfa?.sendEmailCode === 'function') {
++        const { error: sendError } = await signIn.mfa.sendEmailCode();
++        if (!sendError) { setEmailChallenge(true); return; }
++      }
++      setNotice('Kirishni yakunlash uchun qo‘shimcha tekshiruv kerak. Bu sahifada ushbu usul hozircha mavjud emas.');
++    } catch { setNotice('Kirishni yakunlab bo‘lmadi.'); }
++    finally { running.current = false; setBusy(false); }
++  }
++  if (emailChallenge) return heading(h('form', { method: 'post', onSubmit: submit },
++    h('p', null, 'Clerk hisobingizga yuborilgan tasdiqlash kodini kiriting.'),
++    h('label', null, 'Tasdiqlash kodi', h('input', { name: 'code', inputMode: 'numeric', autoComplete: 'one-time-code', required: true })),
++    h('button', { type: 'submit', disabled: busy }, busy ? 'Tekshirilmoqda…' : 'Tasdiqlash'),
++    message(notice)));
++  return heading(h('form', { method: 'post', onSubmit: submit },
++    h('p', null, 'Mavjud Clerk hisobingizning elektron pochtasi va paroli bilan kiring. Yangi hisob ochilmaydi.'),
++    h('label', null, 'Elektron pochta', h('input', { name: 'email', type: 'email', autoComplete: 'username', required: true })),
++    h('label', null, 'Parol', h('input', { name: 'password', type: 'password', autoComplete: 'current-password', required: true })),
++    h('button', { type: 'submit', disabled: busy }, busy ? 'Tekshirilmoqda…' : 'Kirish'),
++    message(notice)));
++}
++
++const mount = document.getElementById('app');
++const key = import.meta.env.VITE_USTOZ_CLERK_PUBLISHABLE_KEY;
++if (mount) {
++  const root = createRoot(mount);
++  if (location.origin !== origin || location.pathname !== '/' || location.search || location.hash ||
++      import.meta.env.VITE_USTOZ_EXISTING_PASSWORD_SIGNIN_APPROVED !== 'true' || !matchingPublishingKey(key)) {
++    root.render(heading(message(unavailable)));
++  } else {
++    root.render(h(ClerkProvider, { publishableKey: key, signInUrl: origin + '/' },
++      h(ClerkLoading, null, heading(message('Kirish oynasi tayyorlanmoqda…'))),
++      h(ClerkFailed, null, heading(message(unavailable))),
++      h(ClerkLoaded, null, h(PasswordEntrance))));
++  }
++}
+diff --git a/apps/mini-app/teacher-entrance/index.html b/apps/mini-app/teacher-entrance/index.html
+new file mode 100644
+index 0000000..ee700a8
+--- /dev/null
++++ b/apps/mini-app/teacher-entrance/index.html
+@@ -0,0 +1,13 @@
++<!doctype html>
++<html lang="uz">
++  <head>
++    <meta charset="utf-8">
++    <meta name="viewport" content="width=device-width,initial-scale=1">
++    <meta name="referrer" content="no-referrer">
++    <title>UniverAcademy · O‘qituvchi kabineti</title>
++  </head>
++  <body>
++    <main id="app"><p role="status">Kirish oynasi tayyorlanmoqda…</p></main>
++    <script type="module" src="/entry.mjs"></script>
++  </body>
++</html>
+diff --git a/apps/mini-app/teacher-entrance/vite.config.mjs b/apps/mini-app/teacher-entrance/vite.config.mjs
+new file mode 100644
+index 0000000..ac6fa92
+--- /dev/null
++++ b/apps/mini-app/teacher-entrance/vite.config.mjs
+@@ -0,0 +1,7 @@
++// Separate build only. Uses existing apps/mini-app lockfile and never writes its dist.
++import { fileURLToPath } from 'node:url';
++import { defineConfig } from 'vite';
++const root = fileURLToPath(new URL('.', import.meta.url));
++export default defineConfig({ root, envDir: root, base: '/', build: {
++  outDir: fileURLToPath(new URL('../dist-teacher-entrance/', import.meta.url)), emptyOutDir: true,
++} });

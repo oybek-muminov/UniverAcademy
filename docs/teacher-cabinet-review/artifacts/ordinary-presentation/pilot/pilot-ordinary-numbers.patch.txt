@@ -1,0 +1,105 @@
+diff --git a/supabase/functions/univeracademy-api/student-wire.ts b/supabase/functions/univeracademy-api/student-wire.ts
+index 4a17fcbe867794c1ea4240b30a3f70be09983059..91cb702701d8ad1bbd3c0c6a0ef1e820f7fe4f2d 100644
+--- a/supabase/functions/univeracademy-api/student-wire.ts
++++ b/supabase/functions/univeracademy-api/student-wire.ts
+@@ -1,5 +1,6 @@
+ import { fail } from "./fault.ts";
+ import type { AnswerAck, AttemptRecord } from "./attempts.ts";
++import { validatePublishedTest } from "./ordinary.ts";
+ import type { Ratio } from "./ordinary.ts";
+ import { seriesKey } from "./student-state.ts";
+ import type { AssignmentRecord, NumericPresentation, Person, StudentState } from "./student-state.ts";
+@@ -85,6 +86,93 @@ export function createOrdinaryNumericPresentation(policy?: ReviewedOrdinaryPrese
+   });
+ }
+ 
++type PilotOrdinaryPin = Readonly<{groupId:string;demoId:string;versionId:string}>;
++
++function finitePilotApproximation(value:Ratio):number {
++  if(value.numerator===0n)return 0;
++  const {numerator:n,denominator:d}=value;
++  // The caller bounded both operands by the exact published test. Determine
++  // the binary exponent before converting anything to Number. Legacy binary64
++  // midpoint rounding is ties-to-even; display still uses exact HALF_UP.
++  let exponent=n.toString(2).length-d.toString(2).length;
++  if(exponent>=0?(n<d<<BigInt(exponent)):(n<<BigInt(-exponent)<d))exponent--;
++  const shift=52-exponent;
++  const a=shift>=0?n<<BigInt(shift):n, b=shift>=0?d:d<<BigInt(-shift);
++  let significand=a/b;
++  const remainderTimesTwo=2n*(a%b);
++  if(remainderTimesTwo>b||(remainderTimesTwo===b&&significand%2n===1n))significand++;
++  // Here significand <= 2^53 (exactly representable) and the published-test
++  // derived bound keeps nonzero inputs away from overflow/subnormal ranges.
++  const approx=Number(significand)*2**(exponent-52);
++  if(!Number.isFinite(approx)||approx<=0)fail("GRADING_POLICY_UNRESOLVED",409);
++  return approx;
++}
++
++/**
++ * Technical-review candidate for an already scoped, committed ordinary-only
++ * pilot result. Never the default Worker numeric config or a scoring operation.
++ * Pass an Owner-approved actual immutable publication pin, not wire values.
++ * Integration must invoke this inside the existing post-commit projection and
++ * only when the pilot record has no separate bonus; exact state is not edited.
++ */
++export function preflightPilotOrdinaryPresentation(record:AttemptRecord,pin:PilotOrdinaryPin):NumericPresentation {
++  const unresolved=():never=>fail("GRADING_POLICY_UNRESOLVED",409);
++  const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++  if(!record||!record.published||!pin||![pin.groupId,pin.demoId,pin.versionId].every(v=>typeof v==="string"&&uuid.test(v))||
++     record.groupId!==pin.groupId||record.published.demoId!==pin.demoId||record.published.versionId!==pin.versionId||
++     !["submitted","expired","forced"].includes(record.status)||!record.ordinary)return unresolved();
++  const test=record.published;
++  validatePublishedTest(test);
++  let maxMilli=1000n*BigInt(test.questions.length);
++  if(test.individualEnabled){
++    maxMilli=0n;
++    for(const question of test.questions){
++      const base=question.individualPoints;
++      if(!base)return unresolved(); // Canonical validation also enforces 0 < base <= 30, <=3dp.
++      maxMilli+=(1000n*base.numerator)/base.denominator;
++    }
++  }
++  if(maxMilli<=0n)return unresolved();
++  // Earned/max denominators divide 1000; percentage denominators divide
++  // exact maxMilli after reduction. A valid tiny total can be below 1 point.
++  const maxDenominator=maxMilli>1000n?maxMilli:1000n;
++  const bounded=(value:Ratio):boolean=>!!value&&typeof value.numerator==="bigint"&&
++    typeof value.denominator==="bigint"&&value.numerator>=0n&&value.numerator<=100n*maxMilli&&
++    value.denominator>0n&&value.denominator<=maxDenominator;
++  const {earned,maximum,percentage}=record.ordinary;
++  if(![earned,maximum,percentage].every(bounded)||maximum.numerator<=0n||
++     maximum.numerator*1000n!==maxMilli*maximum.denominator||
++     earned.numerator*maximum.denominator>maximum.numerator*earned.denominator||
++     percentage.numerator>100n*percentage.denominator||
++     percentage.numerator*earned.denominator*maximum.numerator!==
++       100n*earned.numerator*maximum.denominator*percentage.denominator)return unresolved();
++  // Capture exact approved values before constructing their receipt policy.
++  const expected=[earned,maximum,percentage].map(value=>Object.freeze({...value}));
++  const matches=(value:Ratio,i:number)=>bounded(value)&&value.numerator===expected[i].numerator&&
++    value.denominator===expected[i].denominator;
++  return createOrdinaryNumericPresentation({
++    policyId:"one_group_ordinary_exact_presentation_review_v1",
++    toFiniteNumber(value){
++      if(!expected.some((_,i)=>matches(value,i)))return unresolved();
++      return finitePilotApproximation(value);
++    },
++    toPercentageDisplayString(value){
++      if(!matches(value,2))return unresolved();
++      // Already a 0–100 ratio. HALF_UP2 rounds once; no second ×100 here.
++      return halfUpDisplay(value,100n,2);
++    },
++  });
++}
++
++/** Use only from an already authorized, committed Student read/receipt
++ * projection. This pilot does not select, transform or discard bonus results. */
++export function projectPilotOrdinaryResult(state:StudentState,attemptId:string,pin:PilotOrdinaryPin) {
++  const record=state.attempts[attemptId];
++  if(!record||record.id!==attemptId||Object.hasOwn(state.bonuses,attemptId))
++    fail("GRADING_POLICY_UNRESOLVED",409);
++  return scoreWire(state,record,preflightPilotOrdinaryPresentation(record,pin));
++}
++
+ function studentPointsDisplayWire(value: Ratio, policy: NumericPresentation | undefined): string {
+   if (!policy?.policyId || typeof policy.toStudentPointsDisplayString !== "function") {
+     fail("GRADING_POLICY_UNRESOLVED", 409);

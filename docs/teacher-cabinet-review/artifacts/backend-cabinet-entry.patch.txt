@@ -1,0 +1,203 @@
+diff --git a/supabase/functions/univeracademy-api/cabinet-entry-decision.ts b/supabase/functions/univeracademy-api/cabinet-entry-decision.ts
+new file mode 100644
+index 0000000..5d5c737
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/cabinet-entry-decision.ts
+@@ -0,0 +1,113 @@
++// Review candidate. Not registered as an API route. Inputs are server-owned
++// projections from one validated and scoped read, never request/body fields.
++export type CabinetEntry = Readonly<{
++  person_id: string;
++  default_cabinet: "student" | "teacher";
++}>;
++
++export type CabinetStudentAuth = Readonly<{
++  personId: string;
++  person: Readonly<{
++    enabled: boolean;
++    profile: Readonly<{
++      person_id: string;
++      roles: readonly string[];
++      registration_complete: boolean;
++    }>;
++  }>;
++}>;
++
++export type CabinetStaff = Readonly<{
++  personId: string;
++  // True means the proof-bound server read verified the current enabled,
++  // approved teacher role with at least one active subject approval.
++  canOpenTeacher: boolean;
++}>;
++
++// "none" means the scoped server reader positively established no current
++// resumable attempt for this person. A missing store/read or client state is not
++// "none". The reader owns current generation and authoritative database time.
++export type AttemptContinuity = Readonly<{
++  personId: string;
++  state: "none" | "resumable" | "unknown";
++}>;
++
++const personIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++const maxTime = 8_640_000_000_000_000;
++const isId = (value: unknown): value is string =>
++  typeof value === "string" && value.length === 36 && personIdPattern.test(value);
++const isTime = (value: number): boolean =>
++  Number.isSafeInteger(value) && value >= 0 && value <= maxTime;
++
++export type CurrentAttemptRead = Readonly<{
++  demoId: string;
++  currentAttemptId: string;
++  generation: number;
++  attempt: Readonly<{
++    id: string;
++    personId: string;
++    demoId: string;
++    generation: number;
++    status: "in_progress" | "submitted" | "expired" | "forced" | "cancelled";
++    startedAt: number;
++    deadlineAt: number;
++  }> | null;
++}>;
++
++/**
++ * Call only with the complete current-series projection for the independently
++ * authorized person, bound to the same person lock/transaction and database time.
++ * null means a missing or untrusted projection; [] means a proven empty series.
++ * Do not pass an assignment, visible exam list, pagination or truncated results.
++ * This does not materialize expiry, inspect answers, or mutate attempt state.
++ */
++export function readAttemptContinuity(
++  personId: string,
++  atMs: number,
++  current: readonly CurrentAttemptRead[] | null,
++): AttemptContinuity {
++  const result = (state: AttemptContinuity["state"]): AttemptContinuity =>
++    Object.freeze({ personId, state });
++  if (!isId(personId) || !isTime(atMs) || !Array.isArray(current)) return result("unknown");
++  const series = new Set<string>();
++  let resumable = false;
++  for (const row of current as readonly CurrentAttemptRead[]) {
++    const a = row?.attempt;
++    if (!a || !isId(row.demoId) || !isId(row.currentAttemptId) || series.has(row.demoId) ||
++      a.id !== row.currentAttemptId || a.demoId !== row.demoId || a.personId !== personId ||
++      !Number.isSafeInteger(row.generation) || row.generation < 1 || a.generation !== row.generation ||
++      !isTime(a.startedAt) || !isTime(a.deadlineAt) || a.startedAt > atMs || a.deadlineAt <= a.startedAt)
++      return result("unknown");
++    series.add(row.demoId);
++    if (a.status === "in_progress") resumable ||= atMs < a.deadlineAt;
++    else if (!["submitted", "expired", "forced", "cancelled"].includes(a.status)) return result("unknown");
++  }
++  return result(resumable ? "resumable" : "none");
++}
++
++/**
++ * Produce a navigation hint only. Never issue credentials or grant staff rights.
++ * Return null when the caller cannot derive a current authenticated student
++ * identity. The HTTP composition must return its established auth failure then.
++ */
++export function decideCabinetEntry(
++  auth: CabinetStudentAuth | null,
++  staff: CabinetStaff | null,
++  continuity: AttemptContinuity | null,
++): CabinetEntry | null {
++  const profile = auth?.person.profile;
++  if (!auth || !profile || !isId(auth.personId) ||
++    auth.person.enabled !== true || profile.person_id !== auth.personId ||
++    !Array.isArray(profile.roles) || !profile.roles.includes("student")) return null;
++
++  const teacher = profile.registration_complete === true &&
++    profile.roles.includes("teacher") &&
++    staff?.personId === auth.personId &&
++    staff.canOpenTeacher === true &&
++    continuity?.personId === auth.personId && continuity.state === "none";
++
++  return Object.freeze({
++    person_id: auth.personId,
++    default_cabinet: teacher ? "teacher" : "student",
++  });
++}
+diff --git a/supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts b/supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts
+new file mode 100644
+index 0000000..6c6db94
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts
+@@ -0,0 +1,78 @@
++// Review candidate only: no routing, real reader, or DB privileges installed.
++import { decideCabinetEntry, readAttemptContinuity } from "./cabinet-entry-decision.ts";
++import type { CabinetEntry, CabinetStaff, CabinetStudentAuth, CurrentAttemptRead } from "./cabinet-entry-decision.ts";
++
++type Binding = Readonly<{
++  personId: string;
++  familyId: string;
++  issuer: string;
++  subject: string;
++  sessionId: string;
++}>;
++
++type Scope = Readonly<{
++  auth: CabinetStudentAuth;
++  binding: Binding;
++}>;
++
++type AuthorizedReaders = Readonly<{
++  // Existing Clerk-bound, current opaque-token authorization, same transaction
++  // and person lock. Must verify provider liveness and its current expiry lease,
++  // not read session identity or trust phase/person labels from a GUC.
++  verifyCurrent: (accessToken: string, signal: AbortSignal) => Promise<Scope | null>;
++  // A future proof-bound reader checks the raw token against current ledger rows.
++  // Expected binding is an additional equality assertion, not an authenticator.
++  // Only server-local staff evidence for this same tuple must be returned.
++  readStaff: (accessToken: string, expected: Binding, signal: AbortSignal) =>
++    Promise<Readonly<{ binding: Binding; staff: CabinetStaff }> | null>;
++  // Existing scoped domain-phase snapshot, not the visible Student exam list.
++  // Must not run if the canonical transaction context/lock is unavailable.
++  readCurrentSeries: (expected: Binding, signal: AbortSignal) =>
++    Promise<Readonly<{ personId: string; atMs: number; rows: readonly CurrentAttemptRead[] | null }>>;
++}>;
++
++const same = (a: Binding, b: Binding): boolean =>
++  a.personId === b.personId && a.familyId === b.familyId && a.issuer === b.issuer &&
++  a.subject === b.subject && a.sessionId === b.sessionId;
++
++/**
++ * Intended only inside the existing trusted Worker transaction composition.
++ * Do not pass any outward request-supplied identity values as a scope. Auth or
++ * read faults stay faults; the external client can safely retain Student.
++ * The composing transaction must still perform its own before-commit lease check.
++ */
++export async function readAuthorizedCabinetEntry(
++  accessToken: string,
++  signal: AbortSignal,
++  readers: AuthorizedReaders,
++): Promise<CabinetEntry | null> {
++  if (typeof accessToken !== "string" || accessToken.length !== 64 || !/^[0-9a-f]{64}$/.test(accessToken))
++    return null;
++  signal.throwIfAborted();
++  const initial = await readers.verifyCurrent(accessToken, signal);
++  signal.throwIfAborted();
++  if (!initial || initial.auth.personId !== initial.binding.personId ||
++    !decideCabinetEntry(initial.auth, null, null)) return null;
++
++  const expected = Object.freeze({ ...initial.binding });
++  let scopedStaff: CabinetStaff | null = null;
++  let continuity: ReturnType<typeof readAttemptContinuity> | null = null;
++  if (initial.auth.person.profile.registration_complete && initial.auth.person.profile.roles.includes("teacher")) {
++    const read = await readers.readStaff(accessToken, expected, signal);
++    signal.throwIfAborted();
++    if (read && same(read.binding, expected) && read.staff.personId === expected.personId) {
++      scopedStaff = read.staff;
++      if (scopedStaff.canOpenTeacher === true) {
++        const attempt = await readers.readCurrentSeries(expected, signal);
++        signal.throwIfAborted();
++        if (attempt.personId === expected.personId)
++          continuity = readAttemptContinuity(expected.personId, attempt.atMs, attempt.rows);
++      }
++    }
++  }
++
++  const latest = await readers.verifyCurrent(accessToken, signal);
++  signal.throwIfAborted();
++  if (!latest || !same(latest.binding, expected) || latest.auth.personId !== expected.personId) return null;
++  return decideCabinetEntry(latest.auth, scopedStaff, continuity);
++}

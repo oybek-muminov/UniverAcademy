@@ -1,0 +1,7 @@
+-- REVIEW ONLY. Not an installed migration. No role, policy or data writes.
+-- Preflight: verify live column shape and column-named writes, view/function
+-- return contracts, and existing/older workers (incl. positional row decoders).
+-- Unexpected existing name column must stop review, not be silently skipped.
+ALTER TABLE ua_private.groups ADD COLUMN name text;
+-- Existing group rows remain NULL. New pilot provisioning rejects a missing,
+-- blank or invalid real name in its independently reviewed command boundary.

@@ -1,0 +1,85 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-add-student-group.ts b/supabase/functions/univeracademy-api/teacher-add-student-group.ts
+new file mode 100644
+index 0000000..9b660e5
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-add-student-group.ts
+@@ -0,0 +1,79 @@
++// Unmounted domain logic; no Student/grant/persistence or confirmation defaults.
++import {fail} from "./fault.ts";
++import {currentStaff,nextRevision} from "./staff-state.ts";
++import type {StaffState,VerifiedStaffProof} from "./staff-state.ts";
++
++type Pair=Readonly<{personId:string;groupId:string;active:boolean;revision:number;epoch:number}>;
++type Observed=Readonly<{
++  complete:true; personId:string; enabled:boolean; registeredStudent:boolean;
++  // Server-only complete set fingerprint/revision, never a caller assertion.
++  membershipSetTag:string; pairs:readonly Pair[];
++}>;
++type VerifiedConfirmation=Readonly<{
++  kind:"verified_group_add"; actorId:string; studentId:string; groupId:string;
++  membershipSetTag:string; expiresAt:number;
++}>;
++type LockedInput=Readonly<{
++  nowMs:number; staffState:Pick<StaffState,"staff">; staffProof:VerifiedStaffProof;
++  lockedPersonIds:readonly string[]; lockedGroupIds:readonly string[];
++  target:Readonly<{groupId:string;status:"active"|"archived"}>;
++  student:Observed; confirmation:VerifiedConfirmation;
++}>;
++
++export type MembershipAddDecision=
++  | Readonly<{kind:"already_member"}>
++  | Readonly<{
++    kind:"add_pair"; expectedMembershipSetTag:string;
++    expected:Readonly<{revision:number;epoch:number;active:false}>|null;
++    next:Pair;
++  }>;
++
++const uuid=(v:unknown):v is string=>typeof v==="string"&&v.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
++const count=(v:unknown):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0;
++const tag=(v:unknown):v is string=>typeof v==="string"&&v.length>=16&&v.length<=256;
++const bad=():never=>fail("RESPONSE_INVARIANT_FAILED",500);
++
++/**
++ * The composing transaction must verify the current Clerk lease and opaque
++ * explicit consent separately, and hold actor/student plus current own-group
++ * locks before invoking this pure planner. Its result is never an auth proof.
++ */
++export function planTeacherAddStudentGroup(input:LockedInput):MembershipAddDecision {
++  const {nowMs,staffState,staffProof,lockedPersonIds,lockedGroupIds,target,student,confirmation}=input;
++  if(!count(nowMs)) fail("SERVICE_UNAVAILABLE",503);
++  const actor=currentStaff(staffState,staffProof,nowMs);
++  // This operation's Teacher authority is the current explicit group grant.
++  // The existing generic roster flag belongs to the separate Admin flow.
++  if(!actor.roles.includes("teacher")) fail("FORBIDDEN",403);
++  const groupId=target?.groupId;
++  if(!uuid(groupId)||target.status!=="active"||!actor.scope.group_ids.includes(groupId)) fail("NOT_FOUND",404);
++  if(!uuid(actor.personId)||!uuid(student?.personId)||
++    !lockedPersonIds.includes(actor.personId)||!lockedPersonIds.includes(student.personId)||!lockedGroupIds.includes(groupId)) return bad();
++  if(!student.enabled||!student.registeredStudent) fail("NOT_FOUND",404);
++  if(confirmation?.kind!=="verified_group_add"||confirmation.actorId!==actor.personId||
++    confirmation.studentId!==student.personId||confirmation.groupId!==groupId||
++    !tag(confirmation.membershipSetTag)||!count(confirmation.expiresAt)||nowMs>=confirmation.expiresAt)
++    fail("FORBIDDEN",403);
++  if(student.complete!==true||!tag(student.membershipSetTag)||!Array.isArray(student.pairs)||
++    student.pairs.length>500) fail("SERVICE_UNAVAILABLE",503);
++
++  const seen=new Set<string>();let existing:Pair|null=null;
++  for(const pair of student.pairs){
++    if(!pair||pair.personId!==student.personId||!uuid(pair.groupId)||seen.has(pair.groupId)||
++      typeof pair.active!=="boolean"||!count(pair.revision)||!count(pair.epoch)) return bad();
++    seen.add(pair.groupId);
++    if(pair.groupId===groupId) existing=pair;
++  }
++  // A verified, unexpired confirmation repeated for an existing active pair has
++  // no persistence effects, even if the pupil's unrelated groups have changed.
++  if(existing?.active===true) return Object.freeze({kind:"already_member"});
++  if(confirmation.membershipSetTag!==student.membershipSetTag) fail("RESOURCE_REVISION_CONFLICT",409);
++  const expected=existing?Object.freeze({revision:existing.revision,epoch:existing.epoch,active:false as const}):null;
++  return Object.freeze({
++    kind:"add_pair",
++    expectedMembershipSetTag:student.membershipSetTag,expected,
++    next:Object.freeze({personId:student.personId,groupId,active:true,
++      revision:existing?nextRevision(existing.revision):1,epoch:existing?nextRevision(existing.epoch):1}),
++  });
++}

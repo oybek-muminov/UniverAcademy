@@ -1,0 +1,25 @@
+# Teacher create-group persistence: reviewed contract gates
+
+Pinned canonical main 3dbb714f2f758c7dbe03548a71c161718cf9cb53. This is an unmounted storage contract, not executable SQL or authority to change a project.
+
+## Why the writer is deliberately absent
+
+- tests/account-deletion/schema-catalog.json shows groups has only id/revision/status, and staff_group_scope FK/PK (person_id,group_id). Existing UUID relationships must remain unchanged.
+- tests/telegram-entry/production-auth-extended-catalog.json lists forced RLS and owner-only table ACL snapshots for groups, staff_group_scope, staff_receipts, and staff_audit, without a narrow Teacher insert policy. A Student pool, generic owner/invariant/deletion credential, client role or mutable setting must not substitute for current reviewed Teacher authoring authority. Snapshot alone is not live permission verification.
+- StaffFirstTestRows:137–138,181–188 shows the current user/operation receipt and audit convention. The two tables require each other with initially deferred FKs and immutable history triggers. A receipt-only implementation cannot commit correctly. Existing account deletion preparation also rejects staff audit actor/target relevance. Adding group_create audit entries without an explicit staff history/deletion policy would silently change account lifecycle; omitting audit or taking a separate unaudited writer bypass would be wrong.
+
+Therefore the current createTeacherGroup(..., writer) stays unavailable without a reviewed writer. No INSERT branch, roles, break-glass bypass or table migration is supplied.
+
+## Narrow additive schema and exact transaction contract
+
+- Proposed change: nullable text ua_private.groups.name, no default. Preserve all group UUIDs, references and existing names. Require explicit real group name for new requests, no invented default. Recheck empty/null count at rollout; fill any future legacy null only from owner-confirmed values. Keep initial status and revision within existing group constraints and safe_counter. Do not use a subject title or fake ID as the group name.
+- Required canonical authority: same independently verified, live Clerk actor locked under the existing identity/person order; current enabled and approved Teacher, with active approved subject, no supplied identity/target account. Writer only for one reviewed route/action; no general group grants, account role modification, roster rights elevation, enrollment, or assignment. No canonical subject ID exists yet; pilot display label Fizika is not authority, and this change seeds no subjects.
+- Canonical operation receipt key: actor_id + POST + canonical path /teacher/groups + bounded idempotency key as in the application domain. Payload is exactly its normalized name string in the existing serialized one-field representation. Record response only the checked original group ID/name/revision/status. Do not reuse the older /admin/groups operation or its approval semantics. UUID generated server-side.
+- Inside one canonical transaction, after role/proof and actor lock, read the keyed immutable receipt and current matching exact creator scope. If replay: require current nonrevoked scope to the receipt's group and valid Teacher authority; on matching canonical payload return the original receipt (not current group edit state and never reactivate it); different payload conflicts. Do not expose or reserve other teachers' keys/groups. Refuse missing or invalid receipt/ownership evidence. Reauthorize again before response/commit and enforce live provider lease and abort.
+- If no receipt: insert exactly one group with its real name and create exactly one matching staff_group_scope row for the actor; no upsert/unrevocation or existing-scope modification. Establish exact receipt and paired audit only after the product confirms their lifecycle, using one rollback boundary. Named audit proposal: action group_create, issuer-authorized actor, target new group UUID, original revision, authoritative DB time, command_key same canonical receipt key. No unrelated insert/update/deletion, and never put a credential in receipts/audit. UUID collision, conflicting keys, missing scope rows, unexpected affected-row count or failed auth/liveness aborts the entire unit.
+
+## Decision needed before writing SQL
+
+1. Confirm staff audit retention/account deletion for Teacher who creates groups. Recommended path is canonical paired receipt/audit and an explicit deletion/retention decision, not a separate receipt island that hides an action. Preserve existing deletion invariants until reviewed.
+2. Approve the exact credential/operation-level RLS boundary for this one transaction and scoped replay. Current source does not give it. Keep unrelated rights unchanged; only validate real current roles with authorized accounts.
+3. Approve the additive name column and true rollout parity; owner-confirmed explicit Fizika ID-to-label configuration comes separately with real approval. Then design and verify the real mutation with owner-authorized pilot. No urgent live writes, migration, fixture data or execution in this artifact.

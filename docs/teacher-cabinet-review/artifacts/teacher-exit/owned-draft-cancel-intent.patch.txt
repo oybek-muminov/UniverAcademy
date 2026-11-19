@@ -1,0 +1,71 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-draft-cancel-intent.ts b/supabase/functions/univeracademy-api/teacher-draft-cancel-intent.ts
+new file mode 100644
+index 0000000..2edf873
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-draft-cancel-intent.ts
+@@ -0,0 +1,65 @@
++import { fail } from "./fault.ts";
++import type { DraftRecord, StaffAccessRecord } from "./staff-state.ts";
++
++// Separate from Version.status. No stored terminal marker or mutation exists.
++const confirmation = "cancel-own-unpublished-draft-v1";
++const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
++const idempotency = /^[A-Za-z0-9_-]{8,128}$/u;
++type Pin = Readonly<{
++  personId: string; versionId: string; demoId: string; subjectId: string; revision: number;
++}>;
++
++// Future trusted caller independently verifies current Clerk/person and raw
++// singleton Teacher role, locks the same current draft, and supplies complete
++// domain evidence. These are not input/request schemas or authorizations.
++export type DraftCancellationEvidence = Readonly<{
++  ownership: Readonly<Pin & { kind: "verified_own_draft" }>;
++  noPublishedOrStudentDependencies: Readonly<Pin & { kind: "verified_no_dependents" }>;
++}>;
++export type DraftCancellationPermit = Readonly<Pin & {
++  kind: "reviewed_locked_teacher_draft_cancel"; idempotencyKey: string;
++}>;
++export type DraftCancellationIntent = Readonly<Pin & {
++  kind: "terminal_draft_cancel_intent"; idempotencyKey: string;
++}>;
++
++function samePin(a: Pin, b: Pin): boolean {
++  return a.personId === b.personId && a.versionId === b.versionId &&
++    a.demoId === b.demoId && a.subjectId === b.subjectId && a.revision === b.revision;
++}
++
++export function planTeacherDraftCancellation(actor: StaffAccessRecord, draft: DraftRecord,
++  input: unknown, evidence: DraftCancellationEvidence, permit: DraftCancellationPermit,
++): DraftCancellationIntent {
++  if (!actor.enabled || !actor.approved || actor.roles.length !== 1 || actor.roles[0] !== "teacher")
++    fail("FORBIDDEN", 403);
++  if (!input || typeof input !== "object" || Array.isArray(input))
++    fail("VALIDATION_ERROR", 422);
++  const command = input as Record<string, unknown>;
++  if (Object.keys(command).sort().join(",") !== "confirmation,expected_revision,idempotency_key" ||
++      command.confirmation !== confirmation || typeof command.expected_revision !== "number" ||
++      !Number.isSafeInteger(command.expected_revision) || command.expected_revision < 0 ||
++      typeof command.idempotency_key !== "string" || !idempotency.test(command.idempotency_key))
++    fail("VALIDATION_ERROR", 422);
++  const wire = draft.wire;
++  if (wire.status !== "draft" || draft.publishedSnapshot !== undefined) fail("VERSION_FROZEN", 409);
++  const pin = { personId: actor.personId, versionId: wire.id, demoId: wire.demo_id,
++    subjectId: draft.subjectId, revision: wire.revision };
++  if (![pin.personId,pin.versionId,pin.demoId].every(id => typeof id === "string" && uuid.test(id)) ||
++      typeof pin.subjectId !== "string" || !pin.subjectId || !Number.isSafeInteger(pin.revision) || pin.revision < 0)
++    fail("RESPONSE_INVARIANT_FAILED", 500);
++  if (evidence?.ownership?.kind !== "verified_own_draft" || !samePin(evidence.ownership, pin))
++    fail("NOT_FOUND", 404);
++  if (permit?.kind !== "reviewed_locked_teacher_draft_cancel" ||
++      permit.idempotencyKey !== command.idempotency_key ||
++      !samePin(permit, { ...pin, revision: command.expected_revision }))
++    fail("SERVICE_UNAVAILABLE", 503);
++  if (command.expected_revision !== pin.revision) fail("RESOURCE_REVISION_CONFLICT", 409);
++  if (evidence?.noPublishedOrStudentDependencies?.kind !== "verified_no_dependents" ||
++      !samePin(evidence.noPublishedOrStudentDependencies, pin))
++    fail("SERVICE_UNAVAILABLE", 503);
++
++  // Never mutate draft or publish state. A future acknowledged terminal CAS,
++  // paired audit/receipt and publisher interlock must consume this intent.
++  return Object.freeze({ kind: "terminal_draft_cancel_intent", ...pin, idempotencyKey: command.idempotency_key });
++}

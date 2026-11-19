@@ -1,0 +1,106 @@
+diff --git a/supabase/functions/univeracademy-api/storage/cabinet-staff-capability.ts b/supabase/functions/univeracademy-api/storage/cabinet-staff-capability.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d806f87ea47da3d5381fe0d9eac473c9494a5ac
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/storage/cabinet-staff-capability.ts
+@@ -0,0 +1,54 @@
++import { fail } from "../fault.ts";
++import type { PgClient } from "./postgres-transaction.ts";
++
++export type CabinetStaffActor=Readonly<{personId:string;issuer:string;subject:string}>;
++export type CabinetStaffCapabilityReader=(actor:CabinetStaffActor,signal:AbortSignal)=>Promise<boolean>;
++
++const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++const capability=`
++SELECT EXISTS (
++  SELECT 1
++  FROM ua_private.clerk_identities AS i
++  JOIN ua_private.people AS p ON p.id=i.person_id
++  JOIN ua_private.staff_access AS a ON a.person_id=p.id
++  WHERE i.person_id=$1::uuid AND i.issuer=$2 AND i.subject=$3
++    AND i.enabled IS TRUE AND p.enabled IS TRUE
++    AND 'teacher'=ANY(p.roles) AND a.approved IS TRUE
++    AND EXISTS (
++      SELECT 1 FROM ua_private.teacher_subject_approvals AS t
++      WHERE t.person_id=p.id AND t.approved IS TRUE
++        AND t.revoked_at_ms IS NULL AND t.subject_id<>''
++    )
++) AS can_open_teacher`;
++
++const unavailable=():never=>fail("SERVICE_UNAVAILABLE",503);
++
++/**
++ * Unmounted, Worker-only adapter. The caller injects a separate request-owned
++ * capability connection whose role has only reviewed read privileges, sends no
++ * app proof/digest, and owns cancellation, timeout and disposal. Never use
++ * the Student transaction client here. One unlocked statement on the other
++ * connection is not atomic with the Student lock/snapshot and must not request
++ * a person lock. The caller rechecks its own Clerk lease before accepting it.
++ */
++export function createCabinetStaffCapabilityReader(
++  client:Pick<PgClient,"query">,
++):CabinetStaffCapabilityReader{
++  if(typeof client?.query!=="function")return unavailable();
++  return async(actor,signal)=>{
++    if(signal.aborted||!actor||typeof actor.personId!=="string"||!uuid.test(actor.personId)||
++      typeof actor.issuer!=="string"||actor.issuer.length>512||!/^https:\/\/[^/\s]+$/.test(actor.issuer)||
++      typeof actor.subject!=="string"||actor.subject.length>256||!/^user_[A-Za-z0-9]+$/.test(actor.subject))
++      return unavailable();
++    let rows:Awaited<ReturnType<PgClient["query"]>>["rows"];
++    try{
++      ({rows}=await client.query({name:"ua_cabinet_staff_capability_v1",text:capability,
++        values:[actor.personId,actor.issuer,actor.subject]}));
++    }catch{return unavailable();}
++    if(signal.aborted||!Array.isArray(rows)||rows.length!==1)return unavailable();
++    const row=rows[0];
++    if(!row||Reflect.ownKeys(row).length!==1||
++      typeof Object.getOwnPropertyDescriptor(row,"can_open_teacher")?.value!=="boolean")return unavailable();
++    return row.can_open_teacher as boolean;
++  };
++}
+diff --git a/supabase/functions/univeracademy-api/storage/clerk-domain.ts b/supabase/functions/univeracademy-api/storage/clerk-domain.ts
+index d2a8da5c9784269b47775a50b6232365a9cde31c..5be39aa0aa20810f3ce462dcae22c0b365414c44 100644
+--- a/supabase/functions/univeracademy-api/storage/clerk-domain.ts
++++ b/supabase/functions/univeracademy-api/storage/clerk-domain.ts
+@@ -20,6 +20,7 @@ import {StaffAccessRows} from "./staff-access-rows.ts";
+ import {StaffFirstTestRows} from "./staff-first-test-rows.ts";
+ import type {readAuthorizedCabinetEntry} from "../cabinet-entry-scoped-read.ts";
+ import {readCabinetCurrentSeries} from "./cabinet-current-series.ts";
++import type {CabinetStaffCapabilityReader} from "./cabinet-staff-capability.ts";
+ import {resetTrustedServerContext,setTrustedPhase,setTrustedClerk,closeTrustedServerContext} from "./trusted-server-context.ts";
+ 
+ function emptyStudent():StudentState{return{people:{},families:{},access:{},refresh:{},consumedInitData:{},grants:{},assignments:{},series:{},attempts:{},receipts:{},bonuses:{},cancellations:{}};}
+@@ -49,8 +50,6 @@ type CabinetScope=NonNullable<Awaited<ReturnType<CabinetReaders["verifyCurrent"]
+ type CabinetBinding=CabinetScope["binding"];
+ type CabinetHttpScope=Readonly<{request:Request;signal:AbortSignal;accessToken:string;pool:PgPool;
+   clerk:Readonly<{verifier:ClerkVerifierConfiguration;liveness:ClerkLiveness}>}>;
+-type CabinetStaffRead=(tx:LockedTransaction,token:string,binding:CabinetBinding,signal:AbortSignal)=>
+-  ReturnType<CabinetReaders["readStaff"]>;
+ const sameCabinetBinding=(a:CabinetBinding,b:CabinetBinding)=>
+   a.personId===b.personId&&a.familyId===b.familyId&&a.issuer===b.issuer&&
+   a.subject===b.subject&&a.sessionId===b.sessionId;
+@@ -62,7 +61,7 @@ const sameCabinetBinding=(a:CabinetBinding,b:CabinetBinding)=>
+  * env/request input. This module issues no SQL privileges or database writes.
+  */
+ export function createCabinetReadersTransaction(options:{
+-  readStaffCapability?:CabinetStaffRead;currentAttemptPolicyVerified?:true;
++  readStaffCapability?:CabinetStaffCapabilityReader;currentAttemptPolicyVerified?:true;
+ }={}){
+   const readStaffCapability=options.readStaffCapability;
+   const policyVerified=options.currentAttemptPolicyVerified===true;
+@@ -157,9 +156,13 @@ export function createCabinetReadersTransaction(options:{
+           readStaff:async(token,expected,requestSignal)=>{
+             if(token!==accessToken)fail("SESSION_REVOKED",401);
+             const binding=requireBinding(expected,requestSignal);
+-            const staff=await readStaffCapability(tx,token,binding,signal);
++            // The dedicated reader gets only the verified same-person
++            // Clerk mapping tuple, not this transaction client or any app proof.
++            const actor=Object.freeze({personId:binding.personId,issuer:binding.issuer,subject:binding.subject});
++            const canOpenTeacher=await readStaffCapability(actor,signal);
+             checkLease();
+-            return staff;
++            if(typeof canOpenTeacher!=="boolean")fail("SERVICE_UNAVAILABLE",503);
++            return {binding,staff:{personId:binding.personId,canOpenTeacher}};
+           },
+           readCurrentSeries:async(expected,requestSignal)=>{
+             const binding=requireBinding(expected,requestSignal);

@@ -1,0 +1,128 @@
+diff --git a/apps/teacher-web/src/manual-draft-editor.d.mts b/apps/teacher-web/src/manual-draft-editor.d.mts
+new file mode 100644
+index 0000000..5db1099
+--- /dev/null
++++ b/apps/teacher-web/src/manual-draft-editor.d.mts
+@@ -0,0 +1,37 @@
++export type ManualQuestionBlock =
++  | Readonly<{type:"text";markdown:string}>
++  | Readonly<{type:"formula";latex:string;display:"inline"|"block"}>;
++type Option = Readonly<{id:string;blocks:readonly ManualQuestionBlock[]}>;
++export type ManualDraftQuestion = Readonly<{
++  id:string;
++  position:number;
++  expected_revision:number;
++  prompt_blocks:readonly ManualQuestionBlock[];
++  options:readonly [Option,Option,Option,Option];
++  correct_option_id:string;
++  explanation_blocks:readonly ManualQuestionBlock[];
++  individual_points?:string|null;
++}>;
++type Identity = Readonly<{personId:string;generation:string}>;
++type Version = Readonly<{id:string;revision:number;status:"draft"|"published"}>;
++type Outcome =
++  | Readonly<{kind:"saved";version:Version}>
++  | Readonly<{kind:"signed-out"|"busy"|"identity-changed"|"forbidden"|"conflict"|"invalid"|"unavailable"}>;
++export type ManualDraftTransportV1 = Readonly<{
++  saveQuestion(input:Readonly<{
++    protocol:"teacher-manual-question-v1";
++    expected:Identity; // Equality check with freshly verified current caller only.
++    versionId:string;
++    question:ManualDraftQuestion;
++    idempotencyKey:string;
++    signal:AbortSignal;
++  }>):Promise<Readonly<{status:number;data?:Version}>>;
++}>;
++export function createManualDraftEditorV1(config:Readonly<{
++  identity:Readonly<{current():Identity|null}>;
++  transport:ManualDraftTransportV1;
++}>):Readonly<{
++  protocol:"teacher-manual-question-v1";
++  saveQuestion(target:Version,question:ManualDraftQuestion,
++    options:Readonly<{signal:AbortSignal;idempotencyKey:string}>):Promise<Outcome>;
++}>;
+diff --git a/apps/teacher-web/src/manual-draft-editor.mjs b/apps/teacher-web/src/manual-draft-editor.mjs
+new file mode 100644
+index 0000000..1c8ada5
+--- /dev/null
++++ b/apps/teacher-web/src/manual-draft-editor.mjs
+@@ -0,0 +1,79 @@
++// Versioned, opt-in browser port. There is no default transport or mount.
++const protocol = 'teacher-manual-question-v1';
++const uuid = value => typeof value === 'string' && value.length === 36 &&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(value);
++const revision = value => Number.isSafeInteger(value) && value >= 0;
++
++function snapshot(identity) {
++  const value = identity.current();
++  if (value === null) return null;
++  if (!value || !uuid(value.personId) || typeof value.generation !== 'string' ||
++      value.generation.length < 1 || value.generation.length > 200)
++    throw new Error('teacher identity unavailable');
++  return Object.freeze({personId: value.personId, generation: value.generation});
++}
++const same = (left, right) => left !== null && right !== null &&
++  left.personId === right.personId && left.generation === right.generation;
++
++/**
++ * Transport receives the locally expected identity only for an equality
++ * assertion. At dispatch it must derive the current Clerk person itself,
++ * verify it equals expected, then invoke server-side manual preparation and the
++ * canonical staff handler with one matching independently authorized identity.
++ * Do not copy local identity into a request URL, header or authorization claim.
++ */
++export function createManualDraftEditorV1({identity, transport}) {
++  if (typeof identity?.current !== 'function' || typeof transport?.saveQuestion !== 'function')
++    throw new Error('teacher draft editor unavailable');
++
++  // Prevent parallel saves in this editor, including an account switch while
++  // delivery is unresolved. This is UI protection, not server idempotency.
++  let busy = false;
++  return Object.freeze({
++    protocol,
++    async saveQuestion(target, question, options) {
++      const signal = options?.signal;
++      if (!signal || typeof signal.throwIfAborted !== 'function') throw new Error('cancellation required');
++      signal.throwIfAborted();
++      const expected = snapshot(identity);
++      if (expected === null) return {kind:'signed-out'};
++      if (busy) return {kind:'busy'};
++      const versionId = target?.id, expectedRevision = target?.revision;
++      const key = options?.idempotencyKey;
++      if (target?.status !== 'draft' || !uuid(versionId) || !revision(expectedRevision) ||
++          !question || typeof question !== 'object' || Array.isArray(question) ||
++          typeof key !== 'string' || key.length < 8 || key.length > 128 || /[^A-Za-z0-9_.~-]/.test(key))
++        throw new Error('invalid draft editor input');
++
++      // The server bridge remains the sole schema/body authority; the port
++      // does not generate IDs, guess the correct option or retry writes.
++      const draft = structuredClone(question);
++      if (!uuid(draft.id) || draft.expected_revision !== expectedRevision)
++        throw new Error('invalid draft revision');
++      signal.throwIfAborted();
++      if (!same(expected, snapshot(identity))) return {kind:'identity-changed'};
++      busy = true;
++      try {
++        // The result must be a normalized server envelope from the trusted
++        // transport, never an echo of the submitted DTO.
++        const out = await transport.saveQuestion({
++          protocol, expected, versionId, question: draft, idempotencyKey:key, signal
++        });
++        signal.throwIfAborted();
++        if (!same(expected, snapshot(identity))) return {kind:'identity-changed'};
++        if (out?.status === 401) return {kind:'signed-out'};
++        if (out?.status === 403 || out?.status === 404) return {kind:'forbidden'};
++        if (out?.status === 409) return {kind:'conflict'};
++        if (out?.status === 422) return {kind:'invalid'};
++        if (out?.status !== 200) return {kind:'unavailable'};
++        const version = out.data;
++        if (!version || version.id !== versionId || !revision(version.revision) ||
++            version.revision <= expectedRevision ||
++            (version.status !== 'draft' && version.status !== 'published'))
++          throw new Error('invalid draft editor response');
++        // A replay may return a later published version; never reopen it.
++        return {kind:'saved',version:Object.freeze({id:version.id,revision:version.revision,status:version.status})};
++      } finally { busy = false; }
++    },
++  });
++}

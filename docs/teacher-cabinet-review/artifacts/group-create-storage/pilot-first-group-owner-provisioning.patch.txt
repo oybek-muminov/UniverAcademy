@@ -1,0 +1,35 @@
+diff --git a/supabase/proposals/pilot-first-group-name.review.sql b/supabase/proposals/pilot-first-group-name.review.sql
+new file mode 100644
+index 0000000..428aacd
+--- /dev/null
++++ b/supabase/proposals/pilot-first-group-name.review.sql
+@@ -0,0 +1,7 @@
++-- REVIEW ONLY. Not an installed migration. No role, policy or data writes.
++-- Preflight: verify live column shape and column-named writes, view/function
++-- return contracts, and existing/older workers (incl. positional row decoders).
++-- Unexpected existing name column must stop review, not be silently skipped.
++ALTER TABLE ua_private.groups ADD COLUMN name text;
++-- Existing group rows remain NULL. New pilot provisioning rejects a missing,
++-- blank or invalid real name in its independently reviewed command boundary.
+diff --git a/supabase/proposals/pilot-first-group-owner-provisioning.review.md b/supabase/proposals/pilot-first-group-owner-provisioning.review.md
+new file mode 100644
+index 0000000..449ad3b
+--- /dev/null
++++ b/supabase/proposals/pilot-first-group-owner-provisioning.review.md
+@@ -0,0 +1,16 @@
++# First real pilot group: owner provisioning only
++
++Pinned main 3dbb714f2f758c7dbe03548a71c161718cf9cb53. This is the one-group pilot specialization of the prior group-create and group-create-storage proposals; the separate Teacher create command remains unmounted and is not needed for this initial owner operation.
++
++## Minimal storage delta
++
++The copied catalog in tests/account-deletion/schema-catalog.json declares groups(id UUID, revision safe_counter, status text) and staff_group_scope primary key (person_id, group_id), with FKs to people and groups. The extended catalog shows groups and staff_group_scope FORCE RLS and the recorded owner-only ACL; it is not live authorization evidence. The adjacent review-only SQL adds one nullable, no-default text field. Existing IDs and FKs remain intact. No table or role is created, no rows are inserted, backfilled, or promoted. Old readers using explicit old columns continue to work; check positional INSERTs/decoders, SELECT *, dependent views/return types and lock timeout before reviewing the migration. New metadata views omit or fail closed for unresolved names, never present an ID as a name. No NOT NULL/default until all legacy rows and writers are known. An app rollback keeps the additive column; once it holds real names do not drop it to roll back code.
++
++## Exact command boundary to approve, not an executable writer
++
++- After independent verified current app Owner authentication, not merely dashboard session or submitted UUID, invoke at most one explicit operation for one real name and one independently verified current Teacher. No public route or new role. Validate a normalized nonblank plain-text name under the existing candidate bounds. Generate the group UUID server-side; use existing active status and reviewed counter initialization, not a supplied ID/revision.
++- Resolve exact Owner and intended Teacher through existing enabled canonical identities. Use established Clerk identity/advisory and canonical ordered person-lock protocol, compatible with deletion; read fresh provider state and authoritative DB time. Reject disabled, deletion-frozen, stale/revoked records, unexpected role/actor identity or preexisting unrelated scope; require a named exact Fizika subject ID in accepted owner config and active approved Teacher subject. Label alone, arbitrary existing database-owner credential and inherited management rights do not authorize provisioning.
++- Under a single transaction reauthorize, examine immutable canonical actor+operation+key receipt before allocating a new UUID, then insert one existing-schema group plus its name and one active exact scope link for that Teacher and new group only (revoked_at_ms NULL). No broad capabilities, general subject scope, role appointments, existing-grant reactivation, roster/test creation or Student writes. Replays reauthorize current Owner and verify original complete result/current exact scope; equal request returns the same ID only, nonmatching request conflicts, missing/revoked/reassigned scope fails without reactivation. A separate approved operation is needed to release or transfer rights.
++- Audit is not optional. Existing staff receipt and audit require each other through initially deferred FKs, keys embed actor IDs, and the actor FK points to people. The old deletion guard blocks staff scope even when revoked and staff receipt/audit actor/target references. Owner attribution alone does not solve the Teacher scope deletion gate; including Teacher identity in a payload also creates a review obligation. Don't introduce unmanaged history, alter/delete legacy rows, claim atomicity for an external record, or persist an unaudited group. First settle exact least-privilege transaction authority and receipt/audit/deletion handling including attribution, retained identifiers and scope release; verify exact live policies/ACL and installed deletion functions under separate authorization.
++
++No production action is implied, no group name, Teacher UUID or subject ID is assumed, and no write is implemented. User need not provide group/test content merely to review this proposal.

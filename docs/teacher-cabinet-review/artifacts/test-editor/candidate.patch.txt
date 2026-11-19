@@ -1,0 +1,110 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-manual-question.ts b/supabase/functions/univeracademy-api/teacher-manual-question.ts
+new file mode 100644
+index 0000000..2e4ba8d
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-manual-question.ts
+@@ -0,0 +1,104 @@
++// Review-only input bridge to the existing provisional staff QuestionWrite.
++import { fail } from "./fault.ts";
++import { parseIndividualQuestionPoints } from "./individual-points.ts";
++import type { QuestionWrite, StaffAccessRecord } from "./staff-state.ts";
++
++type QuestionBlock = QuestionWrite["prompt_blocks"][number];
++type DraftTarget = Readonly<{id:string; subjectId:string; revision:number; status:string}>;
++type Command = Readonly<{
++  method:"PUT";
++  path:string;
++  idempotencyKey:string;
++  body:string;
++}>;
++
++const uuid=(value:unknown):value is string=>
++  typeof value==="string"&&value.length===36&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
++const invalid=():never=>fail("VALIDATION_ERROR",422);
++
++function data(value:unknown,required:readonly string[],optional:readonly string[]=[]):Record<string,unknown> {
++  if(!value||typeof value!=="object"||Object.getPrototypeOf(value)!==Object.prototype) return invalid();
++  const keys=Reflect.ownKeys(value);
++  if(keys.some(key=>typeof key!=="string"||(!required.includes(key)&&!optional.includes(key)))) return invalid();
++  const entries=keys.map(key=>{
++    const field=Object.getOwnPropertyDescriptor(value,key);
++    if(!field||!Object.hasOwn(field,"value")) return invalid();
++    return [key,field.value];
++  });
++  if(required.some(key=>!Object.hasOwn(value,key))) return invalid();
++  return Object.fromEntries(entries);
++}
++
++function blocks(value:unknown,allowEmpty:boolean):QuestionBlock[] {
++  if(!Array.isArray(value)||value.length>100||(!allowEmpty&&!value.length)) return invalid();
++  return Array.from({length:value.length},(_,index)=>{
++    const row=Object.getOwnPropertyDescriptor(value,String(index));
++    if(!row||!Object.hasOwn(row,"value")) return invalid();
++    const rough=data(row.value,["type"],["markdown","latex","display","asset_id","alt","caption"]);
++    if(rough.type==="image") fail("SERVICE_UNAVAILABLE",503); // Canonical asset validation not connected.
++    if(rough.type==="text"){
++      const block=data(row.value,["type","markdown"]);
++      if(typeof block.markdown!=="string"||block.markdown.length>20000||!block.markdown.trim()) return invalid();
++      return {type:"text",markdown:block.markdown};
++    }
++    if(rough.type==="formula"){
++      const block=data(row.value,["type","latex","display"]);
++      if(typeof block.latex!=="string"||block.latex.length>10000||!block.latex.trim()||
++        (block.display!=="inline"&&block.display!=="block")) return invalid();
++      return {type:"formula",latex:block.latex,display:block.display};
++    }
++    return invalid();
++  });
++}
++
++/**
++ * Call only with the server's current verified Teacher and canonical draft read.
++ * The eventual receiver must independently reverify authority, revision,
++ * position uniqueness, assets and operation receipts under its normal locks.
++ * This function neither calls a route nor creates/publishes/assigns a test.
++ */
++export function prepareTeacherManualQuestion(staff:StaffAccessRecord,target:DraftTarget,
++  input:unknown,idempotencyKey:unknown):Command{
++  if(!staff.enabled||!staff.approved||!staff.roles.includes("teacher")) fail("FORBIDDEN",403);
++  if(!uuid(target.id)||typeof target.subjectId!=="string"||
++     !staff.approvedSubjectIds.includes(target.subjectId)) fail("NOT_FOUND",404);
++  if(target.status!=="draft") fail("VERSION_FROZEN",409);
++  if(typeof idempotencyKey!=="string"||idempotencyKey.length<8||idempotencyKey.length>128||
++    /[^A-Za-z0-9_.~-]/.test(idempotencyKey)) return invalid();
++  const row=data(input,["id","position","options","correct_option_id","prompt_blocks",
++    "explanation_blocks","expected_revision"],["individual_points"]);
++  if(!uuid(row.id)||!uuid(row.correct_option_id)||typeof row.position!=="number"||
++    !Number.isSafeInteger(row.position)||row.position<1||typeof row.expected_revision!=="number"||
++    !Number.isSafeInteger(row.expected_revision)||row.expected_revision<0) return invalid();
++  if(!Number.isSafeInteger(target.revision)||target.revision<0) fail("SERVICE_UNAVAILABLE",503);
++  if(target.revision!==row.expected_revision) fail("RESOURCE_REVISION_CONFLICT",409);
++  const rawOptions=row.options;
++  if(!Array.isArray(rawOptions)||rawOptions.length!==4) fail("INVALID_OPTION",422);
++  const options=Array.from({length:4},(_,index)=>{
++    const field=Object.getOwnPropertyDescriptor(rawOptions,String(index));
++    if(!field||!Object.hasOwn(field,"value")) fail("INVALID_OPTION",422);
++    const option=data(field.value,["id","blocks"]);
++    if(!uuid(option.id)) fail("INVALID_OPTION",422);
++    return {id:option.id.toLowerCase(),blocks:blocks(option.blocks,false)};
++  });
++  const correct=row.correct_option_id.toLowerCase();
++  const optionIds=new Set(options.map(option=>option.id));
++  if(optionIds.size!==4||!optionIds.has(correct)) fail("INVALID_OPTION",422);
++  const body:QuestionWrite = {
++    id:row.id.toLowerCase(),position:row.position,options,correct_option_id:correct,
++    prompt_blocks:blocks(row.prompt_blocks,false),explanation_blocks:blocks(row.explanation_blocks,true),
++    expected_revision:row.expected_revision,
++  };
++  if(Object.hasOwn(row,"individual_points")){
++    const points=row.individual_points;
++    if(points!==null){
++      if(typeof points!=="string") return invalid();
++      parseIndividualQuestionPoints(points);
++    }
++    body.individual_points=points;
++  }
++  const serialized=JSON.stringify(body);
++  if(new TextEncoder().encode(serialized).length>128_000) return invalid();
++  return Object.freeze({method:"PUT",path:"/api/v1/admin/versions/"+target.id.toLowerCase()+"/questions/"+body.id,
++    idempotencyKey,body:serialized});
++}

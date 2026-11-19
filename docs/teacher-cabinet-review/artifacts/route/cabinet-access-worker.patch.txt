@@ -1,0 +1,168 @@
+diff --git a/runtime/cabinet-access-http.mjs b/runtime/cabinet-access-http.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..0c5db449cc7fcc20c9ca4e1038dd5ea09e148c52
+--- /dev/null
++++ b/runtime/cabinet-access-http.mjs
+@@ -0,0 +1,56 @@
++import {readAuthorizedCabinetEntry} from "../supabase/functions/univeracademy-api/cabinet-entry-scoped-read.ts";
++
++const path="/api/v1/me/cabinet-access";
++const token=/^Bearer ([0-9a-f]{64})$/i;
++function json(status,data,extra={}){
++  return new Response(JSON.stringify(data),{status,headers:{
++    "content-type":"application/json; charset=utf-8","cache-control":"no-store",
++    "cdn-cache-control":"no-store","cloudflare-cdn-cache-control":"no-store",...extra,
++  }});
++}
++function reject(code,status,extra){
++  return json(status,{error:{code,message:code,request_id:crypto.randomUUID()}},extra);
++}
++const unavailable=()=>reject("SERVICE_UNAVAILABLE",503);
++
++export function isCabinetAccessPath(request){
++  return new URL(request.url).pathname===path;
++}
++export function cabinetAccessRequestFault(request){
++  const url=new URL(request.url);
++  if(url.pathname!==path||url.search||request.url.includes("?"))return reject("NOT_FOUND",404);
++  if(request.method!=="GET")return reject("METHOD_NOT_ALLOWED",405,{allow:"GET, OPTIONS"});
++  return null;
++}
++
++/**
++ * Worker-private composition only. A future withCabinetReaders implementation
++ * must call read exactly once inside the canonical person-lock transaction,
++ * install the same opaque-access, Clerk liveness and phase-bound readers, and
++ * return only after successful lease recheck and commit. pool and clerk are
++ * request-owned; nothing selects a reader through HTTP, env or query values.
++ * Passing a callable is not a deployment approval or ACL verification.
++ */
++export async function handleCabinetAccess(request,{withCabinetReaders,pool,clerk}={}){
++  const routeFault=cabinetAccessRequestFault(request);
++  if(routeFault)return routeFault;
++  if(request.signal.aborted||typeof withCabinetReaders!=="function"||!pool||typeof clerk?.liveness!=="function")
++    return unavailable();
++  const accessToken=request.headers.get("authorization")?.match(token)?.[1];
++  if(!accessToken||accessToken!==accessToken.toLowerCase())return reject("SESSION_REVOKED",401);
++  let called=0,settled=false,decision,finished=false;
++  try{
++    const returned=await withCabinetReaders(Object.freeze({
++      accessToken,signal:request.signal,pool,clerk,
++    }),async readers=>{
++      if(finished||++called!==1||request.signal.aborted)throw Error("CABINET_READ_UNAVAILABLE");
++      decision=await readAuthorizedCabinetEntry(accessToken,request.signal,readers);
++      settled=true;
++      return decision;
++    });
++    if(request.signal.aborted||called!==1||!settled||returned!==decision)return unavailable();
++    if(decision===null)return reject("SESSION_REVOKED",401);
++    return json(200,{data:decision});
++  }catch{return unavailable();}
++  finally{finished=true;}
++}
+diff --git a/runtime/cloudflare-api.mjs b/runtime/cloudflare-api.mjs
+index d28843f341b806b971178c75c92f4bff7c9658ee..d2b87737da01ee6034fa8a38bcb1fd849e54efb5 100644
+--- a/runtime/cloudflare-api.mjs
++++ b/runtime/cloudflare-api.mjs
+@@ -4,6 +4,7 @@ import {ApiFault} from "../supabase/functions/univeracademy-api/fault.ts";
+ import {createVercelNodeFunction} from "./vercel-node.mjs";
+ import {createCloudflarePostgres} from "./cloudflare-postgres.mjs";
+ import {publicHttpsOrigin,withPublicCors} from "./local-cors.mjs";
++import {isCabinetAccessPath,handleCabinetAccess} from "./cabinet-access-http.mjs";
+ 
+ const unavailable=()=>new ApiFault("SERVICE_UNAVAILABLE",503);
+ const fault=(code="SERVICE_UNAVAILABLE",status=503)=>new Response(JSON.stringify({error:{code,message:code,request_id:crypto.randomUUID()}}),
+@@ -56,10 +57,12 @@ async function untilAborted(work,signal){
+  * its Clerk adapter is prepared by createClerkWorkerAdapter. No credentials,
+  * provider/DB probe, JWT bypass or browser-trusted flag is provided here.
+  */
+-export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,configuration}={}){
++export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,configuration,withCabinetReaders}={}){
+   return Object.freeze({async fetch(request){
+-    let resource,response,body;
++    let resource,response,body,cabinet=false;
+     try{
++      cabinet=isCabinetAccessPath(request);
++      if(cabinet&&new URL(request.url).origin!==publicHttpsOrigin(apiOrigin))return fault("MALFORMED_REQUEST",400);
+       let scoped;
+       if(configuration!==undefined){
+         if(configuration?.mode!=="production"||configuration.storage!==undefined)throw unavailable();
+@@ -72,13 +75,21 @@ export function createCloudflareApi({apiOrigin,allowedOrigins,Client,postgres,co
+             {signal:options?.signal?AbortSignal.any([request.signal,options.signal]):request.signal})};
+         }
+       }
+-      const api=createVercelNodeFunction({apiOrigin,allowedOrigins,configuration:scoped});
+-      body=ownBody(request);
+-      response=await untilAborted(()=>api.fetch(body.request),request.signal);
++      if(cabinet){
++        const handler=withPublicCors(incoming=>handleCabinetAccess(incoming,{
++          withCabinetReaders,pool:resource?.pool,clerk:scoped?.clerk,
++        }),allowedOrigins);
++        response=await untilAborted(()=>handler(request),request.signal);
++      }else{
++        const api=createVercelNodeFunction({apiOrigin,allowedOrigins,configuration:scoped});
++        body=ownBody(request);
++        response=await untilAborted(()=>api.fetch(body.request),request.signal);
++      }
+     }catch{response=await fallback(request,apiOrigin,allowedOrigins);}
+     finally{body?.close();}
+     // No ACK before owned client disposal; no retry on close/commit uncertainty.
+     try{await resource?.close();}catch{response=await fallback(request,apiOrigin,allowedOrigins);}
++    if(cabinet&&request.signal.aborted)response=await fallback(request,apiOrigin,allowedOrigins);
+     const headers=new Headers(response.headers);headers.set("cloudflare-cdn-cache-control","no-store");
+     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+   }});
+diff --git a/runtime/cloudflare-entry.mjs b/runtime/cloudflare-entry.mjs
+index 11fe5100c9c0d1d53536212201502338f91a86bd..3014772f5b3cac117a7747c04adc4c6e11d72c93 100644
+--- a/runtime/cloudflare-entry.mjs
++++ b/runtime/cloudflare-entry.mjs
+@@ -9,6 +9,7 @@ import {createCloudflareApi} from "./cloudflare-api.mjs";
+ import {createClerkWorkerAdapter} from "./clerk-worker-bindings.mjs";
+ import {publicEnvironmentOptions} from "./vercel-node.mjs";
+ import {withPublicCors} from "./local-cors.mjs";
++import {isCabinetAccessPath,cabinetAccessRequestFault} from "./cabinet-access-http.mjs";
+ 
+ const unavailable=()=>new ApiFault("SERVICE_UNAVAILABLE",503);
+ const deny=()=>{throw unavailable();};
+@@ -76,8 +77,9 @@ function registrationRoute(request){
+  * deployment gates; a syntactically valid binding does not establish them.
+  */
+ export function createCloudflareEntrypoint({loadClient=async()=>(await import("pg")).Client,
+-  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now}={}){
+-  if([loadClient,makeClerk,transport,now].some(v=>typeof v!=="function"))throw unavailable();
++  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now,withCabinetReaders}={}){
++  if([loadClient,makeClerk,transport,now].some(v=>typeof v!=="function")||
++    (withCabinetReaders!==undefined&&typeof withCabinetReaders!=="function"))throw unavailable();
+   return Object.freeze({async fetch(request,env){
+     let publics;
+     try{
+@@ -93,7 +95,12 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
+         if(scopedRequest.method==="GET"&&new URL(scopedRequest.url).pathname==="/health")
+           return new Response('{"status":"ok"}',{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
+         if(!new URL(scopedRequest.url).pathname.startsWith("/api/v1/"))return response("NOT_FOUND",404);
+-        if(!registrationRoute(scopedRequest))return isContractPath(new URL(scopedRequest.url).pathname)?response():response("NOT_FOUND",404);
++        const cabinet=isCabinetAccessPath(scopedRequest);
++        if(cabinet){
++          const reject=cabinetAccessRequestFault(scopedRequest);
++          if(reject)return reject;
++          if(withCabinetReaders===undefined)return response();
++        }else if(!registrationRoute(scopedRequest))return isContractPath(new URL(scopedRequest.url).pathname)?response():response("NOT_FOUND",404);
+         let clerk,result;
+         try{
+           if(scopedRequest.signal.aborted)throw unavailable();
+@@ -117,12 +124,13 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
+           const configuration={mode:"production",sessionPolicy:bindings.sessionPolicy,
+             numericPresentation:unavailableNumbers,now,...(telegram?{botToken:bindings.botToken}:{}),clerk:{verifier:clerk.verifier,liveness:clerk.liveness}};
+           // fetch awaits the accepted resource's end() before returning any ACK.
+-          result=await createCloudflareApi({...publics,Client,postgres:bindings.postgres,configuration}).fetch(scopedRequest);
++          result=await createCloudflareApi({...publics,Client,postgres:bindings.postgres,configuration,
++            ...(cabinet?{withCabinetReaders}:{})}).fetch(scopedRequest);
+         }catch{result=response();}
+         finally{
+           try{await clerk?.close();}catch{result=response();}
+         }
+-        return result;
++        return cabinet&&scopedRequest.signal.aborted?response():result;
+       },publics.allowedOrigins)(request);
+     }catch{return response();} // No raw exception, private binding, body or log.
+   }});

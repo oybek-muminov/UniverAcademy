@@ -1,0 +1,11 @@
+# Teacher pilot named catalog and real subject configuration
+
+Pinned main 3dbb714f2f758c7dbe03548a71c161718cf9cb53. Adds createTeacherNamedCatalog, supplying the actual readMetadata input expected by composeTeacherBrowserPilotPostgres. No route/Worker mount, data, DDL, permissions or default catalog provided.
+
+In trusted server config pass owner-confirmed real backend subject IDs and their labels (the first pilot subject display name is Fizika, but there is no backend subject ID assigned or assumed here). The owned, enabled staff subject approval decides access; the map only resolves display labels. There is no browsing-client map, title-from-ID fallback, fabricated demo, or marketing-label inference. An unknown approved subject fails closed.
+
+Groups use a future additive nullable ua_private.groups.name text column with no default. Require the explicit validated user name for newly created groups, and preserve all existing UUIDs and references. Check migration compatibility and recheck the live group count/null names immediately before rollout; an earlier observed empty table is not a standing assumption. Name any future legacy row only from owner-confirmed real data. A null name never becomes a fake label. The read fails unavailable on an unresolved name. This artifact does not create the column or enable the group writer.
+
+One parameterized read under the pilot's already-authenticated single-person Clerk lock takes name fields from current people.profile, checks current Teacher/staff approval plus the exact set of unrevoked groups and approved subjects, uses real groups.name and assigned demos.title, and emits only minimal browser slots. Display list test IDs are assignment UUIDs and are not version/draft editor IDs. Explicit listingPolicy is a required server gate: use only after approving the narrow assigned-demos list for the pilot and verifying deployed RLS can actually enumerate it; an RLS-hidden assignment cannot be distinguished from no assignment by this query. No authoring/inventory/assignment access is conferred. Missing roles, schema, recognized names/mapping, or complete RLS policy must block activation, not be papered over.
+
+Patch and syntax checks only: strict forward/reverse apply, exact bytes and Node 24 stripped TS syntax. No data/fixture/SQL runtime/roles/appointment/push/deploy.

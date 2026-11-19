@@ -1,0 +1,82 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-browser-continuation.ts b/supabase/functions/univeracademy-api/teacher-browser-continuation.ts
+new file mode 100644
+index 0000000..319dd27
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-browser-continuation.ts
+@@ -0,0 +1,76 @@
++// Unmounted exact-session continuation for a trusted same-origin server context.
++// Not a Telegram-to-browser transfer protocol, login exchange or identity link.
++import { createClerkVerifier } from "./clerk-auth.ts";
++import type { ClerkVerifierConfiguration, ClerkLiveness } from "./clerk-auth.ts";
++import { fail } from "./fault.ts";
++import { readTeacherCabinetBootstrap } from "./teacher-cabinet-bootstrap.ts";
++import type { TeacherBootstrap } from "./teacher-cabinet-bootstrap.ts";
++
++type BootstrapInput=Parameters<typeof readTeacherCabinetBootstrap>[0];
++type ReaderScope=Omit<BootstrapInput,"proof"|"signal"|"liveness">;
++type Entry=Readonly<{
++  kind:"trusted_same_origin_entry";
++  personId:string;
++  issuer:string;
++  userId:string;
++  sessionId:string;
++  expiresAt:number;
++}>;
++type Dependencies=Readonly<{
++  verifier:ClerkVerifierConfiguration;
++  liveness:ClerkLiveness;
++  // In-process server-owned context from an already verified current entry.
++  // Never derive this value from browser params, headers, body, Referer,
++  // unsigned storage, or a navigation hint. No raw request goes to this port.
++  readTrustedEntry:(signal:AbortSignal)=>Promise<Entry|null>;
++  // Caller owns a real Clerk-authorized storage binding and canonical lock.
++  // Roll back or reject on failure, abort or the minimum lease expiry.
++  transaction<T>(personId:string,signal:AbortSignal,
++    run:(scope:ReaderScope)=>Promise<T>):Promise<T>;
++}>;
++
++const uuid=(value:unknown):value is string=>typeof value==="string"&&value.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(value);
++
++export async function readTeacherBrowserContinuation(
++  request:Request, deps?:Dependencies,
++):Promise<TeacherBootstrap> {
++  if(!deps||typeof deps.readTrustedEntry!=="function"||typeof deps.transaction!=="function"||
++     typeof deps.liveness!=="function") fail("SERVICE_UNAVAILABLE",503);
++  if(request.method!=="GET") fail("NOT_FOUND",404);
++  const {signal}=request;
++  signal.throwIfAborted();
++  const header=request.headers.get("authorization");
++  const token=header&&header.length<=8192?header.match(/^Bearer ([^\s]+)$/i)?.[1]:null;
++  if(!token) fail("CLERK_TOKEN_INVALID",401);
++  const proof=await createClerkVerifier(deps.verifier)(token);
++  signal.throwIfAborted();
++  const expected=await deps.readTrustedEntry(signal);
++  signal.throwIfAborted();
++  if(!expected||expected.kind!=="trusted_same_origin_entry"||!uuid(expected.personId)||
++     !Number.isSafeInteger(expected.expiresAt)||expected.expiresAt<0||
++     expected.issuer!==proof.issuer||expected.userId!==proof.userId||
++     expected.sessionId!==proof.sessionId) fail("FORBIDDEN",403);
++
++  // Copy server-owned expectation before another await. Do not pass the JWT
++  // to storage or any URL, and do not query a different browser's person.
++  const {personId,expiresAt}=expected;
++  return deps.transaction(personId,signal,async scope=>{
++    signal.throwIfAborted();
++    if(scope.tx.personIds.length!==1||scope.tx.personIds[0]!==personId) fail("FORBIDDEN",403);
++    const now=await scope.clock();
++    signal.throwIfAborted();
++    if(!Number.isSafeInteger(now)||now<scope.tx.now) fail("SERVICE_UNAVAILABLE",503);
++    if(now>=expiresAt) fail("FORBIDDEN",403);
++    const lease=Math.min(expiresAt,proof.expiresAt);
++    scope.restrictLease(lease);
++    const result=await readTeacherCabinetBootstrap({...scope,proof,signal,liveness:deps.liveness,
++      restrictLease:(n)=>scope.restrictLease(Math.min(n,lease))});
++    signal.throwIfAborted();
++    const after=await scope.clock();
++    signal.throwIfAborted();
++    if(!Number.isSafeInteger(after)||after<now) fail("SERVICE_UNAVAILABLE",503);
++    if(after>=lease||result.person_id!==personId) fail("FORBIDDEN",403);
++    return result;
++  });
++}

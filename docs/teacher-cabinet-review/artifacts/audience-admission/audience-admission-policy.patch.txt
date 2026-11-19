@@ -1,0 +1,130 @@
+diff --git a/supabase/functions/univeracademy-api/audience-admission-policy.ts b/supabase/functions/univeracademy-api/audience-admission-policy.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc66ca698e3bf3a8acc9e531f631b0d97f48b297
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/audience-admission-policy.ts
+@@ -0,0 +1,124 @@
++// Review-only decision boundary. No route, SQL, storage or API schema is
++// installed. Inputs are derived by the caller from authenticated, locked state.
++export type AssignmentAudience =
++  | Readonly<{kind:"group";groupId:string}>
++  | Readonly<{kind:"public";groupId:null}>
++  | Readonly<{kind:"detached";groupId:null}>;
++
++type RegisteredActor = Readonly<{personId:string;enabled:boolean;registered:boolean}>;
++type Assignment = Readonly<{
++  id:string; demoId:string; audience:unknown; opensAt:number; published:boolean; cancelled:boolean;
++}>;
++type GroupEvidence = Readonly<{
++  personId:string; assignmentId:string; groupId:string; groupActive:boolean;
++  membershipActive:boolean; grantActive:boolean; membershipEpoch:number; grantEpoch:number;
++}>;
++type StableDemoSeries = Readonly<{
++  personId:string; demoId:string; normalAttemptUsed:boolean;
++  currentAttemptId:string; generation:number;
++}>;
++// "absent" requires a complete scoped lookup under the person+stable-demo lock.
++type SeriesEvidence = Readonly<{kind:"absent"}> |
++  Readonly<{kind:"present";series:StableDemoSeries}> |
++  Readonly<{kind:"unknown"}>;
++
++const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
++const id=(x:unknown):x is string=>typeof x==="string"&&x.length===36&&uuid.test(x);
++const epoch=(x:unknown):x is number=>typeof x==="number"&&Number.isSafeInteger(x)&&x>=0;
++const at=(x:unknown):x is number=>epoch(x)&&x<=8_640_000_000_000_000;
++const generation=(x:unknown):x is number=>epoch(x)&&x>0;
++const day=86_400_000;
++const tashkentClock=new Intl.DateTimeFormat("en-CA",{
++  timeZone:"Asia/Tashkent",calendar:"gregory",numberingSystem:"latn",
++  year:"numeric",month:"2-digit",day:"2-digit",
++});
++const localDate=(time:number)=>tashkentClock.format(time);
++
++export function normalizeAssignmentAudience(input:unknown):AssignmentAudience|null {
++  if(!input||typeof input!=="object"||![Object.prototype,null].includes(Object.getPrototypeOf(input)))return null;
++  const keys=Reflect.ownKeys(input);
++  if(keys.length!==2||!keys.includes("kind")||!keys.includes("groupId"))return null;
++  const kind=Object.getOwnPropertyDescriptor(input,"kind")?.value;
++  const groupId=Object.getOwnPropertyDescriptor(input,"groupId")?.value;
++  if(kind==="group"&&id(groupId))return Object.freeze({kind,groupId});
++  if((kind==="public"||kind==="detached")&&groupId===null)return Object.freeze({kind,groupId});
++  return null; // In particular, an untagged legacy NULL is never Public.
++}
++
++/** First millisecond of the next Asia/Tashkent local date. The personal
++ * attempt deadline is never derived from, clipped to, or rechecked against it. */
++export function groupAdmissionCloseExclusive(opensAt:number):number|null {
++  if(!at(opensAt)||opensAt>8_640_000_000_000_000-2*day)return null;
++  const startDate=localDate(opensAt);
++  let lo=opensAt,hi=opensAt+2*day;
++  if(localDate(hi)===startDate)return null;
++  while(hi-lo>1){
++    const mid=lo+Math.floor((hi-lo)/2);
++    if(localDate(mid)===startDate)lo=mid;else hi=mid;
++  }
++  return hi;
++}
++
++function validActor(actor:RegisteredActor):boolean {
++  return id(actor?.personId)&&actor.enabled===true&&actor.registered===true;
++}
++function audienceFor(actor:RegisteredActor,assignment:Assignment,group:GroupEvidence|null):AssignmentAudience|null {
++  if(!validActor(actor)||!id(assignment?.id)||!id(assignment.demoId)||assignment.published!==true||assignment.cancelled!==false)return null;
++  const a=normalizeAssignmentAudience(assignment.audience);
++  if(!a||a.kind==="detached")return null;
++  if(a.kind==="public")return a;
++  return group&&group.personId===actor.personId&&group.assignmentId===assignment.id&&group.groupId===a.groupId&&
++    group.groupActive===true&&group.membershipActive===true&&group.grantActive===true&&
++    epoch(group.membershipEpoch)&&group.membershipEpoch===group.grantEpoch?a:null;
++}
++
++/** Audience only; callers still enforce content snapshot integrity, scheduling and
++ * visibility policy. This must never replace historical attempt authorization. */
++export function hasAssignmentAudience(actor:RegisteredActor,assignment:Assignment,group:GroupEvidence|null):boolean {
++  return audienceFor(actor,assignment,group)!==null;
++}
++
++export function decideNormalAssignmentStart(input:Readonly<{
++  actor:RegisteredActor;assignment:Assignment;group:GroupEvidence|null;
++  series:SeriesEvidence;now:number;
++}>):"allow"|"denied"|"already_used"|"admission_closed"|"public_policy_pending" {
++  const {actor,assignment,group,series,now}=input;
++  const audience=audienceFor(actor,assignment,group);
++  if(!audience||!at(now)||!at(assignment.opensAt)||!series)return "denied";
++  if(series.kind==="present"){
++    const s=series.series;
++    if(!s||s.personId!==actor.personId||s.demoId!==assignment.demoId||
++      !id(s.currentAttemptId)||!generation(s.generation))return "denied";
++    // A current recorded attempt is never replaced by a new generation 1;
++    // inconsistent normal-attempt accounting fails closed instead of starting.
++    return s.normalAttemptUsed===true?"already_used":"denied";
++  }
++  if(series.kind!=="absent")return "denied";
++  if(now<assignment.opensAt)return "admission_closed";
++  if(audience.kind==="public")return "public_policy_pending"; // No guessed close/review policy.
++  const close=groupAdmissionCloseExclusive(assignment.opensAt);
++  if(close===null)return "denied";
++  return now<close?"allow":"admission_closed";
++}
++
++type AttemptEvidence = Readonly<{
++  id:string; personId:string; originalAssignmentId:string; demoId:string;
++  generation:number; startedAt:number; deadlineAt:number;
++  status:"in_progress"|"submitted"|"expired"|"forced"|"cancelled";
++}>;
++
++/** Match only current, owned attempt and original assignment. The caller also
++ * retains canonical cancellation/session/review guards. No group/public
++ * eligibility, scheduled window, or current assignment is consulted here. */
++export function canResumeOriginalAssignmentAttempt(input:Readonly<{
++  actor:RegisteredActor;originalAssignmentId:string;attempt:AttemptEvidence;
++  series:StableDemoSeries;now:number;
++}>):boolean {
++  const {actor,originalAssignmentId,attempt,series,now}=input;
++  return validActor(actor)&&id(originalAssignmentId)&&id(attempt?.id)&&id(attempt.demoId)&&
++    attempt.personId===actor.personId&&attempt.originalAssignmentId===originalAssignmentId&&
++    series?.personId===actor.personId&&series.demoId===attempt.demoId&&series.currentAttemptId===attempt.id&&
++    generation(attempt.generation)&&attempt.generation===series.generation&&attempt.status==="in_progress"&&
++    at(now)&&at(attempt.startedAt)&&at(attempt.deadlineAt)&&attempt.startedAt<attempt.deadlineAt&&
++    attempt.startedAt<=now&&now<attempt.deadlineAt;
++}

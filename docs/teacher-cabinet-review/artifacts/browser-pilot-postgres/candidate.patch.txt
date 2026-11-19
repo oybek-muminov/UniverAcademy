@@ -1,0 +1,133 @@
+diff --git a/supabase/functions/univeracademy-api/storage/postgres-transaction.ts b/supabase/functions/univeracademy-api/storage/postgres-transaction.ts
+index 0dcaff4..8cdee66 100644
+--- a/supabase/functions/univeracademy-api/storage/postgres-transaction.ts
++++ b/supabase/functions/univeracademy-api/storage/postgres-transaction.ts
+@@ -1,5 +1,7 @@
+ import { ApiFault, fail } from "../fault.ts";
+-import {resetTrustedServerContext,setTrustedPhase,setTrustedPeople,setTrustedTelegram,closeTrustedServerContext} from "./trusted-server-context.ts";
++import {clerkIdentityKey} from "../clerk-auth.ts";
++import type {ClerkIdentity} from "../clerk-auth.ts";
++import {resetTrustedServerContext,setTrustedPhase,setTrustedPeople,setTrustedTelegram,setTrustedClerk,closeTrustedServerContext} from "./trusted-server-context.ts";
+ 
+ // Driver boundary only. No URL, credential, pool construction or network fallback.
+ export type Statement = { name: string; text: string; values: readonly unknown[] };
+@@ -92,6 +94,32 @@ export class PostgresTransactions {
+       return tx;
+     }, work, { beforeCommit, observe });
+   }
++  async runClerkRead<T>(identity: Pick<ClerkIdentity,"issuer"|"userId">, hooks: PreparedHooks,
++    work: (tx: LockedTransaction) => Promise<T>): Promise<T> {
++    // Server-only: caller owns verified current Clerk proof and lease. Use the
++    // canonical Clerk lock order (identity gate -> identity row -> person).
++    const {issuer,userId}=identity;
++    const {beforeCommit,observe}=hooks;
++    if(typeof beforeCommit!=="function"||typeof work!=="function"||
++      (observe!==undefined&&typeof observe!=="function")) fail("SERVICE_UNAVAILABLE",503);
++    return this.execute(async client=>{
++      await setTrustedClerk(client,issuer,userId);
++      await client.query({name:"ua_clerk_identity_gate",
++        text:"SELECT pg_advisory_xact_lock(1430348620,hashtext($1))",values:[clerkIdentityKey({issuer,userId})]});
++      const mapping=await client.query({name:"ua_clerk_locate",
++        text:"SELECT person_id::text,enabled FROM ua_private.lock_clerk_identity($1::text,$2::text)",values:[issuer,userId]});
++      if(mapping.rows.length!==1||mapping.rows[0].enabled!==true) fail("CLERK_IDENTITY_REVOKED",401);
++      const personId=mapping.rows[0].person_id;
++      if(typeof personId!=="string"||personId.length!==36||!uuid.test(personId)) fail("RESPONSE_INVARIANT_FAILED",500);
++      const ids=Object.freeze([personId]);
++      const tx=await this.lockPeople(client,ids);
++      Object.defineProperties(tx,{
++        personIds:{value:ids,enumerable:true,writable:false,configurable:false},
++        client:{value:client,enumerable:true,writable:false,configurable:false},
++      });
++      return tx;
++    },work,{beforeCommit,observe});
++  }
+   async run<T>(personIds: readonly string[], work: (tx: LockedTransaction) => Promise<T>): Promise<T> {
+     const ids = [...new Set(personIds)].sort();
+     if (!ids.length || ids.some((id) => !uuid.test(id))) fail("NOT_FOUND", 404);
+diff --git a/supabase/functions/univeracademy-api/teacher-browser-pilot-postgres.ts b/supabase/functions/univeracademy-api/teacher-browser-pilot-postgres.ts
+new file mode 100644
+index 0000000..2ce0f7a
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-browser-pilot-postgres.ts
+@@ -0,0 +1,81 @@
++// Local composition only. No default pool, Worker registration, or live grants.
++import { checkClerkProof } from "./clerk-auth.ts";
++import { fail } from "./fault.ts";
++import { handleTeacherBrowserPilot } from "./teacher-browser-pilot.ts";
++import { integer, PostgresTransactions, query } from "./storage/postgres-transaction.ts";
++import type { LockedTransaction, PgPool } from "./storage/postgres-transaction.ts";
++import { setTrustedPhase } from "./storage/trusted-server-context.ts";
++
++type HttpDeps=NonNullable<Parameters<typeof handleTeacherBrowserPilot>[1]>;
++type Runner=HttpDeps["runner"];
++type BootstrapScope=Parameters<Parameters<Runner["run"]>[2]>[0];
++type Metadata=BootstrapScope["readMetadata"];
++
++type Options=Readonly<Pick<HttpDeps,"browserOrigin"|"verifier"|"liveness">&{
++  // Must be a separately approved Teacher-capable storage connection, not
++  // inferred from Student ua_runtime or the account-deletion credential.
++  pool:PgPool;
++  // Real independently authorized, complete metadata provider only.
++  readMetadata:(tx:LockedTransaction,...args:Parameters<Metadata>)=>ReturnType<Metadata>;
++}>;
++
++export function composeTeacherBrowserPilotPostgres(options:Options):(request:Request)=>Promise<Response>{
++  if(typeof options?.pool?.connect!=="function"||typeof options?.verifier?.now!=="function"||
++     typeof options?.liveness!=="function"||typeof options?.readMetadata!=="function")
++    fail("SERVICE_UNAVAILABLE",503);
++  const {pool,verifier,liveness,browserOrigin,readMetadata}=options;
++  const runner:Runner={
++    async run(proof,signal,read){
++      signal.throwIfAborted();
++      const hostNow=()=>{const now=verifier.now();if(!Number.isSafeInteger(now)||now<0)fail("SERVICE_UNAVAILABLE",503);return now;};
++      checkClerkProof(proof,hostNow());
++      let lease=proof.expiresAt, lastDb=-1, completed=false;
++      return new PostgresTransactions(pool).runClerkRead(proof,{
++        beforeCommit:()=>{
++          signal.throwIfAborted();
++          const now=hostNow();
++          if(!completed||now<lastDb) fail("SERVICE_UNAVAILABLE",503);
++          checkClerkProof(proof,now);
++          if(now>=lease) fail("CLERK_SESSION_REVOKED",401);
++        },
++      }, async tx=>{
++        signal.throwIfAborted();
++        lastDb=tx.now;
++        checkClerkProof(proof,lastDb);
++        const personId=tx.personIds[0];
++        // Recheck the verified issuer/subject against the locked person.
++        const still=await query(tx,"ua_teacher_browser_identity_v1",
++          "SELECT person_id::text FROM ua_private.clerk_identities WHERE issuer=$1 AND subject=$2 AND person_id=$3 AND enabled=true",
++          [proof.issuer,proof.userId,personId]);
++        signal.throwIfAborted();
++        if(still.rows.length!==1||still.rows[0].person_id!==personId) fail("CLERK_IDENTITY_REVOKED",401);
++        await setTrustedPhase(tx.client,"domain");
++        const clock=async()=>{
++          signal.throwIfAborted();
++          const result=await query(tx,"ua_clock","SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::text AS now_ms");
++          signal.throwIfAborted();
++          if(result.rows.length!==1) fail("RESPONSE_INVARIANT_FAILED",500);
++          const at=integer(result.rows[0].now_ms);
++          if(at<lastDb||at>8_640_000_000_000_000) fail("SERVICE_UNAVAILABLE",503);
++          lastDb=at;
++          return at;
++        };
++        const restrictLease=(value:number)=>{
++          if(!Number.isSafeInteger(value)||value<=lastDb) fail("CLERK_SESSION_REVOKED",401);
++          lease=Math.min(lease,value);
++        };
++        const result=await read({tx,clock,restrictLease,readMetadata:(scope,signalForRead)=>{
++          if(scope.personId!==personId||signalForRead!==signal) fail("FORBIDDEN",403);
++          signal.throwIfAborted();
++          return readMetadata(tx,scope,signal);
++        }});
++        const after=await clock();
++        checkClerkProof(proof,after);
++        if(after>=lease) fail("CLERK_SESSION_REVOKED",401);
++        completed=true;
++        return result;
++      });
++    },
++  };
++  return request=>handleTeacherBrowserPilot(request,{browserOrigin,verifier,liveness,runner});
++}

@@ -1,0 +1,11 @@
+# Teacher multi-group add: local domain candidate
+
+Canonical base 3dbb714f2f758c7dbe03548a71c161718cf9cb53. Adds only planTeacherAddStudentGroup; does not mount a route, select a Clerk credential, implement lookup/confirmation transport, or write SQL.
+
+Authority first: current enabled/approved Teacher, exact own active target group in current nonrevoked scope (not Owner/all-groups wildcard), locked canonical Teacher and existing enabled registered Student plus target group. Current trusted provider liveness and cryptographic opaque explicit confirmation are required from the composing server. The planner never trusts an unverified client person ID/tag, a profile scalar, or UI role. The trusted confirmation binds actor, Student, exact group, the authoritative membership snapshot tag and expiry. A complete pair snapshot and membership comparison are necessary; no stale preview causes a write. A repeat against an already-active exact pair is a no-op after current scope and confirmation; it never creates history or writes another pair.
+
+This is a distinct Teacher policy: the pinned staff-state.ts requireRosterAuthority checks manage_roster only for a non-Owner Admin. Do not route this candidate through or broaden that old handler. Pinned StaffAccessRows.load reads only explicit nonrevoked staff_group_scope rows into group_ids; this candidate uses exactly that grant for this one add operation, not generic staff capability, inferred ownership, or an Owner/Admin bypass.
+
+The only possible mutation intent is an insert of the exact Student/target pair, with initial revision/epoch 1, or reactivation of that same pair with both its revision and epoch incremented. The writer must CAS its old state (or actual absence) plus the authoritative complete set tag within the same reviewed lock. One pair only; no update to another group, old profile/legacy projection, active attempts, assignments, answers, deadlines, scores, grants or history. No automatic grant to any exam, closed or otherwise; admission and attempt policy remains separate. Any later rejoin writer must not resurrect previous-revision/epoch grants. This is not transfer, removal or invitation.
+
+Checks: exact strict forward and reverse patch apply, diff whitespace, reconstructed bytes and stripped TypeScript syntax. No runtime, fixtures, data, DDL, access changes, deploy or push.

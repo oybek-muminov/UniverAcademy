@@ -1,0 +1,176 @@
+diff --git a/supabase/functions/univeracademy-api/storage/clerk-domain.ts b/supabase/functions/univeracademy-api/storage/clerk-domain.ts
+index 5461cde..6f4169b 100644
+--- a/supabase/functions/univeracademy-api/storage/clerk-domain.ts
++++ b/supabase/functions/univeracademy-api/storage/clerk-domain.ts
+@@ -18,6 +18,7 @@ import {StudentIdentityRows} from "./student-identity-rows.ts";
+ import {locateStudent,locateStudentAccessOnClient,locateStudentRefreshOnClient,studentSessionProofs,studentLogoutRefreshDigest} from "./student-scope.ts";
+ import {StaffAccessRows} from "./staff-access-rows.ts";
+ import {StaffFirstTestRows} from "./staff-first-test-rows.ts";
++import type {PilotStaffPin} from "./staff-first-test-rows.ts";
+ import {resetTrustedServerContext,setTrustedPhase,setTrustedClerk,closeTrustedServerContext} from "./trusted-server-context.ts";
+ 
+ function emptyStudent():StudentState{return{people:{},families:{},access:{},refresh:{},consumedInitData:{},grants:{},assignments:{},series:{},attempts:{},receipts:{},bonuses:{},cancellations:{}};}
+@@ -40,7 +41,7 @@ async function fresh(tx:LockedTransaction){
+   if(now<tx.now)fail("SERVICE_UNAVAILABLE",503);tx.now=now;return now;
+ }
+ type Options={pool:PgPool;request:Request;botToken?:string;sessionPolicy:SessionPolicy;now:()=>number;liveness:ClerkLiveness;verifier?:ClerkVerifierConfiguration;
+-  staff?:{validate:(name:string,value:unknown)=>boolean;newAssignmentId:()=>string}};
++  staff?:{validate:(name:string,value:unknown)=>boolean;newAssignmentId:()=>string;pilot?:PilotStaffPin}};
+ 
+ // Request-scoped bridge for the existing handlers and relational row ports.
+ // No whole-database snapshot, RAM fallback, provider constructor or SQL execution
+@@ -260,7 +261,11 @@ export class ClerkDomainTransactions implements ClerkTransactions{
+   }
+   private async staffOrLink<T>(work:(tx:ClerkTransaction)=>Promise<T>,intent:ClerkTransactionIntent):Promise<T>{
+     const o=this.options,actorId=await this.locate(intent),targets:string[]=[];
+-    if(intent.kind==="staff"){
++    let pilotRows:StaffFirstTestRows|undefined;
++    if(intent.kind==="staff"&&o.staff?.pilot!==undefined){
++      pilotRows=new StaffFirstTestRows(o.request.clone(),o.staff.validate,o.staff.pilot);
++      targets.push(...await pilotRows.pilotTargets(actorId));
++    }else if(intent.kind==="staff"){
+       try{const b=await o.request.clone().json();if(typeof b.student_id==="string")targets.push(b.student_id.toLowerCase());if(Array.isArray(b.student_ids))targets.push(...b.student_ids.map((v:unknown)=>typeof v==="string"?v.toLowerCase():""));}catch{}
+     }
+     const valid=targets.filter(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id));
+@@ -274,7 +279,7 @@ export class ClerkDomainTransactions implements ClerkTransactions{
+       const domain=emptyDomain();let rows:StaffFirstTestRows|undefined;
+       if(intent.kind==="staff"){
+         if(!o.staff)fail("SERVICE_UNAVAILABLE",503);
+-        rows=new StaffFirstTestRows(o.request.clone(),o.staff.validate);await rows.lock(tx,actorId);
++        rows=pilotRows??new StaffFirstTestRows(o.request.clone(),o.staff.validate);await rows.lock(tx,actorId);
+         const current=await new StaffAccessRows().load(tx,{issuer:intent.proof.issuer,subject:intent.proof.userId},actorId,"clerk");
+         Object.assign(domain,await rows.load(tx,current));domain.staff={[intent.proof.userId]:current};
+       }
+diff --git a/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts b/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts
+index d3e9316..77b9cfd 100644
+--- a/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts
++++ b/supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts
+@@ -12,6 +12,7 @@ const json = (v: unknown): string => JSON.stringify(v, (_, x) => typeof x === "b
+ const same = (a: unknown, b: unknown) => json(a) === json(b);
+ type Command = { kind: "question" | "publish" | "metadata" | "member" | "assignment";
+   versionId?: string; groupId?: string; students: string[]; path: string };
++export type PilotStaffPin = Readonly<{teacherId:string;groupId:string;demoId:string;versionId:string;subjectId:string;rosterStudentIds:readonly string[]}>;
+ type Snapshot = NonNullable<DraftRecord["publishedSnapshot"]>;
+ type StoredSnapshot = Omit<Snapshot, "test"> & { test: ReturnType<typeof encodePublished> };
+ const storeSnapshot = (s: DraftRecord["publishedSnapshot"]) => s ? { ...s, test: encodePublished(s.test) } : null;
+@@ -29,12 +30,31 @@ export class StaffFirstTestRows {
+   private receiptKey!: string;
+   private request: Request;
+   private validate: (schema: string, value: unknown) => boolean;
+-  constructor(request: Request, validate: (schema: string, value: unknown) => boolean) {
++  private pilot?:PilotStaffPin;
++  private parsed?:{command:Command;key:string};
++  constructor(request: Request, validate: (schema: string, value: unknown) => boolean, pilot?:PilotStaffPin) {
+     this.request = request; this.validate = validate;
++    if(pilot!==undefined){
++      const ids=pilot.rosterStudentIds;
++      const valid=(v:unknown)=>typeof v==="string"&&v===v.toLowerCase()&&uuid.test(v);
++      if(![pilot.teacherId,pilot.groupId,pilot.demoId,pilot.versionId].every(valid)||
++        typeof pilot.subjectId!=="string"||!pilot.subjectId||pilot.subjectId!==pilot.subjectId.trim()||
++        !Array.isArray(ids)||!ids.length||!ids.every(valid)||new Set(ids).size!==ids.length||ids.includes(pilot.teacherId))
++        fail("SERVICE_UNAVAILABLE",503);
++      this.pilot=Object.freeze({...pilot,rosterStudentIds:Object.freeze([...ids])});
++    }
++  }
++
++  // Use the same canonical, duplicate-safe decoded command for lock hints and rows.
++  async pilotTargets(actorId:string):Promise<readonly string[]>{
++    if(!this.pilot||this.pilot.teacherId!==actorId||this.request.signal.aborted)fail("NOT_FOUND",404);
++    this.parsed=await this.readCommand();
++    return [...this.parsed.command.students];
+   }
+ 
+-  async lock(tx: LockedTransaction, actorId: string): Promise<void> {
+-    const path = new URL(this.request.url).pathname, method = this.request.method;
++  private async readCommand():Promise<{command:Command;key:string}>{
++    const url=new URL(this.request.url),path=url.pathname,method=this.request.method;
++    if(this.pilot&&(url.search||url.hash||path.endsWith("/")))fail("NOT_FOUND",404);
+     const version = path.match(/^\/api\/v1\/admin\/versions\/([^/]+)(?:\/(publish|questions\/([^/]+)))?\/?$/);
+     const member = path.match(/^\/api\/v1\/admin\/groups\/([^/]+)\/members\/?$/);
+     let schema: string, command: Command;
+@@ -60,19 +80,40 @@ export class StaffFirstTestRows {
+       command.groupId = (body.group_id as string).toLowerCase();
+       command.versionId = (body.version_id as string).toLowerCase();
+     }
+-    for (const id of command.students) own(tx, id); // Parsed targets must match the person lock hints.
++    const pilot=this.pilot;
++    if(pilot){
++      if(command.versionId!==pilot.versionId||!["question","publish","assignment"].includes(command.kind))
++        fail("NOT_FOUND",404);
++      if(command.kind==="assignment"&&(command.groupId!==pilot.groupId||
++        typeof body.demo_id!=="string"||body.demo_id.toLowerCase()!==pilot.demoId||!command.students.length||
++        new Set(command.students).size!==command.students.length||command.students.some(id=>!pilot.rosterStudentIds.includes(id))))
++        fail("NOT_FOUND",404);
++    }
+     const key = this.request.headers.get("idempotency-key");
+     if (!key || key.length < 8 || key.length > 128) fail("VALIDATION_ERROR", 422);
+-    this.command = command; this.receiptKey = `${actorId}/${method}/${command.path}/${key}`;
++    return {command,key};
++  }
++
++  async lock(tx:LockedTransaction,actorId:string):Promise<void>{
++    if(this.pilot&&(!this.parsed||this.pilot.teacherId!==actorId))fail("SERVICE_UNAVAILABLE",503);
++    const {command,key}=this.parsed??await this.readCommand();
++    for(const id of command.students)own(tx,id);
++    this.command=command;this.receiptKey=`${actorId}/${this.request.method}/${command.path}/${key}`;
++    const lockGroupId=this.pilot?.groupId??command.groupId;
+     // Lock order for every first-test writer: sorted people, group, version, DB clock.
+-    if (command.groupId) {
++    if (lockGroupId) {
+       this.group = (await query(tx, "ua_first_group_lock",
+-        "SELECT id::text,revision::text,status FROM ua_private.groups WHERE id=$1 FOR UPDATE", [command.groupId])).rows[0];
++        "SELECT id::text,revision::text,status FROM ua_private.groups WHERE id=$1 FOR UPDATE", [lockGroupId])).rows[0];
+       if (!this.group) fail("NOT_FOUND", 404);
+     }
+     if (command.versionId) {
+-      this.version = (await query(tx, "ua_first_version_lock", `SELECT v.id::text,v.demo_id::text,v.revision::text,v.status,v.wire,v.published_snapshot,d.subject_id::text,d.title
+-FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE v.id=$1 FOR UPDATE OF v`, [command.versionId])).rows[0];
++      const pilot=this.pilot;
++      this.version = (pilot
++        ? await query(tx,"ua_pilot_staff_version_lock",`SELECT v.id::text,v.demo_id::text,v.revision::text,v.status,v.wire,v.published_snapshot,d.subject_id::text,d.title
++FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id
++WHERE v.id=$1 AND d.id=$2 AND d.subject_id::text=$3 FOR UPDATE OF v FOR SHARE OF d`,[command.versionId,pilot.demoId,pilot.subjectId])
++        : await query(tx,"ua_first_version_lock",`SELECT v.id::text,v.demo_id::text,v.revision::text,v.status,v.wire,v.published_snapshot,d.subject_id::text,d.title
++FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE v.id=$1 FOR UPDATE OF v`,[command.versionId])).rows[0];
+       if (!this.version) fail("NOT_FOUND", 404);
+     }
+     const clock = await query(tx, "ua_clock", "SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::text AS now_ms");
+@@ -84,6 +125,20 @@ FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE
+   async load(tx: LockedTransaction, actor: StaffAccessRecord): Promise<StaffState> {
+     own(tx, actor.personId);
+     const c = this.command, subject = this.version?.subject_id as string;
++    const pilot=this.pilot;
++    if(pilot){
++      const v=this.version,g=this.group;
++      if(actor.personId!==pilot.teacherId||!actor.enabled||!actor.approved||
++        !actor.roles.includes("teacher")||!actor.approvedSubjectIds.includes(pilot.subjectId)||
++        !actor.scope.group_ids.includes(pilot.groupId)||g?.id!==pilot.groupId||g.status!=="active"||
++        v?.id!==pilot.versionId||v.demo_id!==pilot.demoId||v.subject_id!==pilot.subjectId||
++        (c.kind==="assignment"&&v.status!=="published"))fail("NOT_FOUND",404);
++      if(c.kind==="assignment"){
++        const frozen=v.published_snapshot as StoredSnapshot|null;
++        if(!frozen?.test||frozen.test.demoId!==pilot.demoId||frozen.test.versionId!==pilot.versionId)
++          fail("RESPONSE_INVARIANT_FAILED",500);
++      }
++    }
+     if (c.kind === "member") requireRosterAuthority(actor);
+     else if (c.kind === "assignment") {
+       if (!c.groupId || !this.group || this.group.status !== "active" ||
+@@ -98,7 +153,7 @@ FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE
+     if (c.groupId && !groupScope(actor, c.groupId)) fail("NOT_FOUND", 404);
+     const s: StaffState = { student: emptyStudent(), staff: {}, groups: {}, memberships: {}, versions: {},
+       demos: {}, recoveryAssignments: {}, notifications: {}, approvals: {}, receipts: {}, audit: [] };
+-    if (this.group) s.groups[c.groupId!] = { id: c.groupId!, revision: integer(this.group.revision), status: this.group.status as "active" | "archived" };
++    if (this.group&&c.groupId) s.groups[c.groupId] = { id: c.groupId!, revision: integer(this.group.revision), status: this.group.status as "active" | "archived" };
+     if (this.version) {
+       const row = this.version, wire = row.wire as Version;
+       if (wire.id !== c.versionId || wire.demo_id !== row.demo_id || wire.revision !== integer(row.revision) || wire.status !== row.status)
+@@ -119,6 +174,8 @@ FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE
+       s.student.people[id] = { telegramId: p.telegram_id===null?null:integer(p.telegram_id), enabled: p.enabled, profile };
+       const m = (await query(tx, "ua_first_membership", "SELECT affinity_group_id::text,active,revision::text,epoch::text FROM ua_private.memberships WHERE person_id=$1", [id])).rows[0];
+       if (!m) fail("NOT_FOUND", 404);
++      if(pilot&&(m.affinity_group_id!==pilot.groupId||m.active!==true||
++        profile.active_group_id!==pilot.groupId))fail("NOT_FOUND",404);
+       s.memberships[id] = { affinityGroupId: m.affinity_group_id as string | null, active: m.active as boolean, revision: integer(m.revision), epoch: integer(m.epoch) };
+       // Do not expose an existing foreign membership through a receipt replay.
+       if (m.affinity_group_id && !groupScope(actor, m.affinity_group_id as string)) fail("NOT_FOUND", 404);

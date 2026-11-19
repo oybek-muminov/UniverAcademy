@@ -1,0 +1,42 @@
+# Additive Student group-pair storage: offline review
+
+Grounding: canonical project 3dbb714f2f758c7dbe03548a71c161718cf9cb53; tests/account-deletion/schema-catalog.json and tests/telegram-entry/production-auth-extended-catalog.json; existing membership, grant and exam authorization code. This is a non-executable Markdown design, not a migration, backfill, runtime write, role grant, or production switch. Do not move the SQL sketch into an applicable migrations directory.
+
+## Empty relation only — smallest proposed shape
+
+For review, the separate internal relation would have this shape (names are proposed):
+
+```sql
+CREATE TABLE ua_private.student_group_memberships (
+  person_id uuid NOT NULL REFERENCES ua_private.people(id),
+  group_id uuid NOT NULL REFERENCES ua_private.groups(id),
+  active boolean NOT NULL,
+  revision ua_private.safe_counter NOT NULL,
+  epoch ua_private.safe_counter NOT NULL,
+  PRIMARY KEY (person_id, group_id),
+  CHECK (NOT active OR (revision > 0 AND epoch > 0))
+);
+ALTER TABLE ua_private.student_group_memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ua_private.student_group_memberships FORCE ROW LEVEL SECURITY;
+```
+
+Explicitly inspect new relation ACL and default grants before approval, because deployment defaults might grant access; this proposal configures no privileges, policies, role, triggers, write function or runtime route. Metadata-required existing IDs/labels remain untouched. No generated default, fake seed, inferred group or recreated person. No cascading deletion in this sketch; review deletion/barriers before any backfill or live writes. An optional partial index for active group roster reads should be reviewed with the real workload, not relied on for correctness.
+
+Current singleton memberships stays unchanged, including person_id PK, deferred people reverse FK and legacy affinity. Keep people.profile.active_group_id and all legacy IDs unchanged; this scalar can serve legacy display, never future membership authorization. Admission/grant structures are unchanged by this empty-relation proposal. No role flag, source group, transfer or invitation facility is introduced. Exam-series PK (person_id,demo_id), original attempt assignment, result/history, personal deadlines and one normal attempt remain unchanged.
+
+## Gates before real-data copy (not a backfill statement)
+
+Review from an explicitly authorized metadata/owner context under a planned write freeze and stable snapshot. Pair data is never copied while new writers run. Treat any uncertainty as a blocking failure. Recheck all at the actual operation, not based on copied catalog or a prior read.
+
+- Confirm current schema/constraints/triggers/RLS, safe_counter domains, and that the target relation has no rows, or stop and reconcile an earlier rehearsal. Confirm one singleton row per actual person, present group references, known real labels, no conflicting profile/membership mirrors, and that an active old affinity points to a currently active real group. Confirm active singleton revision/epoch meet positive pair bounds. Old rows with null affinity remain ungrouped and produce no pair. Legacy inactive affinity is historical only; if a real referenced group exists it can carry the inactive pair state, never a recovered active grant.
+- Compare legacy profile active_group_id to active legacy affinity exactly (inactive maps to null). Do not overwrite profile. Compare authoritative old grants to assignment.group_id and old observed grant_epoch. If an otherwise effective grant maps to a different/missing group or inconsistent person epoch, halt and reconcile it. Preserve records and history on stale, inactive, revoked or detached cases; never attach/revive them during copy.
+- Integrate the existing account-deletion classifier/actor-target privacy retention, write barriers and coordinated group lifecycle before writing any new rows: the new FKs can stop old deletion logic once the table contains data. No broad CASCADE or global role bypass. Check all current writers including groups, profile, memberships, grants, attempt start/expiry, and no unreviewed membership mutation during the cutover.
+- Only after those gates, use an independently reviewed staged backfill of each observed real non-null legacy pair, preserving exact active/revision/epoch. Check source/target cardinality and values both directions. No UI data uses incomplete snapshots; no sample rows are supplied. Rehearsal remains genuine authorized data only. This document intentionally contains no INSERT/UPDATE/DELETE or program to execute a copy.
+
+## Before switching any pilot writer
+
+Update authorization from singleton membership to the exact current pair derived through assignment.group_id, then compare only that pair epoch against each grant. Coordinate grant issuer, roster reader, active-set confirmation, review gates/notifications, group management and deletion barriers. The existing roster/add/transfer/removal paths cannot infer one effective group after the switch. Existing attempt save/resume/submit and historical views use the original attempt/assignment anchor even if admission to another group changes; do not reissue or redirect them. No exam grant creation is part of merely adding a pair. Independent future transfer/removal requires an explicit source pair; never coerce unrelated groups.
+
+## Rollback horizon
+
+Before first imported row, abandon the empty proposal with no state continuity effects, subject to review of any adopted schema. After backfill but before live changes: disable pair write/route flags, keep copied rows and compare with the frozen singleton model; do not blindly drop. After the first true multi-group write, an automatic return to the singleton authorization is unsafe (the old projection cannot encode the new pair). Disable new operations, preserve all rows and current exam access/history, and use reviewed forward repair/compatibility. A production migration, controlled write freeze, validation/rollback, grants, and real-account check all remain separate approvals.

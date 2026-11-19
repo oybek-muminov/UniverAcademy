@@ -1,0 +1,128 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-multi-group-preview.ts b/supabase/functions/univeracademy-api/teacher-multi-group-preview.ts
+new file mode 100644
+index 0000000..891e32e
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-multi-group-preview.ts
+@@ -0,0 +1,122 @@
++// Local, unmounted exact-ID preview and confirmation recheck. No database driver.
++import { fail } from "./fault.ts";
++import { currentStaff } from "./staff-state.ts";
++import { planTeacherAddStudentGroup } from "./teacher-add-student-group.ts";
++
++type Input=Parameters<typeof planTeacherAddStudentGroup>[0];
++type Target=Input["target"];
++type Pair=Input["student"]["pairs"][number];
++type Snapshot=Input["student"] & Readonly<{
++  // Every active pair must include a real stored label; inactive rows are not displayed.
++  pairs:readonly (Pair & Readonly<{name:string|null}>)[];
++}>;
++type LockedContext=Omit<Input,"student"|"confirmation">;
++type Confirmation=Input["confirmation"];
++type PreviewPorts=Readonly<{
++  // Bind to verified caller and active target; errors do not leak directory state.
++  consumeExactLookupQuota(actorId:string,signal:AbortSignal):Promise<void>;
++  // Exact canonical public ID, never partial search or singleton legacy inference.
++  readByExactPublicId(publicId:string,signal:AbortSignal):Promise<Readonly<{publicId:string;snapshot:Snapshot}>|null>;
++  // A trusted server-side store binds all facts to a newly generated opaque
++  // random handle, never to a readable, merely signed claims payload.
++  issueConfirmation(context:Confirmation,signal:AbortSignal):Promise<string>;
++}>;
++type ConfirmPorts=Readonly<{
++  verifyConfirmation(opaque:string,signal:AbortSignal):Promise<Confirmation|null>;
++  // Full current pair state under authoritative locks, from verified confirmation.
++  readLockedStudent(personId:string,signal:AbortSignal):Promise<Snapshot|null>;
++}>;
++
++const uuid=(v:unknown):v is string=>typeof v==="string"&&v.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v);
++const digits=(v:string):boolean=>v.length===10&&!/[^0-9]/.test(v);
++const count=(v:unknown):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0;
++const validTicket=(v:unknown):v is string=>typeof v==="string"&&v.length===43&&
++  !/[^A-Za-z0-9_-]/.test(v);
++const label=(v:unknown):v is string=>typeof v==="string"&&v.length<=200&&v.trim().length>0&&
++  !/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(v);
++const unavailable=():never=>fail("SERVICE_UNAVAILABLE",503);
++
++/** Existing public ID is 10 digits stored as text. Never pad a numeric value. */
++export function canonicalExactCabinetId(input:unknown):string {
++  let candidate:unknown=input;
++  if(typeof input==="number"&&Number.isSafeInteger(input)&&input>=1_000_000_000&&input<=9_999_999_999)
++    candidate=String(input);
++  if(typeof candidate!=="string"||!digits(candidate)) fail("NOT_FOUND",404);
++  return candidate;
++}
++
++function authorize(c:LockedContext,target:Target):string {
++  if(!count(c.nowMs)) return unavailable();
++  const teacher=currentStaff(c.staffState,c.staffProof,c.nowMs);
++  if(!teacher.roles.includes("teacher")) fail("FORBIDDEN",403);
++  if(!uuid(target.groupId)||target.status!=="active"||!teacher.scope.group_ids.includes(target.groupId))
++    fail("NOT_FOUND",404);
++  if(!uuid(teacher.personId)||!c.lockedPersonIds.includes(teacher.personId)||
++     !c.lockedGroupIds.includes(target.groupId)) return unavailable();
++  return teacher.personId;
++}
++
++function readComplete(snapshot:Snapshot|null,expectedPerson?:string):{snapshot:Snapshot;activeGroupNames:readonly string[]}{
++  if(!snapshot||!snapshot.enabled||!snapshot.registeredStudent) fail("NOT_FOUND",404);
++  if(!uuid(snapshot.personId)||(expectedPerson!==undefined&&snapshot.personId!==expectedPerson)||
++     snapshot.complete!==true||!Array.isArray(snapshot.pairs)||snapshot.pairs.length>500||
++     typeof snapshot.membershipSetTag!=="string"||snapshot.membershipSetTag.length<16||
++     snapshot.membershipSetTag.length>256) return unavailable();
++  const seen=new Set<string>(), activeGroupNames:string[]=[];
++  for(const pair of snapshot.pairs){
++    if(!pair||pair.personId!==snapshot.personId||!uuid(pair.groupId)||seen.has(pair.groupId)||
++       typeof pair.active!=="boolean"||!count(pair.revision)||!count(pair.epoch)) return unavailable();
++    seen.add(pair.groupId);
++    if(pair.active){
++      if(!label(pair.name)) return unavailable();
++      activeGroupNames.push(pair.name);
++    }
++  }
++  return {snapshot,activeGroupNames:Object.freeze(activeGroupNames)};
++}
++
++/**
++ * Caller revalidates current Clerk lease at response, with no Student details
++ * or credentials in URL, logs, or cross-account output. TTL is a provisional
++ * server policy, not a client-controlled input or independent signer.
++ */
++export async function previewTeacherGroupAdd(publicId:unknown,context:LockedContext,
++  signal:AbortSignal,ports?:PreviewPorts):Promise<Readonly<{group_names:readonly string[];confirmation:string}>>{
++  signal.throwIfAborted();
++  if(!ports) return unavailable();
++  const actorId=authorize(context,context.target),groupId=context.target.groupId;
++  await ports.consumeExactLookupQuota(actorId,signal);
++  signal.throwIfAborted();
++  const exact=canonicalExactCabinetId(publicId);
++  const found=await ports.readByExactPublicId(exact,signal);
++  signal.throwIfAborted();
++  if(!found||found.publicId!==exact) fail("NOT_FOUND",404);
++  const {snapshot,activeGroupNames}=readComplete(found.snapshot);
++  const expiresAt=context.nowMs+120_000;
++  if(!count(expiresAt)) return unavailable();
++  const opaque=await ports.issueConfirmation(Object.freeze({kind:"verified_group_add",actorId,
++    studentId:snapshot.personId,groupId,membershipSetTag:snapshot.membershipSetTag,expiresAt}),signal);
++  signal.throwIfAborted();
++  if(!validTicket(opaque)) return unavailable();
++  return Object.freeze({group_names:activeGroupNames,confirmation:opaque});
++}
++
++/** Explicit confirmation; no auto-add on preview and no write in this module. */
++export async function recheckTeacherGroupAdd(opaque:unknown,context:LockedContext,signal:AbortSignal,
++  ports?:ConfirmPorts):Promise<ReturnType<typeof planTeacherAddStudentGroup>> {
++  signal.throwIfAborted();
++  if(!ports) return unavailable();
++  const actorId=authorize(context,context.target);
++  if(!validTicket(opaque)) fail("NOT_FOUND",404);
++  const authorized=await ports.verifyConfirmation(opaque,signal);
++  signal.throwIfAborted();
++  if(!authorized||authorized.kind!=="verified_group_add"||authorized.actorId!==actorId||
++     authorized.groupId!==context.target.groupId||!uuid(authorized.studentId)||
++     !count(authorized.expiresAt)||context.nowMs>=authorized.expiresAt||
++     !context.lockedPersonIds.includes(authorized.studentId)) fail("NOT_FOUND",404);
++  const selected=await ports.readLockedStudent(authorized.studentId,signal);
++  signal.throwIfAborted();
++  const {snapshot}=readComplete(selected,authorized.studentId);
++  return planTeacherAddStudentGroup({...context,student:snapshot,confirmation:authorized});
++}

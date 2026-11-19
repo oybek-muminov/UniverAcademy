@@ -1,0 +1,120 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-account-exit.ts b/supabase/functions/univeracademy-api/teacher-account-exit.ts
+new file mode 100644
+index 0000000..311b373
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-account-exit.ts
+@@ -0,0 +1,114 @@
++// Unmounted Teacher exit boundary. This is not an account-deletion service.
++import { fail } from "./fault.ts";
++import { currentStaff } from "./staff-state.ts";
++import type { StaffAccessRecord, StaffState, VerifiedStaffProof } from "./staff-state.ts";
++
++type Authority=Readonly<{
++  proof:VerifiedStaffProof;
++  state:Pick<StaffState,"staff">;
++  lockedPersonId:string;
++  nowMs:number;
++}>;
++type Read=Readonly<{personId:string;groupIds:readonly string[];complete:true}>;
++type ExitTransaction=Readonly<{
++  // Verify current Clerk/lease and load canonical StaffState in the same lock.
++  authorizeCurrent(signal:AbortSignal):Promise<Authority>;
++  readExplicitActiveGrants(personId:string,signal:AbortSignal):Promise<Read|null>;
++  // The only allowed effect is revoking the actor's exact existing unrevoked
++  // group grants under the person/scope lock. Do not grant a successor, create
++  // auditable person links, touch role/capabilities, groups, memberships,
++  // students, attempts, histories or the provider account. If a reliable
++  // audited writer does not yet exist, do not implement this method.
++  revokeExactOwnGrants(command:Readonly<{personId:string;groupIds:readonly string[]}>,
++    signal:AbortSignal):Promise<Readonly<{personId:string;revokedIds:readonly string[]}>>;
++}>;
++type Writer=Readonly<{
++  // Acquire canonical lock, make all reads/mutation atomic, and refresh
++  // liveness and scope on the response/commit boundary; throw => rollback.
++  transaction<T>(signal:AbortSignal,work:(tx:ExitTransaction)=>Promise<T>):Promise<T>;
++}>;
++
++const uuid=(x:unknown):x is string=>typeof x==="string"&&x.length===36&&
++  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x);
++function ids(input:unknown,code:string,status:number):readonly string[]{
++  if(!Array.isArray(input)||input.length>500) fail(code,status);
++  const copied:string[]=[];
++  for(let j=0;j<input.length;j++){
++    const entry=Object.getOwnPropertyDescriptor(input,String(j));
++    if(!entry||!Object.hasOwn(entry,"value")||!uuid(entry.value)) fail(code,status);
++    copied.push(entry.value);
++  }
++  if(new Set(copied).size!==copied.length) fail(code,status);
++  return Object.freeze(copied.sort());
++}
++const equals=(left:readonly string[],right:readonly string[])=>left.length===right.length&&
++  left.every((value,index)=>value===right[index]);
++
++function actor(auth:Authority):StaffAccessRecord{
++  if(!uuid(auth.lockedPersonId)||!Number.isSafeInteger(auth.nowMs)||auth.nowMs<0)
++    fail("SERVICE_UNAVAILABLE",503);
++  const s=currentStaff(auth.state,auth.proof,auth.nowMs);
++  if(s.personId!==auth.lockedPersonId||!s.roles.includes("teacher")||
++    s.roles.includes("owner")||s.roles.includes("admin")||s.scope.all_groups||s.scope.all_subjects)
++    fail("FORBIDDEN",403);
++  return s;
++}
++function groups(read:Read|null,staff:StaffAccessRecord):readonly string[]{
++  if(!read||read.complete!==true||read.personId!==staff.personId) fail("SERVICE_UNAVAILABLE",503);
++  const current=ids(read.groupIds,"RESPONSE_INVARIANT_FAILED",500);
++  if(!equals(current,ids(staff.scope.group_ids,"RESPONSE_INVARIANT_FAILED",500)))
++    fail("RESPONSE_INVARIANT_FAILED",500);
++  return current;
++}
++
++/**
++ * CAS on the whole current own-grant set. The expected IDs describe consent
++ * to revoke, never permission. A changed set must be reread/reconfirmed;
++ * do not turn uncertain retries into a second write or infer success.
++ */
++export async function releaseTeacherOwnGroups(expectedGroupIds:unknown,signal:AbortSignal,
++  writer?:Writer):Promise<Readonly<{releasedCount:number}>>{
++  if(typeof writer?.transaction!=="function") fail("SERVICE_UNAVAILABLE",503);
++  signal.throwIfAborted();
++  return writer.transaction(signal,async tx=>{
++    signal.throwIfAborted();
++    const s=actor(await tx.authorizeCurrent(signal));
++    const expected=ids(expectedGroupIds,"VALIDATION_ERROR",422);
++    const current=groups(await tx.readExplicitActiveGrants(s.personId,signal),s);
++    signal.throwIfAborted();
++    if(!equals(expected,current)) fail("RESOURCE_REVISION_CONFLICT",409);
++    if(current.length){
++      const change=await tx.revokeExactOwnGrants(Object.freeze({personId:s.personId,groupIds:current}),signal);
++      signal.throwIfAborted();
++      if(change?.personId!==s.personId||
++         !equals(current,ids(change.revokedIds,"RESPONSE_INVARIANT_FAILED",500)))
++        fail("RESPONSE_INVARIANT_FAILED",500);
++    }
++    const final=actor(await tx.authorizeCurrent(signal));
++    if(final.personId!==s.personId) fail("STAFF_TOKEN_INVALID",401);
++    signal.throwIfAborted();
++    if(groups(await tx.readExplicitActiveGrants(final.personId,signal),final).length)
++      fail("RESPONSE_INVARIANT_FAILED",500);
++    signal.throwIfAborted();
++    return Object.freeze({releasedCount:current.length});
++  });
++}
++
++type LockedDeletionEvidence=Readonly<{
++  // All fields may originate only from the independently authorized deletion
++  // coordinator and its current locked DB/reviewed privacy checks.
++  personId:string;
++  ownActiveGroupIds:readonly string[]|null;
++  identityLinkedTechnicalHistory:"cleared"|"present"|"unknown";
++  otherDeletionGuards:"clear"|"blocked"|"unknown";
++}>;
++/** Never runs deletion and never bypasses the existing authoritative guard. */
++export function assessTeacherExitReadiness(personId:string,evidence?:LockedDeletionEvidence):
++  "ready_for_existing_deletion_flow"|"own_grants_remaining"|"unavailable" {
++  if(!uuid(personId)||evidence?.personId!==personId||evidence.ownActiveGroupIds===null) return "unavailable";
++  if(ids(evidence.ownActiveGroupIds,"RESPONSE_INVARIANT_FAILED",500).length) return "own_grants_remaining";
++  if(evidence.identityLinkedTechnicalHistory!=="cleared"||evidence.otherDeletionGuards!=="clear") return "unavailable";
++  // A successor is intentionally not required. Groups/students are not evidence
++  // to mutate; unlink or optional handoff can happen through separate reviewed flows.
++  return "ready_for_existing_deletion_flow";
++}

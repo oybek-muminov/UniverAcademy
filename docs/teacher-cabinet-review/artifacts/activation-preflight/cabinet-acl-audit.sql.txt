@@ -1,0 +1,108 @@
+-- Offline review artifact. Do not run until the owner approves the metadata
+-- audit against the intended environment. No application rows or credentials.
+-- Replace both placeholder names with approved actual login role names.
+-- Missing role/table/column or any unexpected privilege blocks activation.
+BEGIN TRANSACTION READ ONLY;
+WITH requested(kind, role_name) AS (
+  VALUES ('student'::text, 'REPLACE_WITH_STUDENT_LOGIN_ROLE'::name),
+         ('capability'::text, 'REPLACE_WITH_CAPABILITY_LOGIN_ROLE'::name)
+), roles AS (
+  SELECT q.kind,q.role_name,r.oid,r.rolcanlogin,r.rolsuper,r.rolbypassrls,
+         r.rolcreaterole,r.rolcreatedb,r.rolreplication,r.rolinherit
+  FROM requested q LEFT JOIN pg_catalog.pg_roles r ON r.rolname=q.role_name
+), required(kind, relname, columns) AS (
+  VALUES
+    ('student', 'people', ARRAY['id','enabled']::text[]),
+    ('student', 'clerk_identities', ARRAY['person_id','issuer','subject','enabled']),
+    ('student', 'exam_series', ARRAY['id','person_id','demo_id','current_attempt_id','generation']),
+    ('student', 'attempts', ARRAY['id','person_id','demo_id','generation','body']),
+    ('capability', 'people', ARRAY['id','enabled','roles']),
+    ('capability', 'clerk_identities', ARRAY['person_id','issuer','subject','enabled']),
+    ('capability', 'staff_access', ARRAY['person_id','approved']),
+    ('capability', 'teacher_subject_approvals', ARRAY['person_id','approved','revoked_at_ms','subject_id'])
+), scope AS (
+  SELECT r.kind,r.role_name,r.oid AS role_oid,n.oid AS schema_oid,
+         c.oid AS relation_oid,c.relname::text,c.relowner,c.relrowsecurity,c.relforcerowsecurity,
+         COALESCE(req.columns,ARRAY[]::text[]) AS needed
+  FROM roles r
+  JOIN pg_catalog.pg_namespace n ON n.nspname='ua_private'
+  JOIN pg_catalog.pg_class c ON c.relnamespace=n.oid AND c.relkind IN ('r','p','v','m','f','S')
+  LEFT JOIN required req ON req.kind=r.kind AND req.relname=c.relname::text
+), facts AS (
+  SELECT s.*,
+    CASE WHEN s.role_oid IS NULL OR s.relowner IS NULL THEN NULL
+      ELSE pg_catalog.pg_has_role(s.role_oid,s.relowner,'USAGE') END AS effective_owner,
+    CASE WHEN s.role_oid IS NULL THEN NULL
+      ELSE pg_catalog.has_schema_privilege(s.role_oid,s.schema_oid,'USAGE') END AS schema_usage,
+    CASE WHEN s.role_oid IS NULL THEN NULL
+      ELSE pg_catalog.has_schema_privilege(s.role_oid,s.schema_oid,'CREATE') END AS schema_create,
+    CASE WHEN s.role_oid IS NULL OR s.relation_oid IS NULL THEN NULL
+      WHEN s.relname IS NOT NULL AND EXISTS (
+        SELECT 1 FROM pg_catalog.pg_class cc WHERE cc.oid=s.relation_oid AND cc.relkind='S'
+      ) THEN pg_catalog.has_sequence_privilege(s.role_oid,s.relation_oid,'USAGE,SELECT,UPDATE')
+      ELSE pg_catalog.has_table_privilege(s.role_oid,s.relation_oid,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER,REFERENCES')
+        OR pg_catalog.has_any_column_privilege(s.role_oid,s.relation_oid,'INSERT,UPDATE,REFERENCES')
+    END AS non_read_privilege,
+    CASE WHEN s.role_oid IS NULL OR s.relation_oid IS NULL THEN NULL
+      WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_class cc WHERE cc.oid=s.relation_oid AND cc.relkind='S') THEN false
+      ELSE pg_catalog.has_table_privilege(s.role_oid,s.relation_oid,'SELECT') END AS broad_table_read,
+    ARRAY (
+      SELECT at.attname::text
+      FROM pg_catalog.pg_attribute at
+      JOIN pg_catalog.pg_class cc ON cc.oid=at.attrelid AND cc.relkind<>'S'
+      WHERE at.attrelid=s.relation_oid AND at.attnum>0 AND NOT at.attisdropped
+        AND s.role_oid IS NOT NULL
+        AND pg_catalog.has_column_privilege(s.role_oid,s.relation_oid,at.attnum,'SELECT')
+      ORDER BY at.attname
+    ) AS actual_read,
+    ARRAY (
+      SELECT at.attname::text FROM pg_catalog.pg_attribute at
+      WHERE at.attrelid=s.relation_oid AND at.attnum>0 AND NOT at.attisdropped
+      ORDER BY at.attname
+    ) AS existing_columns,
+    COALESCE((
+      SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+          'name',p.polname,'command',p.polcmd,'permissive',p.polpermissive,
+          'using',pg_catalog.pg_get_expr(p.polqual,p.polrelid)) ORDER BY p.polname)
+      FROM pg_catalog.pg_policy p WHERE p.polrelid=s.relation_oid AND p.polcmd IN ('r','*')
+        AND EXISTS (SELECT 1 FROM pg_catalog.unnest(p.polroles) AS x(policy_role)
+          WHERE CASE WHEN x.policy_role=0 THEN true WHEN s.role_oid IS NULL THEN false
+            ELSE pg_catalog.pg_has_role(s.role_oid,x.policy_role,'USAGE') END)
+    ),'[]'::jsonb) AS effective_select_policies
+  FROM scope s
+)
+SELECT pg_catalog.jsonb_build_object(
+  'roles', (SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(r) ORDER BY r.kind) FROM roles r),
+  'distinct_roles', (SELECT count(DISTINCT oid)=2 FROM roles),
+  'capability_role_memberships', COALESCE((SELECT pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object('role',m.rolname,'inherited',pg_catalog.pg_has_role(c.oid,m.oid,'USAGE'))
+      ORDER BY m.rolname) FROM roles c CROSS JOIN pg_catalog.pg_roles m
+      WHERE c.kind='capability' AND c.oid<>m.oid AND pg_catalog.pg_has_role(c.oid,m.oid,'MEMBER')),'[]'::jsonb),
+  'capability_executable_private_routines', COALESCE((SELECT pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object('routine',p.proname,'security_definer',p.prosecdef) ORDER BY p.proname)
+      FROM roles c CROSS JOIN pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+      WHERE c.kind='capability' AND n.nspname='ua_private'
+        AND pg_catalog.has_function_privilege(c.oid,p.oid,'EXECUTE')),'[]'::jsonb),
+  'missing_relations', COALESCE((SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(q))
+     FROM required q WHERE NOT EXISTS (SELECT 1 FROM facts f WHERE f.kind=q.kind AND f.relname=q.relname)),'[]'::jsonb),
+  'student_required', COALESCE((SELECT pg_catalog.jsonb_agg(
+       pg_catalog.jsonb_build_object('relation',f.relname,'rls',f.relrowsecurity,'force_rls',f.relforcerowsecurity,
+         'effective_owner',f.effective_owner,'schema_usage',f.schema_usage,'required',f.needed,
+         'existing_columns',f.existing_columns,'actual_read',f.actual_read,'select_policies',f.effective_select_policies)
+       ORDER BY f.relname) FROM facts f WHERE f.kind='student' AND pg_catalog.cardinality(f.needed)>0),'[]'::jsonb),
+  'student_staff_grant_review', COALESCE((SELECT pg_catalog.jsonb_agg(
+       pg_catalog.jsonb_build_object('relation',f.relname,'actual_read',f.actual_read,'broad_table_read',f.broad_table_read,
+         'select_policies',f.effective_select_policies) ORDER BY f.relname) FROM facts f
+       WHERE f.kind='student' AND f.relname IN ('staff_access','teacher_subject_approvals')),'[]'::jsonb),
+  'capability_required_and_any_other_effective_privilege', COALESCE((SELECT pg_catalog.jsonb_agg(
+       pg_catalog.jsonb_build_object('relation',f.relname,'rls',f.relrowsecurity,'force_rls',f.relforcerowsecurity,
+         'effective_owner',f.effective_owner,'schema_usage',f.schema_usage,'schema_create',f.schema_create,
+         'non_read_privilege',f.non_read_privilege,'broad_table_read',f.broad_table_read,
+         'required',f.needed,'existing_columns',f.existing_columns,'actual_read',f.actual_read,
+         'unexpected_read',ARRAY(SELECT x FROM pg_catalog.unnest(f.actual_read) x WHERE NOT (x=ANY(f.needed))),
+         'select_policies',f.effective_select_policies)
+       ORDER BY f.relname) FROM facts f WHERE f.kind='capability' AND (
+       pg_catalog.cardinality(f.needed)>0 OR f.non_read_privilege OR f.effective_owner OR
+       f.broad_table_read OR pg_catalog.cardinality(f.actual_read)>0)),'[]'::jsonb)
+) AS acl_metadata;
+ROLLBACK;

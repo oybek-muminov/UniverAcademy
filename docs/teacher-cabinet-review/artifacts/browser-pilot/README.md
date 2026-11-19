@@ -1,0 +1,11 @@
+# Teacher browser pilot: independent existing Clerk login
+
+Pinned project main 3dbb714f2f758c7dbe03548a71c161718cf9cb53. Requires the separate teacher-cabinet-bootstrap.ts candidate. Adds a concrete local GET handler; not registered in runtime/cloudflare-entry.mjs, not a UI change, not deployed.
+
+An ordinary browser login may be used only with the existing Clerk project and configured browser origin. The handler verifies the actual Authorization-header Clerk JWT with createClerkVerifier and admits only the canonical same-origin route/GET (no query, fragment, other Origin, or caller subject). The injected read runner locates the canonical existing person using the verified Clerk issuer/subject and locks that one person. Bootstrap rechecks its exact enabled Clerk-person mapping, live provider lease, current Teacher staff authorization, approved subjects and explicit group scope. No Student opaque bearer, Student family activation/rotation, link/signup, rebinding, Telegram URL data, or assumption that Clerk provider sessions are shared. Successful responses expose only the prior normalized Teacher read and use no-store. Missing dependencies fail unavailable.
+
+The older clerk-domain.ts locator at lines 248–258 establishes the canonical issuer+subject lookup pattern. Its generic staffOrLink path at 261+ also loads StaffFirstTestRows and may flush data; this read deliberately does not reuse its write transaction implementation. The runner needs an approved real read-only storage binding, canonical current Clerk person lookup with a locked recheck, minimum lease/cancellation before commit, and complete genuine metadata. Existing Student database grants do not imply this. No new grants, identity transport, provider configuration, fallback or Worker binding is in this patch.
+
+Do not treat independent browser sign-in as Telegram-to-browser continuation. The separate continuation seam still refuses missing/unverified launch binding; ordinary pilot GET makes no claim about any Telegram initiator and does not change the approved longer-term route.
+
+Checked exact forward/reverse whitespace-strict git apply, source bytes and Node 24 stripped TS syntax. No runtime, fixtures, real records, live auth/SQL, routes, push or deployment.

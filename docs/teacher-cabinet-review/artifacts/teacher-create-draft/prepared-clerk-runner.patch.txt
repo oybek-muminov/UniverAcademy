@@ -1,0 +1,103 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-first-draft-prepared.ts b/supabase/functions/univeracademy-api/teacher-first-draft-prepared.ts
+new file mode 100644
+index 0000000..b0655b9
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-first-draft-prepared.ts
+@@ -0,0 +1,97 @@
++// Unmounted server composition. Never pass a Student, browser-read, account
++// deletion or generic owner resource. No environment/binding loader lives here.
++import { checkClerkProof, requireLiveClerk } from "./clerk-auth.ts";
++import type { ClerkLiveness, ClerkProof } from "./clerk-auth.ts";
++import { fail } from "./fault.ts";
++import { integer, PostgresTransactions, query, StorageUnavailable } from "./storage/postgres-transaction.ts";
++import type { PgPool } from "./storage/postgres-transaction.ts";
++import { insertTeacherPilotFirstDraftRows } from "./storage/teacher-pilot-first-draft-rows.ts";
++import { setTrustedPhase } from "./storage/trusted-server-context.ts";
++
++type Rows = typeof insertTeacherPilotFirstDraftRows;
++type Writer = Readonly<{ pool: PgPool; close(): Promise<void>; signal: AbortSignal }>;
++type Pilot = Readonly<Parameters<Rows>[2] & { teacherId: string }>;
++type Options = Readonly<{ writer: Writer; pilot: Pilot; now(): number;
++  liveness: ClerkLiveness; validate: Parameters<Rows>[5] }>;
++const limit = 8_640_000_000_000_000;
++const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
++
++// Trusted composition must already attest a dedicated writer and approved
++// receipt/audit erasure policy. A supplied ClerkProof is from the canonical
++// verified header path, never an HTTP-authored object or a Student session.
++// Exactly one operation; no general transaction callback is accepted.
++export function prepareTeacherFirstDraftTransaction(options: Options) {
++  const {writer,now,liveness,validate}=options, pilot=Object.freeze({...options.pilot});
++  const signal=writer.signal;
++  if(!(signal instanceof AbortSignal)||typeof writer.pool?.connect!=="function"||
++      typeof writer.close!=="function"||typeof now!=="function"||typeof liveness!=="function"||
++      typeof validate!=="function"||!uuid.test(pilot.teacherId)||!uuid.test(pilot.groupId)||
++      typeof pilot.subjectId!=="string"||!pilot.subjectId||pilot.subjectId!==pilot.subjectId.trim())
++    fail("SERVICE_UNAVAILABLE",503);
++  let used=false;
++  return async (verified: ClerkProof,key: string,input: unknown): Promise<Awaited<ReturnType<Rows>>> => {
++    if(used)fail("SERVICE_UNAVAILABLE",503);
++    used=true;
++    let result:Awaited<ReturnType<Rows>>, acknowledged=false;
++    try{
++      const proof=Object.freeze({...verified});
++      let lastDb=-1,lastHost=-1,lease=proof.expiresAt,completed=false;
++      const host=()=>{
++        const at=now();
++        if(!Number.isSafeInteger(at)||at<0||at>limit||at<lastHost||at<lastDb)
++          fail("SERVICE_UNAVAILABLE",503);
++        lastHost=at;
++        return at;
++      };
++      const alive=(at:number)=>{
++        if(signal.aborted)fail("SERVICE_UNAVAILABLE",503);
++        checkClerkProof(proof,at);
++        if(at>=lease)fail("CLERK_SESSION_REVOKED",401);
++      };
++      alive(host());
++      // Existing browser-pilot dependency: this lock-only helper does not use
++      // a browser read pool, load auth rows, or grant any privileges. Callback
++      // is fixed here, and resource is the separate request-owned writer.
++      result=await new PostgresTransactions(writer.pool).runClerkRead(proof,{
++        beforeCommit:()=>{
++          if(!completed)fail("SERVICE_UNAVAILABLE",503);
++          alive(host());
++        },
++      },async tx=>{
++        const personId=tx.personIds[0];
++        if(tx.personIds.length!==1||personId!==pilot.teacherId)fail("NOT_FOUND",404);
++        lastDb=tx.now;alive(lastDb);
++        const fresh=async()=>{
++          const clock=await query(tx,"ua_clock",
++            "SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::text AS now_ms");
++          if(clock.rows.length!==1)fail("RESPONSE_INVARIANT_FAILED",500);
++          const at=integer(clock.rows[0].now_ms);
++          if(at<lastDb||at>limit)fail("SERVICE_UNAVAILABLE",503);
++          tx.now=lastDb=at;alive(at);return at;
++        };
++        const refresh=async()=>{
++          const at=await fresh();
++          const liveUntil=await requireLiveClerk(proof,at,(identity,instant)=>liveness(identity,instant,{signal}));
++          lease=Math.min(lease,liveUntil);
++          await fresh();
++        };
++        await refresh();
++        await setTrustedPhase(tx.client,"domain");
++        alive(host());
++        const ids=await insertTeacherPilotFirstDraftRows(tx,
++          {personId,issuer:proof.issuer,subject:proof.userId},pilot,key,input,validate);
++        await refresh();
++        completed=true;
++        return ids;
++      });
++      acknowledged=true;
++    }finally{
++      try{await writer.close();}
++      catch{if(acknowledged)throw new StorageUnavailable("commit_unknown");}
++    }
++    // A possibly delivered commit must not be represented as a successful
++    // acknowledgment after request cancellation. Retry only the same key.
++    if(signal.aborted)throw new StorageUnavailable("commit_unknown");
++    return result;
++  };
++}

@@ -1,0 +1,9 @@
+# Teacher creates a group: unmounted domain candidate
+
+Based on project commit 3dbb714f2f758c7dbe03548a71c161718cf9cb53 and the direct-Teacher create-group review in ../group-create. candidate.patch adds only teacher-group-create.ts.
+
+Actual application code: normalizes an explicit real name (trim/NFC, 1–200 Unicode characters, no controls or line separators), accepts exactly one decoded request field and a bounded idempotency key, requires the existing current enabled/approved staff authority plus Teacher and an approved subject in the canonical person lock, generates a server UUID, and builds a command that can create only that group's exact scope for the actor. It gives no role, global scope, manage_roster/content, credentials, membership, assignment, or student data. It checks the copied immutable receipt and reauthorizes the same person before return. An absent writer returns unavailable.
+
+The domain checks depend on a trusted, currently live Clerk-backed writer transaction, not raw caller claims or a Student hint. The proposed persistAtomically seam must claim/compare actor+method+path+key and write exactly one new group, its matching per-group creator scope, and immutable receipt in the same transaction. A replay returns the original receipt only if current exact scope survives; same key/different canonical request conflicts; transaction faults roll back all steps. Before-commit liveness/expiry/cancellation and real storage authority remain the writer's responsibility. Raw HTTP decoding, duplicate JSON member policy, route publication, writer SQL, canonical groups.name storage, and receipt/retention design are not implemented. No guessed DDL, privilege, sample names, appointment or synthetic data.
+
+Checked diff whitespace, forward/reverse strict apply, exact copied bytes, and Node 24 stripped TypeScript syntax. No data, SQL, fixtures, browser/runtime test, push or deployment.

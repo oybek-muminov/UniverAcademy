@@ -1,0 +1,89 @@
+diff --git a/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts b/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
+index 6d3c07a..df03577 100644
+--- a/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
++++ b/supabase/functions/univeracademy-api/storage/teacher-single-group-attachment-rows.ts
+@@ -3,13 +3,10 @@ import { nextRevision } from "../staff-state.ts";
+ import { integer, own, query } from "./postgres-transaction.ts";
+ import type { LockedTransaction } from "./postgres-transaction.ts";
+ import { StaffAccessRows } from "./staff-access-rows.ts";
++import type { TeacherPilotAttachmentConfirmation } from "../teacher-pilot-single-group-add.ts";
+ 
+ type Actor = Readonly<{ personId: string; issuer: string; subject: string }>;
+ type Config = Readonly<{ groupId: string; subjectId: string }>;
+-type Permit = Readonly<{
+-  actorId: string; studentId: string; exactPublicId: string; groupId: string; subjectId: string;
+-  expiresAt: number; groupRevision: number; membershipRevision: number; membershipEpoch: number;
+-}>;
+ type Result = Readonly<{ groupRevision: number; membershipRevision: number }>;
+ 
+ const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u;
+@@ -28,7 +25,7 @@ function exactResult(value: unknown): Result {
+ // store resolves an explicit opaque confirmation, never a client-supplied Permit.
+ export async function attachInitialTeacherPilotStudentRows(
+   tx: LockedTransaction, actor: Actor, pilot: Config, handle: string, key: string,
+-  verifyConfirmation: (handle: string) => Promise<Permit | null>,
++  verifyConfirmation: (handle: string) => Promise<TeacherPilotAttachmentConfirmation | null>,
+ ): Promise<Result> {
+   own(tx, actor.personId);
+   if (!uuid.test(pilot.groupId) || !pilot.subjectId || pilot.subjectId.trim() !== pilot.subjectId)
+diff --git a/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts b/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts
+index 5b20902..7ed4321 100644
+--- a/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts
++++ b/supabase/functions/univeracademy-api/teacher-pilot-single-group-add.ts
+@@ -17,17 +17,17 @@ type Context=Readonly<{
+   // from a default, browser choice, subject label or input ID alone.
+   configuredPilotGroupId:string; configuredPilotSubjectId:string; target:Target;
+ }>;
+-type Confirmation=Readonly<{
+-  actorId:string;studentId:string;groupId:string;expiresAt:number;
++export type TeacherPilotAttachmentConfirmation=Readonly<{
++  actorId:string;studentId:string;exactPublicId:string;groupId:string;subjectId:string;expiresAt:number;
+   groupRevision:number;membershipRevision:number;membershipEpoch:number;
+ }>;
+ type PreviewPorts=Readonly<{
+   consumeLookupQuota(actorId:string,signal:AbortSignal):Promise<void>;
+   readExactPublicId(id:string,signal:AbortSignal):Promise<Snapshot|null>;
+-  issueOpaqueConfirmation(binding:Confirmation,signal:AbortSignal):Promise<string>;
++  issueOpaqueConfirmation(binding:TeacherPilotAttachmentConfirmation,signal:AbortSignal):Promise<string>;
+ }>;
+ type ConfirmPorts=Readonly<{
+-  verifyOpaqueConfirmation(handle:string,signal:AbortSignal):Promise<Confirmation|null>;
++  verifyOpaqueConfirmation(handle:string,signal:AbortSignal):Promise<TeacherPilotAttachmentConfirmation|null>;
+   readCurrentLockedStudent(personId:string,signal:AbortSignal):Promise<Snapshot|null>;
+ }>;
+ type Decision=Readonly<{kind:"already_member"}>|Readonly<{
+@@ -87,13 +87,15 @@ export async function previewTeacherPilotAdd(value:unknown,c:Context,signal:Abor
+   const selected=await ports.readExactPublicId(exact,signal);signal.throwIfAborted();
+   if(!selected||selected.publicId!==exact) fail("NOT_FOUND",404);
+   const s=canonical(selected);
++  if(s.personId===actorId) fail("NOT_FOUND",404);
+   const names=Object.freeze(s.activeGroupName===null?[]:[s.activeGroupName]);
+   // Do not mint permission to transfer or re-add a previously placed Student.
+   if(s.membership.affinityGroupId!==null||s.grantEvidence!=="none"||s.liveAttempt!=="none")
+     return Object.freeze({group_names:names,confirmation:null});
+   const expiresAt=c.nowMs+120_000;
+   if(!counter(expiresAt)) return unavailable();
+-  const confirmation=await ports.issueOpaqueConfirmation(Object.freeze({actorId,studentId:s.personId,groupId,
++  const confirmation=await ports.issueOpaqueConfirmation(Object.freeze({actorId,studentId:s.personId,
++    exactPublicId:exact,groupId,subjectId:c.configuredPilotSubjectId,
+     expiresAt,groupRevision,membershipRevision:s.membership.revision,membershipEpoch:s.membership.epoch}),signal);
+   signal.throwIfAborted();
+   if(!handle(confirmation)) return unavailable();
+@@ -106,11 +108,15 @@ export async function recheckTeacherPilotAdd(value:unknown,c:Context,signal:Abor
+   const actorId=currentTeacher(c);
+   if(!handle(value)) fail("NOT_FOUND",404);
+   const permit=await ports.verifyOpaqueConfirmation(value,signal);signal.throwIfAborted();
+-  if(!permit||permit.actorId!==actorId||permit.groupId!==c.target.id||!uuid(permit.studentId)||
+-    !counter(permit.expiresAt)||c.nowMs>=permit.expiresAt||!c.lockedPersonIds.includes(permit.studentId))
++  if(!permit||permit.actorId!==actorId||permit.groupId!==c.target.id||
++    permit.subjectId!==c.configuredPilotSubjectId||!uuid(permit.studentId)||permit.studentId===actorId||
++    typeof permit.exactPublicId!=="string"||permit.exactPublicId.length!==10||/[^0-9]/.test(permit.exactPublicId)||
++    ![permit.expiresAt,permit.groupRevision,permit.membershipRevision,permit.membershipEpoch].every(counter)||
++    c.nowMs>=permit.expiresAt||!c.lockedPersonIds.includes(permit.studentId))
+     fail("NOT_FOUND",404);
+   const s=canonical(await ports.readCurrentLockedStudent(permit.studentId,signal),permit.studentId);
+   signal.throwIfAborted();
++  if(s.publicId!==permit.exactPublicId) fail("NOT_FOUND",404);
+   const m=s.membership;
+   if(m.active&&m.affinityGroupId===permit.groupId) return Object.freeze({kind:"already_member"});
+   if(m.active||m.affinityGroupId!==null) fail("MEMBERSHIP_STATE_CONFLICT",409);

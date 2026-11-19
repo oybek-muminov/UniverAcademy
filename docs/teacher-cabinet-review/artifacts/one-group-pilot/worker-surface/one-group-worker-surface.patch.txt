@@ -1,0 +1,44 @@
+diff --git a/runtime/one-group-pilot-routes.mjs b/runtime/one-group-pilot-routes.mjs
+new file mode 100644
+index 0000000..c4fdc60
+--- /dev/null
++++ b/runtime/one-group-pilot-routes.mjs
+@@ -0,0 +1,38 @@
++// Dispatch classification only. Never pass an allowed route straight to the
++// general API: write/body and owned attempt pins must be enforced under lock.
++const id = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
++const uuid = new RegExp(`^${id}$`);
++const question = new RegExp(`^/api/v1/admin/versions/(${id})/questions/(${id})$`);
++const publish = new RegExp(`^/api/v1/admin/versions/(${id})/publish$`);
++const exam = new RegExp(`^/api/v1/exams/(${id})(/attempts)?$`);
++const attempt = new RegExp(`^/api/v1/attempts/(${id})(?:/(submit|result|answers/(${id})))?$`);
++
++// pin is reviewed server configuration, never query/body/header input.
++// The existing draft ID is also the ID of its immutable published version.
++export function classifyOneGroupPilotRoute(request, pin) {
++  if (!(request instanceof Request) || request.signal.aborted ||
++      !pin || ![pin.groupId, pin.demoId, pin.versionId].every(x => typeof x === "string" && uuid.test(x)) ||
++      (pin.assignmentId !== undefined && (typeof pin.assignmentId !== "string" || !uuid.test(pin.assignmentId)))) return null;
++  const {pathname: path, search, hash} = new URL(request.url);
++  if (search || hash) return null;
++  const {method} = request;
++  let hit;
++  if (method === "PUT" && (hit = question.exec(path)) && hit[1] === pin.versionId)
++    return {kind: "draft-question"};
++  if (method === "POST" && (hit = publish.exec(path)) && hit[1] === pin.versionId)
++    return {kind: "draft-publish"};
++  if (method === "POST" && path === "/api/v1/admin/assignments")
++    return {kind: "assignment-requires-body-pin"};
++  // Exam path IDs are assignment IDs, not demo IDs. Nothing Student-facing
++  // is eligible before binding the committed, reviewed assignment identifier.
++  if (pin.assignmentId === undefined) return null;
++  if ((hit = exam.exec(path)) && hit[1] === pin.assignmentId) {
++    if (method === "GET" && !hit[2]) return {kind: "exam-detail"};
++    if (method === "POST" && hit[2]) return {kind: "attempt-start"};
++  }
++  if ((hit = attempt.exec(path)) &&
++      ((method === "GET" && (!hit[2] || hit[2] === "result")) ||
++       (method === "PUT" && hit[3]) || (method === "POST" && hit[2] === "submit")))
++    return {kind: "attempt-requires-locked-pin", attemptId: hit[1]};
++  return null;
++}

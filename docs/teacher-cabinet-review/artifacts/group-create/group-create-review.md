@@ -1,0 +1,27 @@
+# Group names and Teacher create-group: review proposal
+
+Reference: UniverAcademy 3dbb714f2f758c7dbe03548a71c161718cf9cb53. This is an additive design for review. It mounts no route, runs no SQL, grants no privileges, and supplies neither labels nor sample records.
+
+## Verified source and genuine labels
+
+- The copied schema catalog records only id/revision/status on groups. Existing assignments, memberships and staff_group_scope refer to group UUIDs. The current group reader selects id/revision/status; do not replace or regenerate those UUIDs.
+- The landing page lists display names such as “Matematika” and “Fizika” in apps/landing/src/Subjects.tsx, but those cards have no canonical backend subject_id mapping, and the page identifies the learning path as not connected. It is not an authoritative label catalog.
+- Backend staff-access-rows.ts reads approved subject IDs. Demos have subject_id and a demo-specific title, not a canonical subject label. The catalog has no verified relation for subject labels. Do not infer labels from demo titles, guess a slug, or substitute IDs as labels. For the first pilot I recommend an owner-reviewed server-side ID-to-label allowlist for the real pilot subjects; use a subject relation instead if the owner needs operational editing. Until a real ID-to-label mapping is supplied, the browser bootstrap still must not be reported ready.
+
+## Minimal compatible storage decision
+
+Recommend a nullable groups.name display column during rollout: same group UUIDs, no default, no bulk synthetic backfill. For newly created groups require a nonblank explicit name (1–200 Unicode characters after trimming, plain text, no control characters); older row names are filled only from owner-confirmed real values. An unresolved legacy name is unavailable metadata, not “Group <UUID>”. Once every real row has a name and all writers/rollbacks support it, a separately reviewed NOT NULL constraint is optional. Existing groups, membership affinity, grants, assignments, attempts and results remain unchanged.
+
+An alternative is a one-to-one name table keyed by the existing UUID. It avoids altering the group row contract but adds keys, joins and permissions; reserve that option for multiple locale labels or if existing positional writers block the additive column. Before choosing the column, verify every group insert/decoder plus trigger/RLS contract; never change immutable history to backfill UI labels.
+
+Group timezone is not currently persisted and is not necessary to name an empty group. For this narrow pilot action keep assignment timezones in the existing assignment flow, not a guessed server timezone or default group backfill. If the product later requires group timezone, add it explicitly with an approved source; do not pretend it exists on legacy groups.
+
+## Initial create-group contract (proposed, unmounted)
+
+- Suggested new exact POST /api/v1/teacher/groups, request exactly {name}, required Idempotency-Key, success 201/no-store with {data:{id,name,revision,status}}. Separate route avoids silently changing the older provisional POST /admin/groups contract: contracts/telegram-return.openapi.json:1540–1542 describes Owner direct / Teacher request; GroupCreate also requires timezone. The newer product direction permits a Teacher to create directly. This review delta does not implement or confer that right.
+- Require the same freshly verified Clerk session and current enabled, approved Teacher role with active subject approval. Do not trust client roles, arbitrary issuer/person/group IDs, owner/all-groups flags, or Student routing hints. Subject approval is checked for access, not accepted as spoofable request data. No Student toggle or separate signup.
+- In one verified transaction: check actorship after canonical locks, take an idempotency receipt keyed to actor+operation+request key, generate group UUID server-side, persist the explicit name and initial active status/revision according to existing counter rules, and insert that teacher's exact per-group scope row as creation authority. Never give global scope, general roster/content capability, role escalation, enrollment, student movement or test assignment. Whether roster management is allowed remains independently governed by existing manage_roster and group authorization.
+- Same normalized request/key may replay the same group only after fresh authorization and current ownership; conflicting payload/key returns a generic conflict. A failure must roll back both group and scope rows. Confirm supported existing receipt/audit invariants or propose their minimal compatible extension; do not forge staff audit rows or change deletion behavior. Cross-role Admin/Owner semantics and any data backfill remain separate.
+- Keep deployment, grants/RLS migration and real-account verification separately approved. Test coverage must use only approved real pilot data. The metadata subset adapter does not become ready until real names, real subject labels and canonical listing visibility are settled.
+
+Evidence: tests/account-deletion/schema-catalog.json; supabase/functions/univeracademy-api/storage/staff-access-rows.ts; supabase/functions/univeracademy-api/storage/staff-first-test-rows.ts; docs/teacher/browser-cabinet-groundwork.md; apps/landing/src/Subjects.tsx; contracts/telegram-return.openapi.json.

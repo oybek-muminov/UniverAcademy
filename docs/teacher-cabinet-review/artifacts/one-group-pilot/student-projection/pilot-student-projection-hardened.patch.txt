@@ -1,0 +1,195 @@
+diff --git a/supabase/functions/univeracademy-api/storage/prepared-student.ts b/supabase/functions/univeracademy-api/storage/prepared-student.ts
+index 2aaf002..aca27c3 100644
+--- a/supabase/functions/univeracademy-api/storage/prepared-student.ts
++++ b/supabase/functions/univeracademy-api/storage/prepared-student.ts
+@@ -5,6 +5,7 @@ import {PostgresTransactions,integer} from "./postgres-transaction.ts";
+ import type {PgPool,PgClient,LockedTransaction} from "./postgres-transaction.ts";
+ import {locateStudentAccessOnClient} from "./student-scope.ts";
+ import {StudentHttpRows} from "./student-http-rows.ts";
++import type {PilotStudentPin} from "./student-http-rows.ts";
+ import {setTrustedPhase} from "./trusted-server-context.ts";
+ 
+ // The first student flow uses existing opaque application-session proofs. Login,
+@@ -81,11 +82,41 @@ function assertRequestWrites(request:Request,raw:string,before:StudentState,afte
+ // and not proof of RLS isolation.
+ // No caller-controlled `trusted`/activation flag, credential loader or fallback.
+ export type BoundStudentAuthorization=(tx:LockedTransaction,auth:StudentState)=>Promise<()=>void>;
++
++const pilotId="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
++const pilotUuid=new RegExp(`^${pilotId}$`);
++const pilotAttemptPath=new RegExp(`^/api/v1/attempts/(${pilotId})(?:/(submit|result|answers/(${pilotId})))?$`);
++function pilotScope(request:Request,input:PilotStudentPin){
++  const pin=Object.freeze({...input});
++  if(![pin.assignmentId,pin.groupId,pin.demoId,pin.versionId].every(v=>typeof v==="string"&&pilotUuid.test(v)))
++    fail("SERVICE_UNAVAILABLE",503);
++  const {pathname,search,hash}=new URL(request.url);
++  if(search||hash)fail("NOT_FOUND",404);
++  const exam=`/api/v1/exams/${pin.assignmentId}`,method=request.method;
++  let targetAttemptId:string|null=null,receiptPath:string|null=null;
++  if(method==="GET"&&pathname===exam){/* exact pinned detail */}
++  else if(method==="POST"&&pathname===exam+"/attempts")receiptPath=pathname.slice("/api/v1".length);
++  else{
++    const hit=pilotAttemptPath.exec(pathname);
++    if(!hit||!((method==="GET"&&(!hit[2]||hit[2]==="result"))||
++      (method==="POST"&&hit[2]==="submit")||(method==="PUT"&&hit[3])))fail("NOT_FOUND",404);
++    targetAttemptId=hit[1];
++    if(method==="POST")receiptPath=pathname.slice("/api/v1".length);
++  }
++  const key=request.headers.get("idempotency-key");
++  return {pin,targetAttemptId,receiptKey:(personId:string)=>
++    receiptPath&&key&&key.length>=8&&key.length<=128?`${personId}/${method}/${receiptPath}/${key}`:null};
++}
+ export class PreparedStudentTransactions implements StudentTransactions {
+   readonly #pool:PgPool;
+   readonly #authorizeBound?:BoundStudentAuthorization;
+-  constructor(pool:PgPool,request:Request,authorizeBound?:BoundStudentAuthorization){
++  readonly #pilot?:ReturnType<typeof pilotScope>;
++  constructor(pool:PgPool,request:Request,authorizeBound?:BoundStudentAuthorization,pilot?:PilotStudentPin){
+     if(!isFirstStudentRequest(request))fail("SERVICE_UNAVAILABLE",503);
++    if(pilot!==undefined){
++      if(typeof authorizeBound!=="function")fail("SERVICE_UNAVAILABLE",503);
++      this.#pilot=pilotScope(request,pilot);
++    }
+     this.#pool=pool;this.#authorizeBound=authorizeBound;
+     entries.set(this,{request:request.clone(),used:false,phase:"created"});
+     Object.freeze(this);
+@@ -118,7 +149,9 @@ export class PreparedStudentTransactions implements StudentTransactions {
+         const personId=e.personId!,rows=new StudentHttpRows(this.#authorizeBound?{boundClerk:true,externalAuthWriter:true}:{}),auth=await rows.loadAuthentication(tx,personId);
+         const authority=structuredClone(auth);
+         const authorize=async()=>{await fresh(tx);check(e,tx);
+-          if((await authenticate(authority,token,tx.now)).personId!==personId)fail("SESSION_REVOKED",401);
++          const proof=await authenticate(authority,token,tx.now);
++          if(proof.personId!==personId||(this.#pilot&&authority.families[proof.familyId]?.authProvider!=="clerk"))
++            fail("SESSION_REVOKED",401);
+           checkBound();};
+         // The locator is a hint. Verify current proof/family/account/role under
+         // the same person lock BEFORE loading any assignment/attempt/answer.
+@@ -132,13 +165,18 @@ export class PreparedStudentTransactions implements StudentTransactions {
+         await setTrustedPhase(tx.client,"domain");
+         await authorize(); // The context statement is another async boundary.
+         const profileOnly=e.request.method==="GET"&&new URL(e.request.url).pathname.replace(/\/$/,"")==="/api/v1/me";
+-        const state=profileOnly?auth:await rows.loadDomain(tx,personId,auth),before=structuredClone(state);
++        const pilot=this.#pilot;
++        const state=pilot?await rows.loadPilotDomain(tx,personId,auth,pilot.pin,pilot.targetAttemptId,pilot.receiptKey(personId)):
++          profileOnly?auth:await rows.loadDomain(tx,personId,auth),before=structuredClone(state);
+         await authorize();check(e,tx);
+         const value=await work({state,now:()=>{check(e,tx);if(e.phase!=="authorized")fail("SERVICE_UNAVAILABLE",503);return tx.now;}});
+         check(e,tx);await authorize();
+         const authView=(s:StudentState)=>JSON.stringify({people:s.people,families:s.families,access:s.access,refresh:s.refresh,consumedInitData:s.consumedInitData});
+         if(authView(before)!==authView(state))fail("RESPONSE_INVARIANT_FAILED",500);
+         assertRequestWrites(e.request,raw,before,state,personId);
++        if(pilot&&Object.values(state.attempts).some(r=>r.personId!==personId||r.assignmentId!==pilot.pin.assignmentId||
++          r.groupId!==pilot.pin.groupId||r.published.demoId!==pilot.pin.demoId||r.published.versionId!==pilot.pin.versionId))
++          fail("RESPONSE_INVARIANT_FAILED",500);
+         await rows.flush(tx,personId,before,state);
+         await authorize();e.phase="flushed";
+         return value;
+diff --git a/supabase/functions/univeracademy-api/storage/student-http-rows.ts b/supabase/functions/univeracademy-api/storage/student-http-rows.ts
+index 7cc222c..6379733 100644
+--- a/supabase/functions/univeracademy-api/storage/student-http-rows.ts
++++ b/supabase/functions/univeracademy-api/storage/student-http-rows.ts
+@@ -6,6 +6,7 @@ import type { LockedTransaction } from "./postgres-transaction.ts";
+ 
+ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+ const digest = (s: string) => /^[0-9a-f]{64}$/.test(s);
++export type PilotStudentPin = Readonly<{assignmentId:string;groupId:string;demoId:string;versionId:string}>;
+ export class StudentHttpRows {
+   private readonly attempts = new AttemptRows();
+   private readonly options:{boundClerk?:boolean;externalAuthWriter?:boolean};
+@@ -61,6 +62,96 @@ export class StudentHttpRows {
+       s.cancellations[row.attempt_id as string]=row.record as StudentState["cancellations"][string];
+     return s;
+   }
++  // Called only after the canonical bounded-Clerk proof under the person lock.
++  async loadPilotDomain(tx: LockedTransaction, personId: string, s: StudentState,
++    pin: PilotStudentPin, targetAttemptId: string | null, receiptKey: string | null): Promise<StudentState> {
++    own(tx, personId);
++    const {assignmentId,groupId,demoId,versionId}=pin;
++    if(!same(Object.keys(s.people),[personId])||s.people[personId].profile.person_id!==personId||
++      Object.values(s.families).some(f=>f.personId!==personId))fail("RESPONSE_INVARIANT_FAILED",500);
++    const assignments=await query(tx,"ua_pilot_student_assignment",`SELECT a.record FROM ua_private.assignments a
++      WHERE a.id=$1 AND a.group_id=$2 AND a.demo_id=$3 AND a.version_id=$4
++      AND (EXISTS(SELECT 1 FROM ua_private.grants g WHERE g.assignment_id=a.id AND g.person_id=$5)
++        OR EXISTS(SELECT 1 FROM ua_private.attempts t WHERE t.assignment_id=a.id AND t.person_id=$5))`,
++      [assignmentId,groupId,demoId,versionId,personId]);
++    if(assignments.rows.length!==1)fail("NOT_FOUND",404);
++    const a=assignments.rows[0].record as Omit<AssignmentRecord,"published">&{published:Parameters<typeof decodePublished>[0]};
++    const published=decodePublished(a.published);
++    if(a.admission.assignmentId!==assignmentId||a.admission.groupId!==groupId||
++      published.demoId!==demoId||published.versionId!==versionId)fail("RESPONSE_INVARIANT_FAILED",500);
++    s.assignments[assignmentId]={...a,published};
++    // The existing person lock serializes canonical membership writers. Affinity
++    // is admission evidence only; detaching must not hide an owned attempt/result.
++    const grants=await query(tx,"ua_pilot_student_grant",`SELECT
++      (g.rostered AND m.active AND m.affinity_group_id IS NOT DISTINCT FROM $3::uuid) AS rostered,
++      m.epoch::text AS membership_epoch,g.grant_epoch::text FROM ua_private.grants g
++      JOIN ua_private.memberships m ON m.person_id=g.person_id
++      WHERE g.person_id=$1 AND g.assignment_id=$2`,[personId,assignmentId,groupId]);
++    if(grants.rows.length>1)fail("RESPONSE_INVARIANT_FAILED",500);
++    if(grants.rows.length){
++      const g=grants.rows[0];
++      if(typeof g.rostered!=="boolean")fail("RESPONSE_INVARIANT_FAILED",500);
++      s.grants[personId][assignmentId]={rostered:g.rostered,membershipEpoch:integer(g.membership_epoch),grantEpoch:integer(g.grant_epoch)};
++    }
++    // Read the global per-person/demo series, never a new per-group series.
++    const series=await query(tx,"ua_pilot_student_series",`SELECT id::text,current_attempt_id::text,generation::text,normal_attempt_used,
++      official_attempt_id::text,recovery_state,recovery_window FROM ua_private.exam_series WHERE person_id=$1 AND demo_id=$2`,
++      [personId,demoId]);
++    if(series.rows.length>1)fail("RESPONSE_INVARIANT_FAILED",500);
++    if(series.rows.length){
++      const row=series.rows[0],currentId=row.current_attempt_id;
++      if(typeof currentId!=="string"||typeof row.id!=="string"||row.normal_attempt_used!==true)
++        fail("RESPONSE_INVARIANT_FAILED",500);
++      if(targetAttemptId!==null&&targetAttemptId!==currentId)fail("NOT_FOUND",404);
++      // Do not load the frozen test, answers, or result for a different assignment.
++      const affinity=await query(tx,"ua_pilot_student_attempt_anchor",`SELECT id::text FROM ua_private.attempts
++        WHERE id=$1 AND person_id=$2 AND assignment_id=$3 AND demo_id=$4
++        AND body->>'groupId'=$5 AND frozen_test->>'versionId'=$6 FOR UPDATE`,[currentId,personId,assignmentId,demoId,groupId,versionId]);
++      if(affinity.rows.length!==1)fail("NOT_FOUND",404);
++      const r=await this.attempts.load(tx,personId,currentId);
++      if(r.assignmentId!==assignmentId||r.groupId!==groupId||r.published.demoId!==demoId||
++        r.published.versionId!==versionId||r.generation!==integer(row.generation))fail("RESPONSE_INVARIANT_FAILED",500);
++      s.attempts[currentId]=r;
++      s.series[personId+"/"+demoId]={id:row.id,currentAttemptId:currentId,generation:r.generation,
++        normalAttemptUsed:row.normal_attempt_used,officialAttemptId:row.official_attempt_id as SeriesRecord["officialAttemptId"],
++        recoveryState:row.recovery_state as SeriesRecord["recoveryState"],recovery:row.recovery_window as SeriesRecord["recovery"]};
++      const bonus=await query(tx,"ua_pilot_student_bonus",`SELECT 1 FROM ua_private.statistical_bonuses
++        WHERE person_id=$1 AND attempt_id=$2`,[personId,currentId]);
++      // Neither hiding an existing adjustment nor making it part of this ordinary-only pilot is safe.
++      if(bonus.rows.length)fail("SERVICE_UNAVAILABLE",503);
++      if(r.status==="cancelled"){
++        const cancellation=await query(tx,"ua_pilot_student_cancellation",`SELECT record FROM ua_private.attempt_cancellations
++          WHERE person_id=$1 AND attempt_id=$2`,[personId,currentId]);
++        if(cancellation.rows.length!==1)fail("RESPONSE_INVARIANT_FAILED",500);
++        s.cancellations[currentId]=cancellation.rows[0].record as StudentState["cancellations"][string];
++      }
++    }else{
++      if(targetAttemptId!==null)fail("NOT_FOUND",404);
++      const prior=await query(tx,"ua_pilot_student_attempt_without_series",`SELECT id::text FROM ua_private.attempts
++        WHERE person_id=$1 AND demo_id=$2 LIMIT 1`,[personId,demoId]);
++      if(prior.rows.length)fail("RESPONSE_INVARIANT_FAILED",500);
++    }
++    if(receiptKey!==null){
++      // Do not INNER JOIN away a present but inconsistent/hidden receipt. Keep
++      // coherent historical receipts so the canonical stale replay still rejects.
++      const receipts=await query(tx,"ua_pilot_student_receipt",`SELECT r.payload,r.attempt_id::text,
++        EXISTS(SELECT 1 FROM ua_private.attempts t WHERE t.id=r.attempt_id
++          AND t.person_id=r.person_id AND t.assignment_id=$3 AND t.demo_id=$4
++          AND t.body->>'id'=t.id::text AND t.body->>'personId'=t.person_id::text
++          AND t.body->>'assignmentId'=t.assignment_id::text AND t.body->>'groupId'=$5
++          AND t.frozen_test->>'demoId'=t.demo_id::text AND t.frozen_test->>'versionId'=$6) AS exact_owned_attempt
++        FROM ua_private.command_receipts r WHERE r.person_id=$1 AND r.key=$2`,
++        [personId,receiptKey,assignmentId,demoId,groupId,versionId]);
++      if(receipts.rows.length>1)fail("RESPONSE_INVARIANT_FAILED",500);
++      if(receipts.rows.length){
++        const r=receipts.rows[0];
++        if(typeof r.payload!=="string"||typeof r.attempt_id!=="string"||r.exact_owned_attempt!==true)
++          fail("RESPONSE_INVARIANT_FAILED",500);
++        s.receipts[receiptKey]={payload:r.payload,attemptId:r.attempt_id};
++      }
++    }
++    return s;
++  }
+   async flush(tx: LockedTransaction, personId: string, before: StudentState, after: StudentState): Promise<void> {
+     own(tx,personId);
+     if (!same(Object.keys(after.people),[personId])) fail("SESSION_REVOKED",401); // Initial identity creation is not implemented here.

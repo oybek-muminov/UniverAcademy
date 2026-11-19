@@ -1,0 +1,58 @@
+diff --git a/supabase/functions/univeracademy-api/teacher-deletion-compatibility.ts b/supabase/functions/univeracademy-api/teacher-deletion-compatibility.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b457fea4c74c9b8b0d873397b2f3ccc635e2f209
+--- /dev/null
++++ b/supabase/functions/univeracademy-api/teacher-deletion-compatibility.ts
+@@ -0,0 +1,52 @@
++// Offline review seam only. Never registered as a route or used to authorize deletion.
++// Facts must come from one complete, authenticated, frozen person-scoped database
++// snapshot. Do not derive them from request data, role claims or RLS-hidden absence.
++type ReviewFacts = Readonly<{
++  complete: true;
++  activeGroupGrant: boolean;
++  staffAccessRow: boolean;
++  staffIdentityRow: boolean;
++  staffGroupScopeRow: boolean;
++  staffSubjectScopeRow: boolean;
++  teacherSubjectApprovalRow: boolean;
++  staffReceiptAsActor: boolean;
++  staffAuditAsActorOrLegacyTarget: boolean;
++}>;
++
++export type TeacherDeletionCompatibilityV1 = Readonly<{
++  version: 1;
++  state:
++    | "unknown"
++    | "release_group_access"
++    | "legacy_staff_references"
++    | "legacy_history_references"
++    | "no_legacy_staff_blocker_observed";
++}>;
++
++const keys = [
++  "activeGroupGrant", "staffAccessRow", "staffIdentityRow", "staffGroupScopeRow",
++  "staffSubjectScopeRow", "teacherSubjectApprovalRow", "staffReceiptAsActor",
++  "staffAuditAsActorOrLegacyTarget",
++] as const;
++
++function isComplete(value: unknown): value is ReviewFacts {
++  if (value === null || typeof value !== "object" ||
++      Object.getPrototypeOf(value) !== Object.prototype ||
++      Reflect.ownKeys(value).length !== keys.length + 1) return false;
++  return Object.getOwnPropertyDescriptor(value, "complete")?.value === true &&
++    keys.every(key => typeof Object.getOwnPropertyDescriptor(value, key)?.value === "boolean");
++}
++
++/** An internal diagnostic, not deletion authorization or historical data. */
++export function inspectTeacherDeletionCompatibility(input: unknown): TeacherDeletionCompatibilityV1 {
++  const result = (state: TeacherDeletionCompatibilityV1["state"]): TeacherDeletionCompatibilityV1 =>
++    Object.freeze({ version: 1, state });
++  if (!isComplete(input) || (input.activeGroupGrant && !input.staffGroupScopeRow)) return result("unknown");
++  if (input.activeGroupGrant) return result("release_group_access");
++  if (input.staffAccessRow || input.staffIdentityRow || input.staffGroupScopeRow ||
++      input.staffSubjectScopeRow || input.teacherSubjectApprovalRow) return result("legacy_staff_references");
++  if (input.staffReceiptAsActor || input.staffAuditAsActorOrLegacyTarget) return result("legacy_history_references");
++  // Do not infer a successor must exist, an account is deletable, or an audit was
++  // anonymized. Existing fresh-auth/freeze/recovery checks still govern.
++  return result("no_legacy_staff_blocker_observed");
++}

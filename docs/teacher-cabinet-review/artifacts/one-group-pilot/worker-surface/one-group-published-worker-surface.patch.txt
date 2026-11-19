@@ -1,0 +1,43 @@
+diff --git a/runtime/one-group-published-pilot-routes.mjs b/runtime/one-group-published-pilot-routes.mjs
+new file mode 100644
+index 0000000..8c95b30
+--- /dev/null
++++ b/runtime/one-group-published-pilot-routes.mjs
+@@ -0,0 +1,37 @@
++// Unmounted dispatch classifier, not authorization. A pin must come solely
++// from private reviewed canonical published-test evidence, never URL/body/env.
++const id = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
++const uuid = new RegExp(`^${id}$`);
++const attempt = new RegExp(`^/api/v1/attempts/(${id})(?:/(submit|result|answers/(${id})))?$`);
++
++export function classifyPublishedOneGroupPilotRoute(request, pin) {
++  if (!(request instanceof Request) || request.signal.aborted ||
++      pin?.kind !== "verified_published_pilot_pin" ||
++      ![pin.teacherId, pin.groupId, pin.demoId, pin.versionId].every(v => typeof v === "string" && uuid.test(v)) ||
++      typeof pin.subjectId !== "string" || !pin.subjectId || pin.subjectId !== pin.subjectId.trim() ||
++      (pin.assignmentId !== undefined && (typeof pin.assignmentId !== "string" || !uuid.test(pin.assignmentId)))) return null;
++  const {pathname, search, hash} = new URL(request.url);
++  if (search || hash) return null;
++  const method = request.method;
++  if (method === "POST" && pathname === "/api/v1/admin/assignments")
++    // Never forward this to a generic Admin handler. The actual validated body,
++    // independently current Teacher and roster must match the Staff pilot pin
++    // before resource selection, then the locked version must still be published.
++    return {kind: "assignment-requires-locked-staff-pin"};
++
++  // Exam route IDs are committed assignment IDs, not stable demo IDs.
++  if (pin.assignmentId === undefined) return null;
++  const exam = "/api/v1/exams/" + pin.assignmentId;
++  if (method === "GET" && pathname === exam) return {kind: "exam-detail"};
++  if (method === "POST" && pathname === exam + "/attempts") return {kind: "attempt-start"};
++  const hit = attempt.exec(pathname);
++  if (!hit) return null;
++  // HTTP attempt id supplies only a selector. Ownership and the frozen
++  // original assignment/group/demo/version are proved in the Student lock.
++  const attemptId = hit[1], action = hit[2];
++  if (method === "GET" && action === undefined) return {kind: "attempt-read", attemptId};
++  if (method === "GET" && action === "result") return {kind: "attempt-result", attemptId};
++  if (method === "POST" && action === "submit") return {kind: "attempt-submit", attemptId};
++  if (method === "PUT" && hit[3] !== undefined) return {kind: "answer-save", attemptId};
++  return null;
++}

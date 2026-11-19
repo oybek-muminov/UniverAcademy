@@ -1,0 +1,57 @@
+diff --git a/supabase/functions/univeracademy-api/student-wire.ts b/supabase/functions/univeracademy-api/student-wire.ts
+index 10942ab834c43da1507170822ab7ca1b9ef08aeb..4a17fcbe867794c1ea4240b30a3f70be09983059 100644
+--- a/supabase/functions/univeracademy-api/student-wire.ts
++++ b/supabase/functions/univeracademy-api/student-wire.ts
+@@ -39,6 +39,52 @@ function halfUpDisplay(value: Ratio, scale: bigint, places: number): string {
+ export const candidateHalfUp2 = (value: Ratio): string => halfUpDisplay(value, 100n, 2);
+ export const studentPointsHalfUp1 = (value: Ratio): string => halfUpDisplay(value, 10n, 1);
+ 
++type ReviewedOrdinaryPresentation = Readonly<{
++  policyId: string;
++  // Backend-approved finite approximation and supported bounds. The value
++  // must never be used as storage or fed to either display formatter.
++  toFiniteNumber(value: Ratio): number;
++  // Canonical two places, from an exact ratio. The contract did not approve
++  // the midpoint algorithm; do not default to candidateHalfUp2 here.
++  toPercentageDisplayString(value: Ratio): string;
++}>;
++
++/**
++ * Optional composition point, not installed by the registration-only Worker.
++ * The approved earned/max HALF_UP1 wire path is fixed. The two still-reviewed
++ * behaviors are required server-owned inputs; no fixture or default policy.
++ */
++export function createOrdinaryNumericPresentation(policy?: ReviewedOrdinaryPresentation): NumericPresentation {
++  const policyId=policy?.policyId, toFinite=policy?.toFiniteNumber, toPercent=policy?.toPercentageDisplayString;
++  const unresolved=():never=>fail("GRADING_POLICY_UNRESOLVED",409);
++  if(typeof policyId!=="string"||!policyId||policyId.trim()!==policyId||policyId.length>128||
++     typeof toFinite!=="function"||typeof toPercent!=="function")return unresolved();
++  const checked=(value:Ratio):Ratio=>{
++    if(!value||typeof value.numerator!=="bigint"||typeof value.denominator!=="bigint"||
++       value.numerator<0n||value.denominator<=0n)return unresolved();
++    return Object.freeze({numerator:value.numerator,denominator:value.denominator});
++  };
++  return Object.freeze({
++    policyId,
++    toFiniteNumber(value:Ratio) {
++      const exact=checked(value), n=toFinite(exact);
++      if(typeof n!=="number"||!Number.isFinite(n)||n<0||Object.is(n,-0)||
++         (exact.numerator===0n?n!==0:n===0))return unresolved();
++      return n;
++    },
++    toDisplayString(value:Ratio) {
++      const exact=checked(value);
++      if(exact.numerator>100n*exact.denominator)return unresolved();
++      const rendered=toPercent(exact);
++      if(typeof rendered!=="string"||
++         !/^(?:0|[1-9][0-9]?|100)\.[0-9]{2}(?![\s\S])/.test(rendered)||
++         Number(rendered)>100||(exact.numerator===0n&&rendered!=="0.00"))return unresolved();
++      return rendered;
++    },
++    toStudentPointsDisplayString(value:Ratio) {return studentPointsHalfUp1(checked(value));},
++  });
++}
++
+ function studentPointsDisplayWire(value: Ratio, policy: NumericPresentation | undefined): string {
+   if (!policy?.policyId || typeof policy.toStudentPointsDisplayString !== "function") {
+     fail("GRADING_POLICY_UNRESOLVED", 409);
