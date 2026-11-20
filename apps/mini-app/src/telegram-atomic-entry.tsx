@@ -27,13 +27,13 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
     readLaunch:()=>{if(!config.telegramEnabled)throw Error('Telegram disabled');return readTelegramBridge(latest.current.scope)?.initData??''},
     identity:()=>{const s=latest.current.clerk.session;return s?.status==='active'&&!s.currentTask?{userId:s.user.id,sessionId:s.id}:null},
     reverify:async id=>{const proof=await verifyRef.current(id);return proof&&'token'in proof?proof:null},
-    connect:(loginMethod,loginSignal,atomicInitData)=>createProductionOwnerConnection({mode:'production',baseUrl:config.apiBaseUrl,contractSha256:config.contractSha256},fetch,{loginMethod,loginSignal,atomicInitData}),
+    connect:(loginMethod,loginSignal,atomicInitData)=>createProductionOwnerConnection({mode:'production',baseUrl:config.apiBaseUrl,contractSha256:config.contractSha256},fetch,{loginMethod,loginSignal,atomicInitData,stagingPilotEnabled:config.stagingPilotEnabled}),
   }));
   const state=useSyncExternalStore(runtime.subscribe,runtime.snapshot);
   useEffect(()=>{void runtime.resume();return()=>runtime.dispose()},[runtime]);
   useEffect(()=>runtime.observe(),[runtime,session?.id,session?.status,session?.currentTask,session?.user.id]);
   const active=session?.status==='active'&&!session.currentTask;
-  if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
+  if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} stagingPilot={config.stagingPilotEnabled} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1>
     {state.notice&&<p role="status">{state.notice}</p>}
     {state.phase==='choose'?(active?<>

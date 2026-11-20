@@ -1,0 +1,150 @@
+{
+  "format_version": 1,
+  "base_commit": "ce9bade40533020117cdc111b20b7763ef6d0e59",
+  "files": [
+    {
+      "path": "api/index.mjs",
+      "previous_sha256": "e8c6699dbfac16771857c2b684b1198ac53950cf71469149200b619fb9412a4b",
+      "bytes": 892,
+      "sha256": "bed26971217e9c899fca78f540daddcf35254433d1dacd782a4483efc48bad14"
+    },
+    {
+      "path": "apps/mini-app/package-lock.json",
+      "previous_sha256": "05c6ae947e87c83412e7814b4de6c29a7dd43ae5612eb417c2523abba64052e7",
+      "bytes": 43344,
+      "sha256": "7441ec3c644a41e2a09e827c082a11f122b32f7da42e03b0d647edb0452f79fc"
+    },
+    {
+      "path": "apps/mini-app/package.json",
+      "previous_sha256": "f170763dbde1552436403d9ac984fa8149ae3f978aeae798472cb301f3a898ee",
+      "bytes": 2211,
+      "sha256": "aa9d0d4eab3969c4d3556e8122265a3efa663d34056c7774ed3bbbd33ee8f72d"
+    },
+    {
+      "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+      "previous_sha256": "5c8f3ab5a4bc4efadadf788a61c1c429e0227f32d88fdd701d528c1fb13c48f7",
+      "bytes": 5313,
+      "sha256": "d5c8c45c60b289854a86b2aeddd1d6337d782415221114c1132d7dcb33c43cc7"
+    },
+    {
+      "path": "apps/mini-app/src/common-production-runtime.ts",
+      "previous_sha256": "2870e2e008743ba593a055978557c9a09801ae27a4d40c5a0cff7e79f5ee20b4",
+      "bytes": 5127,
+      "sha256": "29531dc5a4255b2005054bfae4171b0ba4c8d8378cdcc20a9122e8c9c0599e66"
+    },
+    {
+      "path": "apps/mini-app/src/owner-port.ts",
+      "previous_sha256": "649606b1cf87d7c32d49e178b80616e7b1db09d5940134866157f8f1de1a3e96",
+      "bytes": 12715,
+      "sha256": "dbaca5b9b74a665614b073f13d229d01fc374c1dd028e456ffd39428868951c0"
+    },
+    {
+      "path": "apps/mini-app/src/production-connection.ts",
+      "previous_sha256": "ab8b6fe3ec4344116b45573d49d997146fe7f785bdd449cd2722feede87c4165",
+      "bytes": 2502,
+      "sha256": "ad016583e5014c6bd846d673cef7c6d8d718056dddb8bfa82eb30d4f5e1015ee"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-port.ts",
+      "previous_sha256": null,
+      "bytes": 4936,
+      "sha256": "1920ee41845787dbf82140328bb66fb6d1b135e489703d742db3d66da62aa6e6"
+    },
+    {
+      "path": "apps/mini-app/src/student-app.tsx",
+      "previous_sha256": "1aa3421589049a0496e3041193fd16e8e5cc020ee5d90bbf2a11e6903fb9faed",
+      "bytes": 17339,
+      "sha256": "90d17060404c88bfd7c2c5e40fdbf3c629e72ef21646388a8d93a493833d096a"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
+      "previous_sha256": "72ed0f894b82d231bc7fc2055563db1df5d8b448fb9c6f222c5852ffe8118598",
+      "bytes": 4356,
+      "sha256": "a4cb8a47755f2edbdb454adb5f41ab54d927c1b225a648450bf853f7301f3b55"
+    },
+    {
+      "path": "apps/mini-app/tests/dashboard-navigation.test.mjs",
+      "previous_sha256": "7c0f01c63d8650f2d46e583a571956625e79c5f24ab9510a42ab2f203586c558",
+      "bytes": 1670,
+      "sha256": "f701d5f435cef3dc431b5ecf1a55810d95df6a1bd9cfec0778de57076e4f46fd"
+    },
+    {
+      "path": "package-lock.json",
+      "previous_sha256": "5f1716ee26fbf8e446d7ea6f98f59ea7c05c64535e389f251b725f3df0ed63b0",
+      "bytes": 45951,
+      "sha256": "40a0ee1c0f4265c05ba3dcc24bf5252730cb1ae4b717422b14bf9614fae1ba65"
+    },
+    {
+      "path": "package.json",
+      "previous_sha256": "87d32d6d22cd3ad2cf09c6a2345094082b353689824223379ea66ae1061c663a",
+      "bytes": 2107,
+      "sha256": "0502b4c6a0e0c6db247f932cd94a3e92582ef3aa452af4269ed50ee60c738fa0"
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "previous_sha256": "277992a589c9ad88b10cee24ce3d9e2b748adea26d8952b7efe4dc669a8e0339",
+      "bytes": 9358,
+      "sha256": "ba9b02944a9ee4ad6135889b1a06ce31dc791e97c8528513be613f8ac86e02b1"
+    },
+    {
+      "path": "runtime/cloudflare-worker.mjs",
+      "previous_sha256": "7fd30f2391cec512b8ef4f3066e16a595a05053ad97f36ad80b8669422ed771a",
+      "bytes": 1386,
+      "sha256": "1fafa4177d957eae174f471f68709efa09c0d305af14259e55aa33cc6b4f7427"
+    },
+    {
+      "path": "runtime/teacher-staging-api.mjs",
+      "previous_sha256": null,
+      "bytes": 10854,
+      "sha256": "c960ee8c9ac8178407390ba3f15c76a96bb6058dc9c987bb77d3e8030b75c89c"
+    },
+    {
+      "path": "runtime/teacher-staging-attempts.mjs",
+      "previous_sha256": null,
+      "bytes": 7898,
+      "sha256": "fd7b73ba0801bc80ac329388f7a59aa7b0fe95e86d0c6529477f8592d753f658"
+    },
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": null,
+      "bytes": 5747,
+      "sha256": "3c5296664ca16521fd442091838addaa17c5220d234ebfa6f1c9d37603ba3bab"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/pilot-provisioning.ts",
+      "previous_sha256": "c7967d846727e2ad00ae386654d07caf81de3b7b273b57ef4832c49a22c53cd3",
+      "bytes": 11939,
+      "sha256": "2346bb2311048099f4c732219518b79a8f95ca31285a7e8cf5da20adf56fd1b3"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/staff-content.ts",
+      "previous_sha256": "913a89409e68425ff664def9c76f9be80478cd47f50e4144cff21a0547d49e0e",
+      "bytes": 5299,
+      "sha256": "2e3ea230d7ce46d75eb6e3083e81776d8d68cb3e2fddbbc9bdc3cba4dcac6d6c"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-domain.ts",
+      "previous_sha256": "d5806326405e132a39e94ab120a70716151e27edc0ea595dc48a710782cbc8e3",
+      "bytes": 22969,
+      "sha256": "5f071ff3f288a5e1ae69d0e29ac7f9d6a05c77d356aa7cb7f9e4551da94339f3"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-http.ts",
+      "previous_sha256": "3f56b33870646ae15440d8ecb3040a98de705c65cdc5f9de9a55272e6f16b552",
+      "bytes": 17845,
+      "sha256": "29a6a4d7068ae286c42980892998608f9c16bf2624b3d8106cffd10ed95bd8fe"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/student-wire.ts",
+      "previous_sha256": "50a5ac4cc71e233713bc303b75b6d4c2aa2fa83c9308e5376468a6cf84b57013",
+      "bytes": 10666,
+      "sha256": "201bc09ad05f6d65dc4f27dbd69511cfa46eed3c80d0d02aec63f751b3f0c30c"
+    },
+    {
+      "path": "vercel.json",
+      "previous_sha256": "29c44dcff6c14b92cdd84a68afaba6dae869577dfceba54dfd911eb2d9427148",
+      "bytes": 308,
+      "sha256": "a26b2b7311f50d5e13c055178fc06aa383fce5d9a10eb1b51208d5b6429f08f4"
+    }
+  ]
+}

@@ -25,6 +25,7 @@ export type HistoryEntry = { title: string; status: string; summary: string; att
 export type Draft = { questionId: string; optionId: string | null };
 export type SaveIntent = Draft & { attemptId: string; assignmentId: string; generation: number; expectedRevision: number };
 export type StudentPort = {
+  stagingPilot?(person:string): import('./staging-student-port.ts').StagingStudentPort;
   profile(): Promise<Student | null>;
   register(firstName: string, lastName: string): Promise<Student>;
   exams(): Promise<Exam[]>;

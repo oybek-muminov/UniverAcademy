@@ -2,8 +2,8 @@
 import { randomUUID } from 'node:crypto';
 import { fail } from '../supabase/functions/univeracademy-api/fault.ts';
 import { writeDraftQuestion } from '../supabase/functions/univeracademy-api/staff-content.ts';
-import { validate } from '../tests/backend/staff-fixture.ts';
-import { validatePilotFormulas } from './teacher-local-ui/validate-formula.mjs';
+import { validate } from './teacher-staging-contract.mjs';
+import { validatePilotFormulas } from '../packages/test-content/validate-formula.mjs';
 
 const blocks = markdown => [{ type: 'text', markdown }];
 export function cleanText(value, maximum, code = 'VALIDATION_ERROR') {
@@ -39,7 +39,7 @@ function importQuestion(input, index) {
   if (!validate('QuestionWrite', question)) fail('INVALID_TEST_FILE',422);
   return question;
 }
-export function importDraft(state, staff, input, now) {
+export function importDraft(state, staff, input, now, subjectId='physics') {
   if (!exact(input,['title','duration_seconds','questions','instructions_blocks','grading_config']) ||
       !Array.isArray(input.questions) || input.questions.length === 0 || input.questions.length > 200) fail('INVALID_TEST_FILE',422);
   const title=cleanText(input.title,160,'INVALID_TEST_FILE'), duration=input.duration_seconds ?? 1800;
@@ -59,8 +59,8 @@ export function importDraft(state, staff, input, now) {
     if (positions.has(q.position) || wire.grading_config.individual_enabled && q.individual_points == null) fail('INVALID_TEST_FILE',422);
     positions.add(q.position);
   }
-  const record={wire,subjectId:'physics',teacherPersonId:staff.personId,questionIds:[]};
-  state.demos[demo]={title,subjectId:'physics'};
+  const record={wire,subjectId,teacherPersonId:staff.personId,questionIds:[]};
+  state.demos[demo]={title,subjectId};
   state.versions[id]=record;
   for (const question of questions) {
     const q={...question,expected_revision:record.wire.revision};

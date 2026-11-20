@@ -122,7 +122,7 @@ function sendBody(chatId, url) {
 
 // Internal composition seam: authenticates and validates the private-human start
 // before returning its two numeric lookup fields. No public endpoint is added.
-export async function readPrivateStartContext(request, env = {}) {
+export async function readPrivateStartContext(request, env = {}, onPrivateStart) {
   const url = new URL(request.url);
   if (url.pathname !== PATH || url.search || url.hash) throw new Failure(404, 'NOT_FOUND');
   if (request.method !== 'POST') throw new Failure(405, 'METHOD_NOT_ALLOWED');
@@ -138,6 +138,7 @@ export async function readPrivateStartContext(request, env = {}) {
   const update = await readJson(request.body);
   validateUpdate(update);
   const id = recipient(update);
+  if (id !== null && onPrivateStart) onPrivateStart(update.message.text);
   return id === null ? null : Object.freeze({ update_id: update.update_id, telegram_user_id: id });
 }
 

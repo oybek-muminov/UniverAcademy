@@ -18,14 +18,10 @@ type Options=Readonly<Pick<HttpDeps,"browserOrigin"|"verifier"|"liveness">&{
   catalog: Parameters<typeof createTeacherNamedCatalog>[0];
 }>;
 
-export function composeTeacherBrowserPilotPostgres(options:Options):(request:Request)=>Promise<Response>{
-  if(typeof options?.pool?.connect!=="function"||typeof options?.verifier?.now!=="function"||
-     typeof options?.liveness!=="function")
-    fail("SERVICE_UNAVAILABLE",503);
-  const {pool,verifier,liveness,browserOrigin}=options;
-  const readMetadata=createTeacherNamedCatalog(options.catalog);
-  const runner:Runner={
-    async run(proof,signal,read){
+type IdentityScope=Pick<Parameters<Parameters<Runner["run"]>[2]>[0],"tx"|"clock"|"restrictLease">;
+export function createClerkPersonTransactions({pool,verifier}:Pick<Options,"pool"|"verifier">) {
+  return {
+    async run<T>(proof: Parameters<Runner["run"]>[0],signal:AbortSignal,read:(scope:IdentityScope)=>Promise<T>){
       signal.throwIfAborted();
       const hostNow=()=>{const now=verifier.now();if(!Number.isSafeInteger(now)||now<0)fail("SERVICE_UNAVAILABLE",503);return now;};
       checkClerkProof(proof,hostNow());
@@ -76,11 +72,7 @@ export function composeTeacherBrowserPilotPostgres(options:Options):(request:Req
           if(!Number.isSafeInteger(value)||value<=lastDb) fail("CLERK_SESSION_REVOKED",401);
           lease=Math.min(lease,value);
         };
-        const result=await read({tx,clock,restrictLease,readMetadata:(scope,signalForRead)=>{
-          if(scope.personId!==personId||signalForRead!==signal) fail("FORBIDDEN",403);
-          signal.throwIfAborted();
-          return readMetadata(tx,scope,signal);
-        }});
+        const result=await read({tx,clock,restrictLease});
         const after=await clock();
         checkClerkProof(proof,after);
         if(after>=lease) fail("CLERK_SESSION_REVOKED",401);
@@ -89,5 +81,19 @@ export function composeTeacherBrowserPilotPostgres(options:Options):(request:Req
       });
     },
   };
+}
+
+export function composeTeacherBrowserPilotPostgres(options:Options):(request:Request)=>Promise<Response>{
+  if(typeof options?.pool?.connect!=="function"||typeof options?.verifier?.now!=="function"||
+     typeof options?.liveness!=="function") fail("SERVICE_UNAVAILABLE",503);
+  const {pool,verifier,liveness,browserOrigin}=options;
+  const readMetadata=createTeacherNamedCatalog(options.catalog);
+  const identity=createClerkPersonTransactions({pool,verifier});
+  const runner:Runner={run:(proof,signal,read)=>identity.run(proof,signal,scope=>
+    read({...scope,readMetadata:(requested,signalForRead)=>{
+      if(requested.personId!==scope.tx.personIds[0]||signalForRead!==signal)fail("FORBIDDEN",403);
+      signal.throwIfAborted();
+      return readMetadata(scope.tx,requested,signal);
+    }}))};
   return request=>handleTeacherBrowserPilot(request,{browserOrigin,verifier,liveness,runner});
 }

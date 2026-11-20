@@ -11,4 +11,13 @@ export class TelegramAccountDirectory extends WorkerEntrypoint{
  async lookupTelegramStart(input){return directory.lookupTelegramStart(input,this.env);}
  async fetch(){return new Response(null,{status:404,headers:{'cache-control':'no-store'}});}
 }
+// Bind only the bot to this separate named staging writer, with its own least-privilege database role.
+export class TelegramPilotDirectory extends WorkerEntrypoint {
+  async recordPilotPrivateStart(input) {
+    if (this.env.UA_TELEGRAM_PILOT_DIRECTORY_ENABLED !== 'true') throw Error('SERVICE_UNAVAILABLE');
+    const { recordStagingPrivateStart } = await import('./staging-private-start.mjs');
+    return recordStagingPrivateStart(input, this.env);
+  }
+  async fetch() { return new Response(null, {status:404}); }
+}
 export default withTelegramMenuCompletion(api);

@@ -8,6 +8,7 @@ import { createTeacherPilot } from './teacher-pilot-domain.mjs';
 import { teacherPilotBotLinks, teacherPilotBotStart } from '../apps/telegram-bot/src/teacher-pilot-invite.mjs';
 
 const staticRoutes = new Map([
+  ['/teacher/workspace.mjs', '../apps/teacher-web/src/workspace.mjs'],
   ['/', './teacher-local-ui/index.html'],
   ['/admin/', './teacher-local-ui/admin.html'],
   ['/admin/admin.mjs', './teacher-local-ui/admin.mjs'],
@@ -105,7 +106,11 @@ export function createTeacherPilotServer(options = {}) {
       }
       if (req.method === 'GET' && staticRoutes.has(url.pathname)) {
         const file = staticRoutes.get(url.pathname);
-        const bytes = await readFile(new URL(file, import.meta.url));
+        let bytes = await readFile(new URL(file, import.meta.url));
+        if (url.pathname === '/teacher/') {
+          const workspace = await readFile(new URL('../apps/teacher-web/src/workspace.html', import.meta.url), 'utf8');
+          bytes = bytes.toString('utf8').replace('<!--teacher-workspace-->', workspace);
+        }
         res.writeHead(200, { 'Content-Type': mediaTypes[file.split('.').at(-1)] + '; charset=utf-8' });
         return res.end(bytes);
       }

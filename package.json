@@ -27,14 +27,18 @@
     "test:clerk-auth": "node --test tests/clerk-auth/*.test.mjs"
   },
   "devDependencies": {
-    "ajv": "8.20.0",
     "openapi-typescript": "7.13.0",
     "typescript": "5.9.3"
   },
   "dependencies": {
     "@clerk/backend": "3.27.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "jose": "6.2.15",
+    "katex": "0.19.1",
     "pg": "8.16.3",
-    "pg-cloudflare": "1.2.7"
+    "pg-cloudflare": "1.2.7",
+    "saxes": "6.0.0",
+    "sharp": "0.34.5"
   }
 }

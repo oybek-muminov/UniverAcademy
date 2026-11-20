@@ -22,6 +22,7 @@ export function readCommonEntryConfig(env: Readonly<Record<string, unknown>>, pa
     throw new StudentFailure('protocol', 'CLERK_CONFIG_INVALID');
   return Object.freeze({ ...config, publishableKey: key, clerkFrontendOrigin: url.origin,
     callbackUrl: config.appOrigin + '/auth/callback', signInUrl: config.appOrigin + '/sign-in',
+    stagingPilotEnabled: env.VITE_TEACHER_PILOT_ENABLED === 'true',
     telegramEnabled: env.VITE_TELEGRAM_SDK_ENABLED === 'true', telegramAtomicEnabled: env.VITE_TELEGRAM_ATOMIC_ENTRY === 'true', deletionEnabled: env.VITE_ACCOUNT_DELETION_ENABLED === 'true' });
 }
 export type CommonEntryConfig = ReturnType<typeof readCommonEntryConfig>;
@@ -35,7 +36,7 @@ export function createCommonProductionRuntime(config: CommonEntryConfig, sdk: Cl
   const provider = createClerkSdkAdapter(sdk);
   const app = createClerkAppSession((signal, method = 'clerk') => createProductionOwnerConnection({ mode: 'production',
     baseUrl: config.apiBaseUrl, contractSha256: config.contractSha256 }, fetcher,
-  { loginMethod: method, loginSignal: signal }));
+  { loginMethod: method, loginSignal: signal, stagingPilotEnabled:config.stagingPilotEnabled }));
   const launch = options.launch;
   const runtime = createSignInController({ context, provider, retire: app.retire,
     identityContext: () => { const session = sdk.session(); return session?.status === 'active' && !session.currentTask ? session.id : null; },

@@ -24,7 +24,7 @@ import {resetTrustedServerContext,setTrustedPhase,setTrustedClerk,closeTrustedSe
 function emptyStudent():StudentState{return{people:{},families:{},access:{},refresh:{},consumedInitData:{},grants:{},assignments:{},series:{},attempts:{},receipts:{},bonuses:{},cancellations:{}};}
 function emptyDomain(student=emptyStudent()):StaffState{return{student,staff:{},groups:{},memberships:{},versions:{},recoveryAssignments:{},notifications:{},approvals:{},receipts:{},audit:[]};}
 const same=(a:unknown,b:unknown)=>JSON.stringify(a,(_,v)=>typeof v==="bigint"?v.toString():v)===JSON.stringify(b,(_,v)=>typeof v==="bigint"?v.toString():v);
-function combined(auth:ClerkAuthSnapshot,domain=emptyDomain()):ClerkCandidateState{
+export function combined(auth:ClerkAuthSnapshot,domain=emptyDomain()):ClerkCandidateState{
   if(auth.person)domain.student.people[auth.person.profile.person_id]=auth.person;
   if(auth.person&&auth.membership)domain.memberships[auth.person.profile.person_id]=auth.membership;
   Object.assign(domain.student,{families:auth.families,access:auth.access,refresh:auth.refresh});

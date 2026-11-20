@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AccountDashboard } from './account-dashboard.tsx';
 import { localizeServerDisplay, historySummary } from './display.ts';
 import type { ReactNode } from 'react';
+import { StudentFailure } from './transport.ts';
 import type { StudentFlow } from './flow.ts';
 
+const StagingStudentPanel = lazy(() => import('./staging-student-panel.tsx'));
 const letters = ['A', 'B', 'C', 'D'];
 
-export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls, onDeleteAccount, deletionBusy = false }: {
+export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls, onDeleteAccount, deletionBusy = false, stagingPilot = false }: {
   studentFlow: StudentFlow; mode: 'demo' | 'local_fixture' | 'telegram';
   onEnter?: () => Promise<void>; onLogout?: () => Promise<void>; demoControls?: ReactNode;
-  onDeleteAccount?: () => void; deletionBusy?: boolean;
+  onDeleteAccount?: () => void; deletionBusy?: boolean; stagingPilot?:boolean;
 }) {
   const flow = studentFlow;
   const [dashboardPerson, setDashboardPerson] = useState<string | null>(null);
   const s = useSyncExternalStore(flow.subscribe, flow.snapshot, flow.snapshot);
+  const pilot = useMemo(() => stagingPilot && mode === 'telegram' && s.student?.registrationComplete
+    ? flow.port.stagingPilot?.(s.student.person) : undefined,[stagingPilot,mode,flow,s.student?.person,s.student?.registrationComplete]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [confirmation, setConfirmation] = useState<'start' | 'submit' | 'questions' | null>(null);
@@ -91,7 +95,10 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls,
       <button className="primary" disabled={s.busy}>Davom etish →</button>
     </form>}
 
-    {s.screen === 'exams' && <>
+    {s.screen === 'exams' && pilot && s.student && <Suspense fallback={<p role="status">Guruh ochilmoqda…</p>}>
+      <StagingStudentPanel key={s.student.person} port={pilot} person={s.student.person} onAuthLost={()=>flow.fail(new StudentFailure('auth','FRESH_LAUNCH_REQUIRED'))}/>
+    </Suspense>}
+    {s.screen === 'exams' && !pilot && <>
       {s.exams.map(exam => <article className="card exam-card" key={exam.id}>
         <div className="card-top"><span className="subject-icon" aria-hidden="true">⚛</span><span className="pill green">Sizga biriktirilgan</span></div>
         <h2>{exam.title}</h2><p>{exam.group}</p>

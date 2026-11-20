@@ -1,3 +1,4 @@
+import {createStagingStudentPort} from './staging-student-port.ts';
 import {createDeletionHttpPort} from './account-deletion-candidate/http-port.ts';
 import {createPublicRecoveryStatus} from './account-deletion-candidate/recovery-status-port.ts';
 import type {DeletionPort} from './account-deletion-candidate/controller.ts';
@@ -24,7 +25,7 @@ export type OwnerPortOptions = {
   mode: 'local_fixture' | 'production'; contractSha256: string; baseUrl: string;
   loginMethod?: 'telegram' | 'clerk' | 'telegram_resume' | 'telegram_atomic'; loginSignal?: AbortSignal; atomicInitData?: string;
   fetcher(request: Request): Promise<Response>; view(assignmentId: string, metadata?: StudentSchema['Meta']): View; assetUrl(value: string): string;
-  now?: () => number;
+  now?: () => number; stagingPilotEnabled?: boolean;
   logoutReceiptPolicy?: { retentionMs: number; monotonicNow?: () => number };
 };
 export function createOwnerPort(options: OwnerPortOptions) {
@@ -99,10 +100,14 @@ export function createOwnerPort(options: OwnerPortOptions) {
   });
   const context = (assignmentId: string, metadata?: StudentSchema['Meta']) => ({ assignmentId, ...options.view(assignmentId, metadata) });
   const port: StudentPort = {
+    ...(options.mode === 'production' && options.stagingPilotEnabled ? {stagingPilot: (person:string) => createStagingStudentPort({
+      baseUrl:options.baseUrl, person, current:transport.person, access:transport.withAccess, fetcher,
+    })} : {}),
     profile: () => transport.withAccess(async access => mapper.profile((await call(client => client.me(access))).data)),
     register: (firstName, lastName) => transport.withAccess(async access =>
       mapper.profile((await call(client => client.updateProfile(access, { first_name: firstName, last_name: lastName }))).data), true),
-    exams: () => transport.withAccess(async access => (await call(client => client.exams(access))).data.map(meta =>
+    // The staging group panel reads its own authenticated dashboard after profile admission.
+    exams: () => options.stagingPilotEnabled && options.mode === 'production' ? Promise.resolve([]) : transport.withAccess(async access => (await call(client => client.exams(access))).data.map(meta =>
       mapper.exam(meta, context(meta.assignment_id, meta)))),
     current: assignmentId => transport.withAccess(async access => {
       const meta = (await call(client => client.exam(access, assignmentId))).data;

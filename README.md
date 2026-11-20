@@ -42,6 +42,8 @@ node --test apps/telegram-bot/tests/*.test.mjs
 
 Root `npm test` faqat lokal backend oqimini tekshiradi; boshqa test guruhlari root `package.json` skriptlarida. Mini App testlari manba yaxlitligini tekshiruvchi guardni ham bajaradi. Test fixturelari va tarixiy kontrakt namunalari shu tekshiruvlarning kirish ma’lumotlaridir.
 
+O‘qituvchi kabinetini bir guruhda tekshirish, Supabase orqali rol tayinlash va bosqichni qaytarish tartibi [staging pilot yo‘riqnomasida](docs/teacher-staging-pilot.md).
+
 ## Konfiguratsiya
 
 Mini App build sozlamalari: [production.env.example](apps/mini-app/production.env.example). Originlar, Clerk va Telegram sozlamalari haqiqiy muhit uchun alohida tasdiqlanadi. Maxfiy qiymatlar repoga yozilmaydi.

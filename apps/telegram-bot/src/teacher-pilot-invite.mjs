@@ -1,4 +1,4 @@
-// Used only by the localhost pilot. The deployed bot worker keeps its existing /start handler.
+// Shared Telegram group invitation payload grammar for the local pilot and opt-in staging adapter.
 const invitePayload = /^grp_[A-Za-z0-9_-]{1,60}$/;
 
 export function isTeacherPilotInviteToken(token) {
@@ -13,13 +13,19 @@ export function teacherPilotBotLinks(token) {
   };
 }
 
-export function teacherPilotBotStart(command) {
+export function teacherPilotStartToken(command) {
   if (typeof command !== 'string' || command.length > 88) return null;
   const parts = command.split(' ');
   if (parts.length !== 2 || !isTeacherPilotInviteToken(parts[1])) return null;
   if (parts[0] !== '/start' && !(parts[0].startsWith('/start@') && parts[0].slice(7).toLowerCase() === 'univeracademybot')) return null;
+  return parts[1];
+}
+
+export function teacherPilotBotStart(command) {
+  const token = teacherPilotStartToken(command);
+  if (!token) return null;
   return {
     text: 'Sizni guruhga taklif qilishdi. O‘quvchi kabinetini ochib, taklifni tasdiqlang.',
-    studentPath: '/student/?invite=' + parts[1],
+    studentPath: '/student/?invite=' + token,
   };
 }

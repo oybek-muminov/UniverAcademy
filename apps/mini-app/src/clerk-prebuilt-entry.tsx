@@ -49,7 +49,7 @@ function LegacyPrebuiltReadyEntry({ config, scope, signIn, signUp }: {
   }, [runtime, launch]);
   useEffect(() => () => gate.dispose(), [gate]);
   if (state.step === 'ready' && state.flow && (runtime.telegramOutcome() === 'resumed' || gate.matches()))
-    return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} studentFlow={state.flow!} mode="telegram" onEnter={() => act(() => gate.reset())}
+    return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} stagingPilot={config.stagingPilotEnabled} studentFlow={state.flow!} mode="telegram" onEnter={() => act(() => gate.reset())}
       onLogout={() => act(() => gate.logout())} />}</AccountDeletionHost>;
   const canContinue = session?.status === 'active' && !session.currentTask;
   const blockedReturn = runtime.telegramOutcome() === 'failed';

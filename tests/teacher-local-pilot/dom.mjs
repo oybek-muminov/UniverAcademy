@@ -7,6 +7,7 @@ import { createTeacherPilotServer } from '../../runtime/teacher-local-pilot.mjs'
 const { JSDOM } = createRequire(new URL('./tooling/package.json', import.meta.url))('jsdom');
 const root = new URL('../../', import.meta.url);
 const hostedModules = new Map([
+  ['/teacher/workspace.mjs', 'apps/teacher-web/src/workspace.mjs'],
   ['/pilot/blocks.mjs', 'apps/mini-app/local-teacher-pilot/blocks.mjs'],
   ['/pilot/rich-blocks.mjs', 'apps/mini-app/src/rich-blocks.mjs'],
   ['/pilot/vendor/katex.mjs', 'runtime/teacher-local-ui/node_modules/katex/dist/katex.mjs'],

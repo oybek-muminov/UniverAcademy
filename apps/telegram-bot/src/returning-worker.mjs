@@ -1,4 +1,5 @@
 import { readPrivateStartContext, readAuthUrl } from './worker.mjs';
+import { teacherPilotStartToken } from './teacher-pilot-invite.mjs';
 import { lookupValidatedStart } from './private-start-lookup.mjs';
 
 // Lookup-first navigation only. Never authenticates, links accounts, mints a
@@ -45,11 +46,40 @@ function failure(error) {
   return json({ error: { code } }, errors[code]);
 }
 
+async function recordPilotPrivateStart(directory, telegramUserId) {
+  if (typeof directory?.recordPilotPrivateStart !== 'function') throw configFailure();
+  let timer;
+  try {
+    await Promise.race([
+      directory.recordPilotPrivateStart({telegramUserId}),
+      new Promise((_,reject) => { timer = setTimeout(() => reject(Error('DEPENDENCY_UNAVAILABLE')),5000); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
 export function createReturningBotWorker() {
   return { async fetch(request, env = {}) {
     try {
-      const context = await readPrivateStartContext(request, env);
+      let pilotEnabled = false, invite;
+      const context = await readPrivateStartContext(request, env, text => {
+        pilotEnabled = Object.hasOwn(env,'TELEGRAM_TEACHER_PILOT_ENABLED') && env.TELEGRAM_TEACHER_PILOT_ENABLED === 'true';
+        if (pilotEnabled) invite = teacherPilotStartToken(text);
+      });
       if (context === null) return ack(); // Unsupported authenticated update.
+      if (pilotEnabled) {
+        await recordPilotPrivateStart(env.TELEGRAM_PILOT_DIRECTORY, context.telegram_user_id);
+        if (invite) {
+          const nav = await lookupValidatedStart(context, env.TELEGRAM_START_LOOKUP);
+          if (nav.status === 'disabled') return ack();
+          const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
+          const url = new URL(urls.cabinet);
+          url.searchParams.set('invite', invite);
+          return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
+            text: 'Guruhga taklif keldi. Taklifni tasdiqlash uchun o‘quvchi kabinetini oching.',
+            reply_markup: { inline_keyboard: [[{text: 'Taklifni ochish', web_app: {url: url.href}}]] },
+          });
+        }
+      }
       // Opt-in only: a missing durable binding must fail closed, never silently
       // fall back to untracked sends after lifecycle activation.
       if (env.TELEGRAM_MESSAGE_LIFECYCLE_ENABLED === 'true') {

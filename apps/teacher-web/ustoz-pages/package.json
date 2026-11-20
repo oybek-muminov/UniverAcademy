@@ -1,0 +1,18 @@
+{
+  "name": "@univeracademy/ustoz-pages-build",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "npm run build:assets && npm run build:functions",
+    "build:assets": "node ../../mini-app/node_modules/vite/bin/vite.js build --config ../../mini-app/teacher-entrance/vite.config.mjs --mode production",
+    "build:functions": "wrangler pages functions build functions --project-directory . --build-output-directory . --outdir ../../mini-app/dist-teacher-entrance/_worker.js --output-routes-path ../../mini-app/dist-teacher-entrance/_routes.json --compatibility-date 2026-11-13",
+    "verify": "node verify.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.165.0"
+  }
+}

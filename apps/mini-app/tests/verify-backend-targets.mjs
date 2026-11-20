@@ -719,6 +719,20 @@ for (const file of brand.files) {
     'BRAND_PREIMAGE_MISMATCH: ' + file.path);
   selected.set(file.path, { path: file.path, bytes: file.bytes, sha256: file.sha256 });
 }
+// Preserve each historical selected digest, then verify the staging candidate bytes.
+const STAGING_OVERLAY_SHA256 = '68b0bd4a828aeede2f211ed45fb2fafeb645197ae2ba9278280b583b4cdbf7a6';
+const stagingRaw = readTarget('apps/mini-app/tests/fixtures/teacher-staging-overlay.json');
+assert.equal(sha256(stagingRaw), STAGING_OVERLAY_SHA256, 'STAGING_OVERLAY_MISMATCH');
+const staging = JSON.parse(stagingRaw);
+assert.equal(staging.base_commit, 'ce9bade40533020117cdc111b20b7763ef6d0e59');
+const stagedPaths = new Set();
+for (const file of staging.files) {
+  assert(canonicalPath(file.path) && !stagedPaths.has(file.path), 'STAGING_TARGET_PATH_INVALID');
+  stagedPaths.add(file.path);
+  assert.equal(selected.get(file.path)?.sha256 ?? null, file.previous_sha256, 'STAGING_PREIMAGE_MISMATCH: ' + file.path);
+  assert(Number.isSafeInteger(file.bytes) && file.bytes >= 0 && /^[0-9a-f]{64}$/.test(file.sha256));
+  selected.set(file.path, {path:file.path, bytes:file.bytes, sha256:file.sha256});
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

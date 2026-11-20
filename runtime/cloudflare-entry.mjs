@@ -1,3 +1,4 @@
+import {forwardTeacherStaging} from './teacher-staging-proxy.mjs';
 import {telegramMenuEnvironmentKeys} from './telegram-menu-completion.mjs';
 import {createTelegramClerkEntryApi,atomicEntryEnabled,atomicAuthorizedParties,atomicEntryEnvironmentKeys} from "./telegram-clerk-entry-api.mjs";
 import {createDeletionApi,isDeletionRequestPath,deletionRequestEnvironmentKeys} from "./account-deletion-api.mjs";
@@ -82,6 +83,9 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
     let publics;
     try{
       if(!(request instanceof Request))throw unavailable();
+      if (new URL(request.url).pathname.startsWith('/api/v1/student/pilot/')) {
+        return forwardTeacherStaging(request,env,{surface:'student',transport});
+      }
       publics=publicBindings(env);
       if(new URL(request.url).origin!==publics.apiOrigin)return response("MALFORMED_REQUEST",400);
       if(isDeletionRequestPath(new URL(request.url).pathname))

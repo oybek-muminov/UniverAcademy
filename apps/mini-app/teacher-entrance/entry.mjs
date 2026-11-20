@@ -41,10 +41,16 @@ function SignedInCabinet({ sessionId, userId }) {
         await clerk.signOut({ sessionId, redirectUrl: origin + '/' });
       },
     };
-    return mountTeacherReadOnlyCabinet(host.current, {
-      origin, identity, getCurrentClerkToken: () => currentSession()?.getToken(),
-      fetch: window.fetch.bind(window),
-    });
+    const options = { origin, identity, getCurrentClerkToken: () => currentSession()?.getToken(), fetch: window.fetch.bind(window) };
+    if (import.meta.env.VITE_USTOZ_CABINET_WRITE_ENABLED !== 'true') {
+      return mountTeacherReadOnlyCabinet(host.current, options);
+    }
+    const element = host.current;
+    let cancelled = false, unmount;
+    void import('./staff-workspace.mjs').then(({mountAuthenticatedWorkspace}) => {
+      if (!cancelled && currentSession()) unmount = mountAuthenticatedWorkspace(element, options);
+    }).catch(() => { if (!cancelled) element.textContent = unavailable; });
+    return () => { cancelled = true; unmount?.(); element.replaceChildren(); };
   }, [clerk, sessionId, userId]);
   return h('div', { ref: host });
 }
@@ -56,7 +62,7 @@ function EmailCodeEntrance() {
   const [challenge, setChallenge] = useState(null);
   if (!isLoaded) return heading(message('Kirish oynasi tayyorlanmoqda…'));
   if (isSignedIn && session?.status === 'active' && !session.currentTask && session.user?.id &&
-      import.meta.env.VITE_USTOZ_CABINET_READ_ENABLED === 'true') {
+      (import.meta.env.VITE_USTOZ_CABINET_READ_ENABLED === 'true' || import.meta.env.VITE_USTOZ_CABINET_WRITE_ENABLED === 'true')) {
     return h(SignedInCabinet, { key: session.id + '/' + session.user.id, sessionId: session.id, userId: session.user.id });
   }
   if (isSignedIn) return heading(message(session?.status === 'active' && !session.currentTask

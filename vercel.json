@@ -1,6 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "{supabase/functions/univeracademy-api/**/*.ts,node_modules/jose/**/*}"
+    }
+  },
   "rewrites": [
     { "source": "/api/v1/:path*", "destination": "/api/index" }
   ]

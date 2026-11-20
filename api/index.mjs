@@ -1,11 +1,17 @@
 import {createVercelNodeEntrypoint,publicEnvironmentOptions} from "../runtime/vercel-node.mjs";
+import {teacherStagingPath} from "../runtime/teacher-staging-proxy.mjs";
 
-// Vercel Node Web Standard entry, not Edge and not a standalone listener.
-// This local candidate has no approved production HttpConfiguration bootstrap.
-// Public transport settings alone permit preflight, while API work stays503.
-// Wire the reviewed real configuration into these options before any deployment;
-// never import fixture/RAM state, guess a DB URL or reuse test policies here.
-export default createVercelNodeEntrypoint(()=>({
+// Registration keeps its existing entry; the new cabinet has a separate opt-in Node composition.
+const registration=createVercelNodeEntrypoint(()=>({
   ...publicEnvironmentOptions(process.env),
   configuration:undefined,
 }));
+let stage;
+export default {async fetch(request) {
+  if (!teacherStagingPath(new URL(request.url).pathname)) return registration.fetch(request);
+  if (process.env.UA_CABINET_STAGING_ENABLED!=='true')
+    return Response.json({error:{code:'NOT_FOUND',message:'NOT_FOUND'}},{status:404,headers:{'cache-control':'no-store'}});
+  const {createTeacherStageNode}=await import('../runtime/teacher-staging-node.mjs');
+  stage??=createTeacherStageNode(()=>process.env);
+  return stage.fetch(request);
+}};

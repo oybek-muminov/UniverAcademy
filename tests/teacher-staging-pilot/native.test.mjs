@@ -1,0 +1,292 @@
+import assert from 'node:assert/strict';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import pg from 'pg';
+import { forwardTeacherStaging } from '../../runtime/teacher-staging-proxy.mjs';
+import { createTeacherStageNode } from '../../runtime/teacher-staging-node.mjs';
+import { createTeacherStagingApi } from '../../runtime/teacher-staging-api.mjs';
+import { createStagingInviteDeliveryStore } from '../../runtime/teacher-staging-delivery.mjs';
+import { createCluster, createServiceLogin } from './cluster.mjs';
+import { proofHash } from '../../supabase/functions/univeracademy-api/student-state.ts';
+import { issuer,party,testClerk,provisionStaff,provisionStudent } from './credentials.mjs';
+import { apiOrigin,routes,studentOrigin,good,rejected,graphSvg,richDocument } from './requests.mjs';
+import { testBot } from './bot.mjs';
+
+async function afterRestart(input) {
+  const program=fileURLToPath(new URL('./restart-probe.mjs',import.meta.url));
+  const child=spawn(process.execPath,[program],{stdio:['pipe','pipe','pipe']});
+  let output='',diagnostic='';
+  child.stdout.setEncoding('utf8').on('data',value=>output+=value);
+  child.stderr.setEncoding('utf8').on('data',value=>diagnostic+=value);
+  const completed=new Promise((resolve,reject)=>{
+    child.once('error',reject);
+    child.once('close',code=>code===0?resolve():reject(Error('Restart probe: '+diagnostic)));
+  });
+  child.stdin.end(JSON.stringify(input));
+  await completed;
+  return JSON.parse(output);
+}
+
+test('staging routes require an explicit server configuration',async()=>{
+  const off=createTeacherStagingApi();
+  const path=party+'/api/v1/teacher/pilot/dashboard';
+  const never=async()=>assert.fail('Disabled adapters must not initialize or send requests.');
+  assert.equal((await off.fetch(new Request(path))).status,404);
+  const offNode=createTeacherStageNode(()=>({}),never);
+  assert.equal((await offNode.fetch(new Request(path))).status,404);
+  for(const surface of ['teacher','student']) {
+    const edge=await forwardTeacherStaging(new Request(path),{},{surface,transport:never});
+    assert.equal(edge.status,404);
+  }
+});
+
+test('classroom workflow with restricted logins and the captured PostgreSQL catalog',async t=>{
+  const cluster=await createCluster();
+  let pool,deliveryPool;
+  t.after(async()=>{try {await Promise.all([pool?.end(),deliveryPool?.end()]);}finally {await cluster.close();}});
+  const db=cluster.admin;
+  await cluster.installDeletion();
+  const migration=await readFile(new URL('../../supabase/migrations/teacher-staging/up.sql',import.meta.url),'utf8');
+  await db.query(migration);
+  const database=await createServiceLogin(cluster,'qa_cabinet_service',[
+    {role:'ua_api_login',inherit:true,set:false},{role:'ua_cabinet_stage',inherit:false,set:true}
+  ]);
+  const deliveryUrl=await createServiceLogin(cluster,'qa_cabinet_delivery',[{role:'ua_cabinet_delivery',inherit:false,set:true}]);
+  pool=new pg.Pool({connectionString:database,max:8});
+  deliveryPool=new pg.Pool({connectionString:deliveryUrl,max:3});
+  const visitor=await pool.query(`SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user`);
+  assert.deepEqual(visitor.rows[0],{current_user:'qa_cabinet_service',rolsuper:false,rolbypassrls:false});
+  const clerk=await testClerk();
+  const teacherRow=await provisionStaff(db,'Muallim','teacher');
+  const otherRow=await provisionStaff(db,'Muallima','teacher');
+  const adminRow=await provisionStaff(db,'Guruh administratori','admin');
+  const byId=await provisionStudent(db,'Ali','0100000021',711000021,{clerk});
+  const byInvite=await provisionStudent(db,'Zebo','0100000022',711000022,{clerk});
+  const outsider=await provisionStudent(db,'Sardor','0100000023',711000023);
+  const configuration={enabled:true,pool,teacherOrigin:party,studentOrigin,apiOrigin,verifier:clerk.verifier,liveness:clerk.liveness,
+    allowLegacyTelegram:true};
+  const nodeOrigin='https://node.stage-classroom.example.com';
+  const env={
+    UA_CABINET_STAGING_ENABLED:'true',UA_CABINET_STAGING_NODE_ORIGIN:nodeOrigin,UA_API_ORIGIN:apiOrigin,
+    UA_CABINET_TEACHER_ORIGIN:party,UA_CABINET_STAGING_PROXY_SECRET:randomBytes(32).toString('hex')
+  };
+  const host=createTeacherStageNode(()=>env,async()=>createTeacherStagingApi(configuration));
+  const router={fetch(req){
+    const surface=new URL(req.url).origin===party?'teacher':'student';
+    return forwardTeacherStaging(req,env,{surface,transport:r=>host.fetch(r)});
+  }};
+  const teacherJWT=await clerk.sign(teacherRow.subject);
+  const teacher=routes(router,'teacher',teacherJWT),other=routes(router,'teacher',await clerk.sign(otherRow.subject));
+  const admin=routes(router,'admin',await clerk.sign(adminRow.subject));
+  const student=routes(router,'student',byId.token),invitee=routes(router,'student',byInvite.token);
+  const bystander=routes(router,'student',outsider.token);
+  const directory=createStagingInviteDeliveryStore({pool:deliveryPool});
+  const bot=testBot(directory);
+  const scalar=async (sql,values=[])=>Number((await db.query(sql,values)).rows[0].n);
+  let group,invitation,media,draft,assignment,attempt,answerId;
+  await t.test('issuer, subject, opaque families and database roles determine separate access',async()=>{
+    const unsourced=await host.fetch(new Request(nodeOrigin+'/api/v1/teacher/pilot/dashboard',{
+      headers:{authorization:'Bearer '+teacherJWT,origin:party}
+    }));
+    assert.equal(unsourced.status,403);
+    const options=await router.fetch(new Request(apiOrigin+'/api/v1/student/pilot/dashboard',{
+      method:'OPTIONS',headers:{origin:studentOrigin,'access-control-request-method':'GET'}
+    }));
+    assert.equal(options.status,204);
+    assert.equal(options.headers.get('access-control-allow-origin'),studentOrigin);
+    const badOrigin=await router.fetch(new Request(apiOrigin+'/api/v1/student/pilot/dashboard',{
+      headers:{origin:party,authorization:'Bearer '+byId.token}
+    }));
+    assert.equal(badOrigin.status,403);
+    assert.equal((await good(teacher.dashboard())).role,'teacher');
+    assert.equal((await good(admin.dashboard())).role,'admin');
+    assert.equal((await good(student.dashboard())).univeracademy_id,'0100000021');
+    await rejected(routes(router,'teacher',byId.token).dashboard());
+    await rejected(routes(router,'student',teacherJWT).dashboard());
+    await rejected(routes(router,'admin',teacherJWT).dashboard());
+    const wrongIssuer=await clerk.sign(teacherRow.subject,{iss:'https://different.example.com'});
+    await rejected(routes(router,'teacher',wrongIssuer).dashboard(),401);
+    await rejected(routes(router,'teacher',await clerk.sign('user_UnmappedPrincipal')).dashboard());
+    await rejected(teacher.call('session','POST',JSON.stringify({actor:'admin'}),{'content-type':'application/json'}));
+  });
+
+  const groupKey=randomUUID();
+  await t.test('repeated group request and Admin approval create one group; leading-zero ID is authoritative',async()=>{
+    const data={name:'Mexanika 01',subjectId:'physics'};
+    const repeated=await Promise.all([1,2].map(()=>good(teacher.command('createGroup',data,groupKey))));
+    assert.equal(repeated[0].id,repeated[1].id);
+    group=repeated[0];
+    assert.equal(group.status,'pending');
+    await rejected(teacher.command('createGroup',{...data,name:'Boshqa guruh'},groupKey),409);
+    await rejected(teacher.command('addMember',{groupId:group.id,univeracademy_id:byId.cabinetId}));
+    const pending=(await good(admin.dashboard())).groups.find(row=>row.id===group.id);
+    assert.equal(pending.status,'pending');
+    await good(admin.command('approveGroup',{groupId:group.id}));
+    await rejected(other.command('createInvite',{groupId:group.id}));
+    const add={groupId:group.id,univeracademy_id:byId.cabinetId};
+    const key=randomUUID();
+    await Promise.all([good(teacher.command('addMember',add,key)),good(teacher.command('addMember',add,key))]);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.memberships WHERE active AND affinity_group_id=$1',[group.id]),1);
+    assert.equal((await good(student.dashboard())).group.id,group.id);
+  });
+
+  await t.test('bot private start and targeted outbox grant one membership after the intended student accepts',async()=>{
+    await rejected(teacher.command('sendInvite',{groupId:group.id,univeracademy_id:byInvite.cabinetId}),409);
+    await bot.start(byInvite.telegramId);
+    const privateLink=await good(teacher.command('createInvite',{groupId:group.id}));
+    const webApp=await bot.start(byInvite.telegramId,privateLink.token);
+    assert.equal(webApp.origin,studentOrigin);
+    assert.equal(webApp.searchParams.get('invite'),privateLink.token);
+    const key=randomUUID(), input={groupId:group.id,univeracademy_id:byInvite.cabinetId};
+    const [first,again]=await Promise.all([good(teacher.command('sendInvite',input,key)),good(teacher.command('sendInvite',input,key))]);
+    assert.equal(first.token,again.token);assert.equal(first.delivery,'queued');
+    const delivered=[];
+    const statuses=await Promise.all([bot.dispatch(delivered),bot.dispatch(delivered)]);
+    assert.deepEqual(statuses.sort(),['empty','sent']);
+    assert.equal(delivered.length,1);assert.equal(delivered[0].chat_id,byInvite.telegramId);
+    const target=new URL(delivered[0].reply_markup.inline_keyboard[0][0].web_app.url);
+    assert.equal(target.origin,studentOrigin);
+    invitation=target.searchParams.get('invite');
+    assert.equal(invitation,first.token);
+    assert.equal((await good(invitee.dashboard())).group,null);
+    await rejected(bystander.command('acceptInvite',{token:invitation}));
+    const [a,b]=await Promise.all([good(invitee.command('acceptInvite',{token:invitation})),good(invitee.command('acceptInvite',{token:invitation}))]);
+    assert.equal(a.id,group.id);assert.equal(b.id,group.id);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.memberships WHERE active AND affinity_group_id=$1',[group.id]),2);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet.redemptions WHERE student_id=$1',[byInvite.id]),1);
+  });
+
+  await t.test('rich test import, teacher preview, publish and group assignment preserve private question assets',async()=>{
+    media=await good(teacher.upload(graphSvg,'image/svg+xml'));
+    assert.equal((await teacher.image(media.id)).headers.get('content-type'),'image/png');
+    await rejected(other.image(media.id));
+    await rejected(student.image(media.id));
+    const file=richDocument(media.id);
+    draft=await good(teacher.command('importTest',file));
+    const before=(await good(teacher.dashboard())).tests;
+    const malformed=structuredClone(file);
+    malformed.questions[0].options[1].blocks[1].latex=String.raw`\InvalidUniverCommand`;
+    const invalid=await teacher.command('importTest',malformed);
+    assert.equal(invalid.status,422);
+    const fault=(await invalid.json()).error;
+    assert.equal(fault.code,'INVALID_FORMULA');
+    assert.match(fault.message,/1-savol, B javobi, 2-blok/);
+    assert.deepEqual((await good(teacher.dashboard())).tests,before);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.test_versions'),1);
+    const preview=await good(teacher.command('previewTest',{testId:draft.id}));
+    assert.equal(preview.questions[0].prompt_blocks[1].latex,String.raw`\frac{s}{t}`);
+    await rejected(other.command('publishTest',{testId:draft.id}));
+    await good(teacher.command('publishTest',{testId:draft.id}));
+    const key=randomUUID(),input={testId:draft.id,groupId:group.id};
+    const assigned=await Promise.all([good(teacher.command('assignTest',input,key)),good(teacher.command('assignTest',input,key))]);
+    assert.equal(assigned[0].id,assigned[1].id);
+    assignment=assigned[0];
+    assert.equal((await good(bystander.dashboard())).assignments.length,0);
+  });
+
+  await t.test('concurrent starts create one attempt; stale updates fail and a fresh API process resumes the saved answer',async()=>{
+    const key=randomUUID();
+    const starts=await Promise.all([good(invitee.command('startAttempt',{assignmentId:assignment.id},key)),good(invitee.command('startAttempt',{assignmentId:assignment.id},key))]);
+    attempt=starts[0];
+    assert.equal(attempt.id,starts[1].id);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.attempts WHERE assignment_id=$1 AND person_id=$2',[assignment.id,byInvite.id]),1);
+    assert.doesNotMatch(JSON.stringify(attempt),/correct_option_id|Maxsus o‘qituvchi izohi/);
+    const q=attempt.questions[0];
+    assert.equal(q.prompt_blocks[1].latex,String.raw`\frac{s}{t}`);
+    const image=await invitee.image(media.id);
+    assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');
+    const pixels=Buffer.from(await image.arrayBuffer());
+    assert.equal(pixels.readUInt32BE(16),96);
+    assert.equal(pixels.readUInt32BE(20),50);
+    await rejected(bystander.image(media.id));
+    await rejected(student.command('resumeAttempt',{attemptId:attempt.id}));
+    answerId=q.options.find(o=>o.blocks.some(b=>b.latex===String.raw`\frac{20}{4}`)).id;
+    const answer={attemptId:attempt.id,questionId:q.id,optionId:answerId,expectedRevision:0};
+    const saveKey=randomUUID();
+    const replies=await Promise.all([good(invitee.command('saveAnswer',answer,saveKey)),good(invitee.command('saveAnswer',answer,saveKey))]);
+    assert.equal(replies[0].revision,1);assert.deepEqual(replies[1],replies[0]);
+    await rejected(invitee.command('saveAnswer',{...answer,optionId:q.options.find(o=>o.id!==answerId).id}),409);
+    const resumed=await afterRestart({database,auth:clerk.publicConfiguration(),token:byInvite.token,attempt:attempt.id});
+    assert.equal(resumed.id,attempt.id);
+    assert.equal(resumed.answers.find(a=>a.questionId===q.id).optionId,answerId);
+  });
+
+  await t.test('submitted score is persisted exactly once and remains visible only to its teacher and learner',async()=>{
+    const key=randomUUID();
+    const grade=await good(invitee.command('submitAttempt',{attemptId:attempt.id},key));
+    assert.equal(grade.percentage,'100.00');
+    assert.deepEqual(await good(invitee.command('submitAttempt',{attemptId:attempt.id},key)),grade);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.ordinary_results WHERE attempt_id=$1',[attempt.id]),1);
+    assert.equal((await good(teacher.dashboard())).results.find(r=>r.attemptId===attempt.id).earned,'1.0');
+    assert.equal((await good(invitee.dashboard())).results.find(r=>r.attemptId===attempt.id).percentage,'100.00');
+    assert.deepEqual((await good(other.dashboard())).results,[]);
+    assert.deepEqual((await good(student.dashboard())).results,[]);
+    await rejected(invitee.image(media.id));
+  });
+
+  await t.test('media access follows the current active group and original grant epoch on every fetch',async()=>{
+    const opened=await good(student.command('startAttempt',{assignmentId:assignment.id}));
+    assert.equal(opened.status,'in_progress');
+    assert.equal((await student.image(media.id)).status,200);
+    // Simulate the canonical administrative release. The membership/profile projection is deferred to commit.
+    await db.query('BEGIN');
+    try {
+      await db.query('UPDATE ua_private.memberships SET active=false,affinity_group_id=NULL,epoch=epoch+1,revision=revision+1 WHERE person_id=$1',[byId.id]);
+      await db.query(`UPDATE ua_private.people SET profile=jsonb_set(profile,'{active_group_id}','null'::jsonb) WHERE id=$1`,[byId.id]);
+      await db.query('COMMIT');
+    } catch(error) {await db.query('ROLLBACK');throw error;}
+    await rejected(student.image(media.id),404);
+    await good(teacher.command('addMember',{groupId:group.id,univeracademy_id:byId.cabinetId}));
+    assert.equal((await good(student.dashboard())).group.id,group.id);
+    // New membership in the same group cannot revalidate the old assignment grant.
+    await rejected(student.image(media.id),404);
+    await rejected(student.command('resumeAttempt',{attemptId:opened.id}),403);
+  });
+
+  await t.test('operator down/up retains canonical work, closes both stage roles and restores the same data',async()=>{
+    const versionCount=await scalar('SELECT count(*) n FROM ua_private.test_versions');
+    const down=await readFile(new URL('../../supabase/migrations/teacher-staging/down.sql',import.meta.url),'utf8');
+    await db.query(down);
+    const [disabled]=(await db.query(`SELECT to_regnamespace('ua_cabinet') IS NULL gone,
+      has_schema_privilege('ua_cabinet_stage','ua_cabinet_retained','USAGE') stage,
+      has_schema_privilege('ua_cabinet_delivery','ua_cabinet_retained','USAGE') delivery`)).rows;
+    assert.deepEqual(disabled,{gone:true,stage:false,delivery:false});
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.test_versions'),versionCount);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet_retained.media WHERE id=$1',[media.id]),1);
+    await db.query(migration);
+    assert.equal((await good(teacher.dashboard())).tests.find(row=>row.id===draft.id).status,'published');
+    assert.equal((await good(invitee.dashboard())).group.id,group.id);
+    assert.equal((await teacher.image(media.id)).status,200);
+  });
+
+  await t.test('deleting a linked student clears delivery records and keeps the teacher’s test and other learner',async()=>{
+    // Compose with the actual reviewed deletion transaction rather than issuing a manual person DELETE.
+    await db.query('UPDATE ua_private.account_deletion_control SET accepting=true');
+    const job=randomUUID(),lease=randomUUID(),receipt=randomBytes(32).toString('hex');
+    const prepared=await db.query('SELECT * FROM ua_private.prepare_account_deletion($1,$2,$3,$4,$5,$6,$7,$8)',
+      [job,byInvite.id,await proofHash(byInvite.token),issuer,byInvite.subject,byInvite.sessionId,receipt,Date.now()]);
+    assert.equal(prepared.rows[0].state,'pending');
+    await rejected(invitee.dashboard());
+    await db.query('SELECT * FROM ua_private.claim_account_deletion($1,$2)',[job,lease]);
+    assert.equal((await db.query('SELECT ua_private.mark_account_provider_deleted($1,$2) ok',[job,lease])).rows[0].ok,true);
+    assert.equal((await db.query('SELECT ua_private.finish_account_deletion($1,$2) ok',[job,lease])).rows[0].ok,true);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.people WHERE id=$1',[byInvite.id]),0);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet.redemptions WHERE student_id=$1',[byInvite.id]),0);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet.invites WHERE recipient_id=$1',[byInvite.id]),0);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet.invite_delivery WHERE telegram_id=$1',[byInvite.telegramId]),0);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet.private_starts WHERE telegram_id=$1',[byInvite.telegramId]),0);
+    assert.equal((await good(teacher.dashboard())).groups.find(row=>row.id===group.id).members.length,1);
+    assert.equal((await good(student.dashboard())).univeracademy_id,byId.cabinetId);
+    assert.equal((await good(teacher.dashboard())).tests.find(row=>row.id===draft.id).status,'published');
+  });
+
+  await t.test('revoking a staff mapping or an opaque family closes even a previously successful replay',async()=>{
+    await db.query('UPDATE ua_private.clerk_identities SET enabled=false WHERE person_id=$1',[teacherRow.id]);
+    await rejected(teacher.command('createGroup',{name:'Mexanika 01',subjectId:'physics'},groupKey));
+    await db.query('UPDATE ua_private.student_families SET revoked_at_ms=$1 WHERE id=$2',[Date.now(),byId.familyId]);
+    await rejected(student.dashboard());
+  });
+});
