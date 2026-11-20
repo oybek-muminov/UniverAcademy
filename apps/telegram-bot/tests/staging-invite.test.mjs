@@ -29,6 +29,40 @@ test('a verified private invitation opens the configured Mini App and does not g
   assert.equal(disabled.reply_markup.inline_keyboard[0][0].web_app.url,urls.cabinet);
   assert.equal(observed.length,1);
 });
+test('private start sends one fixed browser link only to linked staff and preserves the student invite', async () => {
+  const worker = createReturningBotWorker();
+  let role = 'teacher', state = 'linked', reads = 0;
+  const env = {TELEGRAM_WEBHOOK_SECRET:webhookSecret, TELEGRAM_TEACHER_PILOT_ENABLED:'true',
+    MINI_CABINET_URL:urls.cabinet, MINI_SIGN_IN_URL:urls.signIn,
+    TELEGRAM_START_LOOKUP:{lookupTelegramStart:async()=>({status:state})},
+    TELEGRAM_PILOT_DIRECTORY:{recordPilotPrivateStart:async()=>{}, async readStaffCabinet(input) {
+      assert.deepEqual(input,{telegramUserId:401}); reads++;
+      if (role === 'unavailable') throw Error('SERVICE_UNAVAILABLE');
+      return role;
+    }}};
+  async function buttons(text) {
+    const response = await worker.fetch(webhook({text}), env);
+    assert.equal(response.status,200);
+    return (await response.json()).reply_markup.inline_keyboard;
+  }
+  for (const [hint,path] of [['teacher','/'],['admin','/admin'],['owner','/owner']]) {
+    role=hint;
+    assert.deepEqual(await buttons('/start'), [[{text:'Kabinet',url:'https://ustoz.univeracademy.uz'+path}]]);
+  }
+  const beforeInvite = reads;
+  assert.equal((await buttons('/start '+token))[0][0].web_app.url, urls.cabinet+'?invite='+token);
+  assert.equal(reads,beforeInvite);
+  for (const hint of [null,'https://wrong.example','unavailable']) {
+    role=hint;
+    assert.deepEqual(await buttons('/start'), [[{text:'Kabinet',web_app:{url:urls.cabinet}}]]);
+  }
+  const beforeUnlinked = reads;
+  state='needs_clerk';
+  assert.equal((await buttons('/start'))[0][0].web_app.url, urls.signIn);
+  state='disabled';
+  assert.equal(await (await worker.fetch(webhook({text:'/start'}),env)).text(),'');
+  assert.equal(reads,beforeUnlinked);
+});
 test('only a matching Telegram receipt confirms a claim, and only explicit throttling asks for redelivery',async()=>{
   const outcomes = [
     [{kind:'ok',result:{message_id:7,chat:{id:401}}},{status:'sent'}],

@@ -8,6 +8,7 @@ import type { StudentSchema, StudentClient } from './owner-client/student-client
 import { createStudentTransport, StudentFailure } from './transport.ts';
 import type { FailureKind } from './transport.ts';
 import { createWireMap } from './wire-map.ts';
+import { staffPriority } from './staff-cabinets.ts';
 import type { Exam, StudentPort } from './flow.ts';
 import type { EntryGroupDashboard } from './staging-student-port.ts';
 
@@ -109,9 +110,9 @@ export function createOwnerPort(options: OwnerPortOptions) {
     entryDashboard = undefined;
     ungroupedPerson = transport.person() === profile.person_id && profile.active_group_id === null ? profile.person_id : null;
     // Only the authenticated app profile selects a landing page. Ustoz authorizes independently.
-    const teacher = options.mode === 'production' && transport.person() === profile.person_id &&
-      profile.registration_complete && profile.roles.includes('teacher');
-    return {...mapper.profile(profile), activeGroupId: profile.active_group_id, ...(teacher ? {teacherCabinet: true as const} : {})};
+    const staffCabinet = options.mode === 'production' && transport.person() === profile.person_id && profile.registration_complete
+      ? staffPriority.find(role => profile.roles.includes(role)) : undefined;
+    return {...mapper.profile(profile), activeGroupId: profile.active_group_id, ...(staffCabinet ? {staffCabinet} : {})};
   }
   const context = (assignmentId: string, metadata?: StudentSchema['Meta']) => ({ assignmentId, ...options.view(assignmentId, metadata) });
   const stagingPilot = options.mode === 'production' && options.stagingPilotEnabled ?

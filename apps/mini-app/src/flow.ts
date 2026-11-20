@@ -1,4 +1,5 @@
 import { asFailure, createOperationJournal, failureMessage, StudentFailure } from './transport.ts';
+import type { StaffRole } from './staff-cabinets.ts';
 import type { SignInMethod } from './transport.ts';
 
 // UI projections only; actual wire schemas/client remain Backend-owned.
@@ -7,7 +8,7 @@ export const lifecycleLabel: Record<Lifecycle, string> = {
   ready: 'Qayta urinish tayyor', in_progress: 'Davom etmoqda', submitted: 'Topshirilgan',
   expired: 'Vaqti tugagan', forced: 'Majburiy yakunlangan', cancelled: 'Bekor qilingan', recovery_lapsed: 'Qayta urinish oynasi tugagan',
 };
-export type Student = { person: string; firstName: string; lastName: string; displayId: string; registrationComplete: boolean; teacherCabinet?: true; activeGroupId?: string|null };
+export type Student = { person: string; firstName: string; lastName: string; displayId: string; registrationComplete: boolean; staffCabinet?: StaffRole; activeGroupId?: string|null };
 export type DisplayBlock = { kind: 'text'; text: string } | { kind: 'formula'; latex: string; display: 'inline' | 'block' } |
   { kind: 'image'; assetId: string; url: string; expiresAt: string; contentType: string; alt: string; caption: string | null };
 export type SeriesView = { currentAttemptId: string | null; generation: number; officialResultAttemptId: string | null; recovery: 'none' | 'ready' | 'active' | 'lapsed' };
@@ -79,7 +80,7 @@ export class StudentFlow {
     try { await action(); } catch (error) { this.fail(error); } finally { this.patch({ busy: false }); }
   }
   async entryExams(student: Student | null) {
-    return student?.registrationComplete && !student.teacherCabinet ? this.port.exams() : [];
+    return student?.registrationComplete && !student.staffCabinet ? this.port.exams() : [];
   }
   async enter() {
     await this.run(async () => {

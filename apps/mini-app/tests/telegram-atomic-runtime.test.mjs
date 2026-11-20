@@ -28,7 +28,7 @@ test('successful signed resume opens cabinet without Clerk proof and never auto-
 });
 
 test('a linked teacher reaches the cabinet without requesting student exams or accepting an invitation', async () => {
-  const student = {person: 'teacher-person', registrationComplete: true, teacherCabinet: true};
+  const student = {person: 'teacher-person', registrationComplete: true, staffCabinet: 'teacher'};
   const h = setup({connect: method => {
     assert.equal(method, 'telegram_resume');
     return {auth: {person: () => student.person, login: async () => student.person, clear() {}},
@@ -37,7 +37,7 @@ test('a linked teacher reaches the cabinet without requesting student exams or a
   }});
   await h.runtime.resume();
   assert.equal(h.runtime.snapshot().phase, 'ready');
-  assert.equal(h.runtime.snapshot().flow.snapshot().student.teacherCabinet, true);
+  assert.equal(h.runtime.snapshot().flow.snapshot().student.staffCabinet, 'teacher');
   h.runtime.dispose();
 });
 

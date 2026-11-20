@@ -1,3 +1,4 @@
+import {telegramRequestClock} from './telegram-request-clock.ts';
 import {ApiFault,fail} from "../fault.ts";
 import {checkClerkProof,clerkIdentityKey,clerkSessionKey,requireLiveClerk} from "../clerk-auth.ts";
 import type {ClerkIdentity,ClerkProof,ClerkLiveness,ClerkVerifierConfiguration} from "../clerk-auth.ts";
@@ -93,20 +94,25 @@ export class TelegramReturnRows implements TelegramReturnPort{
   async resume(raw:string):Promise<TelegramSession>{return this.run("resume",raw) as Promise<TelegramSession>;}
   private async run(kind:"link"|"resume",raw:string,proof?:ClerkProof):Promise<{ok:true}|TelegramSession>{
     const o=this.o,policy=checkSessionPolicy(o.sessionPolicy);if(!o.botToken||!o.verifier||typeof o.liveness!=="function")unavailable();
-    const launch=await verifyTelegramLaunch(raw,o.botToken,policy,o.now());
+    const timestamps=telegramRequestClock(o.now);
+    const launch=await verifyTelegramLaunch(raw,o.botToken,policy,timestamps.worker());
     if(kind==="link"){
       if(!proof||proof.issuer!==o.verifier.issuer)fail("CLERK_TOKEN_INVALID",401);
-      checkClerkProof(proof,o.now());
+      checkClerkProof(proof,timestamps.worker());
     }
     const c=await checkout(o.pool);let began=false,committing=false,discard=false,time=0,lease:number|undefined,familyDeadline:number|undefined,accessDeadline:number|undefined;
-    const check=()=>{
-      const now=o.now();if(o.signal?.aborted||!Number.isSafeInteger(now)||now<time)unavailable();
+    const checkAt=(now:number)=>{
+      if(o.signal?.aborted)unavailable();
       checkTelegramLaunch(launch,now,policy);if(proof)checkClerkProof(proof,now);
       if(lease!==undefined&&now>=lease)fail("CLERK_SESSION_REVOKED",401);
       if(familyDeadline!==undefined&&now>=familyDeadline)fail("CLERK_SESSION_REVOKED",401);
-      if(accessDeadline!==undefined&&now>=accessDeadline)fail("APP_SESSION_EXPIRED",401);time=now;
+      if(accessDeadline!==undefined&&now>=accessDeadline)fail("APP_SESSION_EXPIRED",401);
     };
-    const fresh=async()=>{const now=await clock(c);if(now<time)unavailable();time=now;check();};
+    const check=()=>{time=timestamps.worker();checkAt(time);};
+    const fresh=async()=>{
+      checkAt(timestamps.database(await clock(c)));
+      check();
+    };
     const live=async(id:ClerkIdentity)=>{
       await fresh();const expires=await requireLiveClerk(id,time,(who,at)=>o.liveness(who,at,{signal:o.signal}));
       lease=lease===undefined?expires:Math.min(lease,expires);await fresh();

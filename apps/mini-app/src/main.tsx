@@ -1,4 +1,5 @@
 import './style.css';
+import { staffHandoffRole } from './staff-cabinets.ts';
 
 const element = document.getElementById('root')!;
 
@@ -11,6 +12,13 @@ async function renderDemo(App: import('react').ComponentType) {
 if (location.pathname === '/account-deletion-status') {
   void import('./account-deletion-candidate/recovery-entry.tsx').then(({mountDeletionRecovery}) =>
     mountDeletionRecovery(element, {env:import.meta.env,pageOrigin:location.origin,storage:()=>localStorage}));
+} else if (location.pathname.startsWith('/open-staff/')) {
+  const role = staffHandoffRole(location.pathname);
+  if (role) {
+    void import('./staff-menu-handoff.ts').then(({mountStaffHandoff}) => mountStaffHandoff(element, role));
+  } else {
+    element.querySelector('[role="status"]')!.textContent = 'Kabinet manzili topilmadi.';
+  }
 } else if (import.meta.env.DEV && __AUTH_PROTOTYPE_PREVIEW__) {
   void import('./common-entry-prototype.tsx').then(({CommonEntryPrototypeApp}) => renderDemo(CommonEntryPrototypeApp));
 } else if (import.meta.env.DEV && import.meta.env.MODE === 'local_fixture') {

@@ -25,6 +25,7 @@ async function expireVisible(tx,person,groupIds,teacher){
 }
 export async function dashboard(tx,actor){
   const base={role:actor.role,person_id:actor.personId,name:displayName(actor.profile)};
+  if(actor.role==='owner')return base;
   if(actor.role==='admin'){
     const gs=await query(tx,`SELECT r.id,r.name,r.subject_id,COALESCE(g.status,'pending') status,${profileNameSql} AS teacher_name FROM ua_cabinet.group_requests r
       LEFT JOIN ua_private.groups g ON g.id=r.active_group_id JOIN ua_private.people p ON p.id=r.teacher_id

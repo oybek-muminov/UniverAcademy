@@ -81,5 +81,25 @@ test('only eligible teachers receive a single private notice and its own receipt
     assert.equal((await state(third)).state,'unconfirmed');
     await delivery.recordPrivateStart({telegramUserId:700000004},true);
     assert.equal(await sendTeacherNotice(store,()=>assert.fail('Blind retry')),false);
+
+    // Exercise the real delivery role and each existing column grant/RLS policy.
+    const chat = 700000004;
+    const hint = telegramUserId => delivery.readStaffCabinet({telegramUserId});
+    assert.equal(await hint(chat), 'teacher');
+    assert.equal(await hint(700000002), null);
+    assert.equal(await hint(799999999), null);
+    await db.query("UPDATE ua_private.teacher_subject_approvals SET approved=false WHERE person_id=$1", [third]);
+    assert.equal(await hint(chat), null);
+    const setRoles = roles => db.query("UPDATE ua_private.people SET roles=$2,profile=jsonb_set(profile,'{roles}',to_jsonb($2::text[])) WHERE id=$1", [third, roles]);
+    await setRoles(['student','teacher','admin']);
+    assert.equal(await hint(chat), 'admin');
+    await setRoles(['student','teacher','admin','owner']);
+    assert.equal(await hint(chat), 'owner');
+    await db.query('UPDATE ua_private.staff_access SET approved=false WHERE person_id=$1',[third]);
+    assert.equal(await hint(chat), null);
+    await db.query('UPDATE ua_private.staff_access SET approved=true WHERE person_id=$1',[third]);
+    await db.query('UPDATE ua_private.people SET enabled=false WHERE id=$1',[third]);
+    assert.equal(await hint(chat), null);
+
   } finally { await pool.end(); }
 });

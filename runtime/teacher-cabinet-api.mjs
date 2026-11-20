@@ -1,3 +1,4 @@
+import { cabinetRole } from './cabinet-role.mjs';
 import { availableStudentsGroup,cabinetQueryAllowed } from './teacher-student-directory.mjs';
 import { randomUUID } from 'node:crypto';
 import { createClerkVerifier, requireLiveClerk } from '../supabase/functions/univeracademy-api/clerk-auth.ts';
@@ -105,10 +106,13 @@ export function createCabinetApi(options, normalizeImage) {
       if (!configured) fail('NOT_FOUND',404);
       if (!httpsOrigin(options.teacherOrigin)||!httpsOrigin(options.studentOrigin)||!options.pool||
           !options.verifier?.authorizedParties?.includes(options.teacherOrigin)||typeof options.liveness!=='function') fail('SERVICE_UNAVAILABLE',503);
-      const url=new URL(req.url),match=/^\/api\/v1\/(teacher|admin|student)\/pilot\/(dashboard|import-preview|media(?:\/([0-9a-f-]{36}))?|commands\/([A-Za-z]+))$/.exec(url.pathname);
+      const url=new URL(req.url),role=cabinetRole(url.pathname,req.method);
+      if(!role) fail('NOT_FOUND',404);
+      const tail=url.pathname.slice(('/api/v1/'+role+'/pilot/').length);
+      const match=/^(dashboard|import-preview|media(?:\/([0-9a-f-]{36}))?|commands\/([A-Za-z]+))$/.exec(tail);
       const groupId=availableStudentsGroup(url.pathname);
       if((!match&&!groupId)||!cabinetQueryAllowed(url,req.method)||url.hash||url.username||url.password) fail('NOT_FOUND',404);
-      const role=groupId?'teacher':match[1],path=match?.[2],mediaId=match?.[3],command=match?.[4];
+      const path=match?.[1],mediaId=match?.[2],command=match?.[3];
       const origin=req.headers.get('origin');
       const publicOrigin=role==='student'?options.studentOrigin:options.teacherOrigin;
       if (url.origin!==publicOrigin && !(role==='student'&&url.origin===options.apiOrigin)) fail('NOT_FOUND',404);

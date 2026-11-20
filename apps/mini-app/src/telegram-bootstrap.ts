@@ -3,32 +3,15 @@ import type { StudentPort } from './flow.ts';
 import { asFailure, failureMessage, StudentFailure } from './transport.ts';
 import { STUDENT_CONTRACT_SHA256 } from './owner-client/student-client.ts';
 
-export type TelegramBridge = { readonly initData?: string; readonly platform?: string; ready?(): void };
+import type { TelegramBridge } from './telegram-bridge.ts';
+export { hasTelegramLaunchContext, readTelegramBridge } from './telegram-bridge.ts';
+export type { TelegramBridge } from './telegram-bridge.ts';
 export type StudentConnection = {
   port: StudentPort;
   auth: { login(rawInitData: string): Promise<string>; logout(): Promise<void>; person(): string | null };
 };
 type Phase = 'idle' | 'opening' | 'ready' | 'needs_launch' | 'logged_out' | 'error';
 type Snapshot = Readonly<{ phase: Phase; flow: StudentFlow | null; notice: string; errorCode: string | null }>;
-
-// SDK identity/roles/initDataUnsafe are deliberately never inspected or trusted.
-// The official SDK must already be provided by an approved host integration.
-export function readTelegramBridge(scope: unknown): TelegramBridge | undefined {
-  if (!scope || typeof scope !== 'object') return;
-  const telegram = (scope as { Telegram?: unknown }).Telegram;
-  if (!telegram || typeof telegram !== 'object') return;
-  const bridge = (telegram as { WebApp?: unknown }).WebApp;
-  return bridge && typeof bridge === 'object' ? bridge as TelegramBridge : undefined;
-}
-
-// Loading the official SDK also creates WebApp in an ordinary browser. Only its
-// exact empty/unknown default is non-Telegram here; any other present bridge
-// retains the return flow's missing/invalid-proof rejection. This selects UI
-// context only. Backend alone verifies initData and grants Telegram identity.
-export function hasTelegramLaunchContext(scope: unknown): boolean {
-  const bridge = readTelegramBridge(scope);
-  return !!bridge && !(bridge.platform === 'unknown' && bridge.initData === '');
-}
 
 export function createTelegramBootstrap(options: {
   apiBaseUrl: string;

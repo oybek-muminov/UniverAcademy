@@ -1,5 +1,6 @@
 import { lookupValidatedStart } from './private-start-lookup.mjs';
 import { readMiniDestinations } from './returning-worker.mjs';
+import { staffCabinetNavigation } from './staff-cabinet-navigation.mjs';
 const RETRY = 60000, POLL = 30000, DAY = 86400000;
 const positive = n => Number.isSafeInteger(n) && n > 0;
 // Injectable durable engine; all public operations are serialized by the DO wrapper.
@@ -104,8 +105,10 @@ export class LoginMessageLifecycle {
     if (s.menuDue && s.menuDue <= now) {
       if (nav) {
         const urls = readMiniDestinations(this.env.MINI_CABINET_URL, this.env.MINI_SIGN_IN_URL);
+        const staff = nav.status === 'linked' ? await staffCabinetNavigation(this.env, s.chatId) : null;
+        const cabinetUrl = staff ? urls.cabinet + staff.handoff : urls.cabinet;
         const result = await this.deliver('setChatMenuButton', { chat_id: s.chatId,
-          menu_button: nav.status === 'linked' ? { type: 'web_app', text: 'Kabinet', web_app: { url: urls.cabinet } } : { type: 'commands' } });
+          menu_button: nav.status === 'linked' ? { type: 'web_app', text: 'Kabinet', web_app: { url: cabinetUrl } } : { type: 'commands' } });
         s.menuNotBefore = result.kind === 'retry' ? now + result.delay : null;
         s.menuDue = result.kind === 'ok' ? null : now + (result.delay || RETRY);
       } else s.menuDue = now + RETRY;

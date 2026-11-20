@@ -5,12 +5,14 @@ import { ClerkProvider, ClerkFailed, ClerkLoaded, ClerkLoading, useClerk, useSes
 
 import { mountTeacherReadOnlyCabinet } from '../../teacher-web/src/read-only-entry.mjs';
 import '../../teacher-web/src/style.css';
+import { staffDestination, staffOrigin } from './staff-route.mjs';
 import { mountAuthenticatedWorkspace } from './staff-workspace.mjs';
 import { requestTeacherEmailCode } from './email-code.mjs';
 
-const origin = 'https://ustoz.univeracademy.uz';
+const destination = staffDestination(location);
+const entranceUrl = staffOrigin + location.pathname;
 const unavailable = 'Kirish hozircha mavjud emas.';
-const product = 'O‘qituvchi kabinetiga kirish';
+const product = destination ? destination.title + 'ga kirish' : 'Kabinetga kirish';
 const heading = (body) => h('section', { className: 'status-card' }, h('h1', null, product), body);
 const message = (value) => h('p', { role: 'status' }, value);
 
@@ -40,10 +42,10 @@ function SignedInCabinet({ sessionId, userId }) {
       },
       async signOut() {
         if (!currentSession()) throw new Error('Session changed');
-        await clerk.signOut({ sessionId, redirectUrl: origin + '/' });
+        await clerk.signOut({ sessionId, redirectUrl: entranceUrl });
       },
     };
-    const options = { origin, identity, getCurrentClerkToken: () => currentSession()?.getToken(), fetch: window.fetch.bind(window) };
+    const options = { origin:staffOrigin, identity, getCurrentClerkToken: () => currentSession()?.getToken(), fetch: window.fetch.bind(window) };
     if (import.meta.env.VITE_USTOZ_CABINET_WRITE_ENABLED !== 'true') {
       return mountTeacherReadOnlyCabinet(host.current, options);
     }
@@ -59,7 +61,8 @@ function EmailCodeEntrance() {
   const [challenge, setChallenge] = useState(null);
   if (!isLoaded) return heading(message('Kirish oynasi tayyorlanmoqda…'));
   if (isSignedIn && session?.status === 'active' && !session.currentTask && session.user?.id &&
-      (import.meta.env.VITE_USTOZ_CABINET_READ_ENABLED === 'true' || import.meta.env.VITE_USTOZ_CABINET_WRITE_ENABLED === 'true')) {
+      (import.meta.env.VITE_USTOZ_CABINET_WRITE_ENABLED === 'true' ||
+        destination.role === 'teacher' && import.meta.env.VITE_USTOZ_CABINET_READ_ENABLED === 'true')) {
     return h(SignedInCabinet, { key: session.id + '/' + session.user.id, sessionId: session.id, userId: session.user.id });
   }
   if (isSignedIn) return heading(message(session?.status === 'active' && !session.currentTask
@@ -160,11 +163,12 @@ const mount = document.getElementById('app');
 const key = import.meta.env.VITE_USTOZ_CLERK_PUBLISHABLE_KEY;
 if (mount) {
   const root = createRoot(mount);
-  if (location.origin !== origin || location.pathname !== '/' || location.search || location.hash ||
+  if (destination) document.title = 'UniverAcademy · ' + destination.title;
+  if (!destination ||
       import.meta.env.VITE_USTOZ_EXISTING_EMAIL_SIGNIN_APPROVED !== 'true' || !matchingPublishingKey(key)) {
     root.render(heading(message(unavailable)));
   } else {
-    root.render(h(ClerkProvider, { publishableKey: key, prefetchUI: false, signInUrl: origin + '/' },
+    root.render(h(ClerkProvider, { publishableKey: key, prefetchUI: false, signInUrl: entranceUrl },
       h(ClerkLoading, null, heading(message('Kirish oynasi tayyorlanmoqda…'))),
       h(ClerkFailed, null, heading(message(unavailable))),
       h(ClerkLoaded, null, h(EmailCodeEntrance))));

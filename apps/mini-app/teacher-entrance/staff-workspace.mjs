@@ -1,3 +1,4 @@
+import { staffDestination } from './staff-route.mjs';
 import { createStaffTransport, uuid } from './staff-transport.mjs';
 
 export function button(doc, name, click) {
@@ -7,10 +8,22 @@ export function button(doc, name, click) {
   node.onclick = click;
   return node;
 }
+export function alternateCabinet(doc, role) {
+  const link = doc.createElement('a');
+  link.href = role === 'teacher' ? '/admin' : '/';
+  link.textContent = role === 'teacher' ? 'Admin bo‘limi' : 'O‘qituvchi kabineti';
+  return link;
+}
 export function mountAuthenticatedWorkspace(host, options) {
   const doc = host.ownerDocument, win = doc.defaultView;
+  const destination = staffDestination(win.location);
+  if (!destination) {
+    host.textContent = 'Kirish hozircha mavjud emas.';
+    return () => {};
+  }
+  const {role} = destination;
   const expected = options.identity.current();
-  let role = 'teacher', boundPerson = null, controller, cleanup, disposed = false;
+  let boundPerson = null, controller, cleanup, disposed = false;
   function sameIdentity() {
     const now = options.identity.current();
     return expected && now && now.userId === expected.userId && now.generation === expected.generation;
@@ -30,8 +43,8 @@ export function mountAuthenticatedWorkspace(host, options) {
     try { if (sameIdentity()) await options.identity.signOut(expected); }
     catch { if (!disposed && sameIdentity()) panel('Chiqishni yakunlab bo‘lmadi.', [button(doc, 'Qayta urinish', signout)]); }
   }
-  async function open(nextRole = role) {
-    clear(); role = nextRole;
+  async function open() {
+    clear();
     if (disposed || !sameIdentity() || doc.visibilityState === 'hidden') return;
     controller = new AbortController();
     const { signal } = controller;
@@ -39,29 +52,38 @@ export function mountAuthenticatedWorkspace(host, options) {
     function denied(status) {
       if (signal.aborted) return;
       clear();
-      const actions = [button(doc, 'Qayta tekshirish', () => open(nextRole)), button(doc,'Chiqish',signout)];
-      if (status === 403) actions.unshift(button(doc, nextRole === 'teacher' ? 'Admin bo‘limi' : 'O‘qituvchi kabineti',
-        () => open(nextRole === 'teacher' ? 'admin' : 'teacher')));
+      const actions = [button(doc, 'Qayta tekshirish', open), button(doc,'Chiqish',signout)];
+      if (status === 403 && role !== 'owner') actions.unshift(alternateCabinet(doc, role));
       panel(status === 403 ? 'Bu bo‘lim uchun ruxsat berilmagan.' : 'Kirish sessiyasini tekshiring.', actions);
     }
-    const port = createStaffTransport({...options, role:nextRole, signal, expected, onDenied:denied});
+    const port = createStaffTransport({...options, role, signal, expected, onDenied:denied});
     async function dashboard() {
       const data = await port.request('dashboard');
       if (signal.aborted || !sameIdentity()) throw Error('Sessiya o‘zgardi.');
-      if (data?.role !== nextRole || !uuid(data.person_id) || boundPerson && data.person_id !== boundPerson ||
-          !Array.isArray(data.groups) || nextRole === 'teacher' && !['subjects','tests','assignments','results'].every(key => Array.isArray(data[key]))) {
+      if (data?.role !== role || !uuid(data.person_id) || boundPerson && data.person_id !== boundPerson ||
+          role === 'owner' && (typeof data.name !== 'string' || !data.name.trim()) ||
+          role !== 'owner' && !Array.isArray(data.groups) || role === 'teacher' && !['subjects','tests','assignments','results'].every(key => Array.isArray(data[key]))) {
         denied(403); throw Error('Kabinetni tasdiqlab bo‘lmadi.');
       }
       boundPerson = data.person_id;
       return data;
     }
     try {
-      const [data, views] = await Promise.all([dashboard(), import('./staff-views.mjs')]);
+      const [data, views] = await Promise.all([dashboard(), role === 'owner' ? null : import('./staff-views.mjs')]);
       if (signal.aborted || !sameIdentity()) return;
-      const lifecycle = {signal, dashboard, signout, teacher:() => open('teacher'), admin:() => open('admin')};
-      cleanup = nextRole === 'teacher' ? views.teacherView(host, port, data, lifecycle) : views.adminView(host, data, lifecycle);
+      if (role === 'owner') {
+        const section = doc.createElement('section');
+        section.className = 'status-card';
+        const title = doc.createElement('h1'); title.textContent = destination.title;
+        const name = doc.createElement('p'); name.textContent = data.name;
+        section.append(title, name, button(doc, 'Chiqish', signout));
+        host.replaceChildren(section);
+      } else {
+        const lifecycle = {signal, dashboard, signout};
+        cleanup = role === 'teacher' ? views.teacherView(host, port, data, lifecycle) : views.adminView(host, data, lifecycle);
+      }
     } catch {
-      if (!signal.aborted) { clear(); panel('Kabinetni yuklab bo‘lmadi.', [button(doc, 'Qayta urinish', () => open(nextRole))]); }
+      if (!signal.aborted) { clear(); panel('Kabinetni yuklab bo‘lmadi.', [button(doc, 'Qayta urinish', open)]); }
     }
   }
   const unsubscribe = options.identity.subscribe(() => { clear(); if (sameIdentity()) void open(); });

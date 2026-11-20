@@ -1,17 +1,18 @@
+import { cabinetRole } from './cabinet-role.mjs';
 import { cabinetQueryAllowed } from './teacher-student-directory.mjs';
 // Pages sends staff requests to a named Worker service or the configured legacy Node upstream.
 const noStore={'cache-control':'no-store','cdn-cache-control':'no-store','x-content-type-options':'nosniff'};
 const error=(code,status)=>Response.json({error:{code,message:code}},{status,headers:noStore});
-export const teacherStagingPath=path=>/^\/api\/v1\/(?:teacher|admin|student)\/pilot\//.test(path);
+export const teacherStagingPath=(path,method='GET')=>Boolean(cabinetRole(path,method));
 function origin(value) {
   try {const u=new URL(value);if(u.protocol==='https:'&&u.origin===value)return u.origin;}catch{}
   return null;
 }
 export async function forwardTeacherStaging(request,env,{surface,transport=fetch}={}) {
   const url=new URL(request.url);
-  const role=/^\/api\/v1\/(teacher|admin|student)\/pilot\//.exec(url.pathname)?.[1];
+  const role=cabinetRole(url.pathname,request.method);
   if (env?.UA_CABINET_STAGING_ENABLED!=='true'||!role||
-      (surface==='teacher'?!['teacher','admin'].includes(role):surface!=='student'||role!=='student')||!cabinetQueryAllowed(url,request.method)||url.hash) return error('NOT_FOUND',404);
+      (surface==='teacher'?role==='student':surface!=='student'||role!=='student')||!cabinetQueryAllowed(url,request.method)||url.hash) return error('NOT_FOUND',404);
   const external=origin(surface==='teacher'?env.UA_CABINET_TEACHER_ORIGIN:env.UA_API_ORIGIN);
   if (!external) return error('SERVICE_UNAVAILABLE',503);
   if (url.origin!==external || !['GET','POST','OPTIONS'].includes(request.method))return error('NOT_FOUND',404);

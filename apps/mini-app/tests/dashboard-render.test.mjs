@@ -16,7 +16,7 @@ test('cabinet header and dashboard render accessible controls without placeholde
   assert.match(html,/Namuna O‘quvchi/);
   assert.match(html,/>Dashboard<\/button>/);
   assert.doesNotMatch(html,/Salom,|Tez kunda/);
-  flow.patch({student: {...student, teacherCabinet:true}});
+  flow.patch({student: {...student, staffCabinet:'teacher'}});
   const teacherHtml = renderToStaticMarkup(createElement(StudentApp,{studentFlow:flow,mode:'telegram'}));
   assert.match(teacherHtml, /O‘qituvchi kabineti/);
   assert.match(teacherHtml, /href="https:\/\/ustoz\.univeracademy\.uz\/"/);

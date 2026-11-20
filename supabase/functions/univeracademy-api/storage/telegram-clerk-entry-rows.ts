@@ -1,3 +1,4 @@
+import {telegramRequestClock} from './telegram-request-clock.ts';
 import {fail} from '../fault.ts';
 import {exchangeClerkSession} from '../clerk-http.ts';
 import type {ClerkCandidateState,ClerkCandidateDependencies} from '../clerk-http.ts';
@@ -29,15 +30,19 @@ export class TelegramClerkEntryRows{
  async enter(verified:FreshDeletionProof,raw:string):Promise<TelegramSession>{
   const o=this.o,{proof}=verified,policy=o.deps.sessionPolicy;
   if(proof.issuer!==o.deps.verifier.issuer)fail('CLERK_TOKEN_INVALID',401);
-  requireFreshDeletionProof(verified,o.deps.verifier.now());
-  const launch=await verifyTelegramLaunch(raw,o.botToken,policy,o.deps.verifier.now());
+  const timestamps=telegramRequestClock(o.deps.verifier.now);
+  requireFreshDeletionProof(verified,timestamps.worker());
+  const launch=await verifyTelegramLaunch(raw,o.botToken,policy,timestamps.worker());
   const c:PgClient=await o.pool.connect().catch(()=>{throw new StorageUnavailable('not_committed');});
-  let began=false,committing=false,discard=false,time=0;
+  let began=false,committing=false,discard=false,time=0,databaseTime=0;
+  const checkAt=(now:number)=>{requireFreshDeletionProof(verified,now);checkTelegramLaunch(launch,now,policy);};
+  const workerNow=()=>{const now=timestamps.worker();checkAt(now);return now;};
   const fresh=async()=>{
    if(o.signal?.aborted)unavailable();
    const result=await q(c,'ua_atomic_clock','SELECT floor(extract(epoch FROM clock_timestamp())*1000)::text AS now_ms');
-   if(result.rows.length!==1)unavailable();const db=integer(result.rows[0].now_ms),now=o.deps.verifier.now();
-   if(db<time||now<db)unavailable();time=now;requireFreshDeletionProof(verified,time);checkTelegramLaunch(launch,time,policy);
+   if(result.rows.length!==1)unavailable();
+   databaseTime=timestamps.database(integer(result.rows[0].now_ms));checkAt(databaseTime);
+   time=workerNow();
   };
   try{
    await q(c,'ua_atomic_begin','BEGIN');began=true;
@@ -71,7 +76,8 @@ export class TelegramClerkEntryRows{
    const state=combine(structuredClone(before));
    const digest=await proofHash(clerkReplayIdentity(proof));scope.exchangeDigest=digest;
    await fresh();await setTrustedPhase(c,'exchange');
-   const result=await exchangeClerkSession({state,now:()=>time,newPersonId:()=>personId},proof,o.deps);
+   const result=await exchangeClerkSession({state,now:()=>time,newPersonId:()=>personId},proof,
+     {...o.deps,verifier:{...o.deps.verifier,now:workerNow}});
    await fresh();scope.now=time;
    const after=snapshot(state,personId);
    await rows.flush(scope,before,after);
@@ -83,7 +89,8 @@ export class TelegramClerkEntryRows{
    if(replay.rowCount!==1)fail('INIT_DATA_REPLAY',409);
    if(replay.rows.length!==1||replay.rows[0].digest!==launch.replayDigest)unavailable();
    await fresh();
-   if(time>=Date.parse(result.expires_at)||time>=Date.parse(result.refresh_expires_at))fail('APP_SESSION_EXPIRED',401);
+   const expiresCheckAt=Math.max(time,databaseTime);
+   if(expiresCheckAt>=Date.parse(result.expires_at)||expiresCheckAt>=Date.parse(result.refresh_expires_at))fail('APP_SESSION_EXPIRED',401);
    committing=true;await q(c,'ua_atomic_commit','COMMIT');began=false;
    return {...result,token_type:'Bearer' as const};
   }catch(e){

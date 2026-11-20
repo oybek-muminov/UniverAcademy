@@ -1,3 +1,4 @@
+import {StaffBrowserChoices} from './staff-browser-entry.tsx';
 import {AccountDeletionHost} from './account-deletion-candidate/host.tsx';
 import { AtomicTelegramEntry } from './telegram-atomic-entry.tsx';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -54,7 +55,7 @@ function LegacyPrebuiltReadyEntry({ config, scope, signIn, signUp }: {
   const canContinue = session?.status === 'active' && !session.currentTask;
   const blockedReturn = runtime.telegramOutcome() === 'failed';
   return <main className="shell">
-    {state.notice && <p className="notice" role="alert">{state.notice}</p>}
+    {state.notice && !blockedReturn && <p className="notice" role="alert">{state.notice}</p>}
     {state.busy || authBusy || resumePending || blockedReturn || (state.flow && !gate.matches()) ? <section className="card"><h1>Kabinetga kirish</h1>
       <p role="status">{blockedReturn ? state.notice || 'Kirishni yangidan tasdiqlang. Oldingi tasdiq takror yuborilmadi.' : 'Kabinetga kirish tekshirilmoqda…'}</p>
       <button className="text-button" onClick={() => void act(() => gate.reset())}>Bekor qilish</button></section>
@@ -64,5 +65,6 @@ function LegacyPrebuiltReadyEntry({ config, scope, signIn, signUp }: {
         <p>Bu Telegram oynasida Google bilan kirish va tashqi brauzerdan qaytish hali ulanmagan.</p></section>
       : <SignIn routing="hash" withSignUp oauthFlow="redirect" forceRedirectUrl={config.callbackUrl}
         signUpForceRedirectUrl={config.callbackUrl} fallback={<p role="status">Kirish oynasi tayyorlanmoqda…</p>} />}
+    {webview && !state.busy && !authBusy && !resumePending && <StaffBrowserChoices />}
   </main>;
 }

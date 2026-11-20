@@ -242,6 +242,31 @@ test('successful resume preserves family/expiry and rotates only access/refresh 
  assert.deepEqual(f.pool.data.families,before.families);assert.equal(f.pool.data.access[f.digest].superseded,true);assert.equal(r.data.refresh_expires_at,new Date(before.families[f.family].expiresAt).toISOString());
  assert.equal(r.data.profile.person_id,ids.person);assert.deepEqual(f.pool.data.people,before.people);assert.equal(f.pool.events.some(forbidden),false);order(f);assert.equal(f.pool.checkouts,1);
 });
+test('resume tolerates small database/Worker offsets while signed launch and lease remain current on both',async()=>{
+ for(const offset of [-100,-1,0,1,100]){
+  const f=await returnFixture({linked:true});
+  f.pool.now=clock+500;f.serverNow=()=>clock+500+offset;
+  const session=await f.service().resume(await launch());
+  assert.equal(session.profile.person_id,ids.person);
+  assert.equal(f.pool.events.filter(e=>e.name==='ua_telegram_commit').length,1);
+ }
+});
+for(const source of ['database','worker'])test('resume rolls back a backward '+source+' clock even after staging the session',async()=>{
+ const f=await returnFixture({linked:true}),before=structuredClone(f.pool.data);
+ let worker=clock+500;f.pool.now=worker;f.serverNow=()=>worker;
+ f.pool.hook=(name,p)=>{if(name==='ua_telegram_clock'&&p.events.some(tgWrites)){
+   if(source==='database')p.now=clock+499;else worker=clock+499;
+ }};
+ await assert.rejects(f.service().resume(await launch()),e=>e.status===503&&e.outcome==='not_committed');
+ assert.deepEqual(f.pool.data,before);assert.equal(f.pool.events.filter(e=>e.name==='ua_telegram_rollback').length,1);
+});
+test('resume checks the provider lease against the database even when the Worker clock has not reached expiry',async()=>{
+ const f=await returnFixture({linked:true}),before=structuredClone(f.pool.data);
+ f.pool.now=clock+500;f.serverNow=()=>clock+500;f.expires=clock+550;
+ f.pool.hook=(name,p)=>{if(name==='ua_telegram_clock'&&p.events.some(tgWrites))p.now=f.expires;};
+ await assert.rejects(f.service().resume(await launch()),failCode('CLERK_SESSION_REVOKED'));
+ assert.deepEqual(f.pool.data,before);
+});
 test('missing link reports409 and consumes/creates nothing',async()=>{
  const f=await returnFixture(),before=structuredClone(f.pool.data),r=await f.resume(await launch());assert.equal(r.status,409);assert.equal(r.error.code,'TELEGRAM_LINK_REQUIRED');assert.deepEqual(f.pool.data,before);assert.equal(f.pool.events.some(tgWrites),false);
 });

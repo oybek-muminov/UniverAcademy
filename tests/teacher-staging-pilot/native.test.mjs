@@ -114,6 +114,35 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     await rejected(teacher.call('session','POST',JSON.stringify({actor:'admin'}),{'content-type':'application/json'}));
   });
 
+  await t.test('Owner browser reads only its own identity and immediately loses access on revocation',async()=>{
+    const row=await provisionStaff(db,'Loyiha egasi','owner'),jwt=await clerk.sign(row.subject);
+    const owner=routes(router,'owner',jwt);
+    const reply=await owner.dashboard();
+    assert.equal(reply.headers.get('cache-control'),'no-store');
+    assert.deepEqual(await good(reply),{role:'owner',person_id:row.id,name:'Loyiha egasi Sinov'});
+    await rejected(routes(router,'owner',teacherJWT).dashboard(),403);
+    const adminClaim=await clerk.sign(adminRow.subject,{role:'owner'});
+    await rejected(routes(router,'owner',adminClaim).dashboard(),403);
+    await rejected(routes(router,'owner',await clerk.sign(byId.subject)).dashboard(),403);
+    await rejected(routes(router,'owner',byId.token).dashboard(),401);
+    await rejected(routes(router,'teacher',jwt).dashboard(),403);
+    await rejected(routes(router,'admin',jwt).dashboard(),403);
+    await rejected(owner.call('dashboard','POST'),404);
+    await rejected(owner.command('approveGroup',{}),404);
+    await rejected(owner.call('dashboard?person_id='+teacherRow.id),404);
+    await rejected(router.fetch(new Request(party+'/api/v1/owner/pilot/dashboard')),401);
+    await db.query('UPDATE ua_private.staff_access SET approved=false WHERE person_id=$1',[row.id]);
+    await rejected(owner.dashboard(),403);
+    await db.query('UPDATE ua_private.staff_access SET approved=true WHERE person_id=$1',[row.id]);
+    await db.query('UPDATE ua_private.people SET enabled=false WHERE id=$1',[row.id]);
+    await rejected(owner.dashboard(),403);
+    await db.query(`UPDATE ua_private.people_registration SET enabled=true,roles=ARRAY['admin']::text[],
+      profile=jsonb_set(profile,'{roles}','["admin"]') WHERE id=$1`,[row.id]);
+    await rejected(owner.dashboard(),403);
+    await db.query('UPDATE ua_private.clerk_identities SET enabled=false WHERE person_id=$1',[row.id]);
+    await rejected(owner.dashboard(),401);
+  });
+
   const groupKey=randomUUID();
   await t.test('a verified teacher immediately creates one usable group across concurrent retries and enrolls by leading-zero ID',async()=>{
     const data={name:'Mexanika 01',subjectId:'physics'};

@@ -1,6 +1,7 @@
 import { readPrivateStartContext, readAuthUrl } from './worker.mjs';
 import { teacherPilotStartToken } from './teacher-pilot-invite.mjs';
 import { lookupValidatedStart } from './private-start-lookup.mjs';
+import { staffCabinetNavigation } from './staff-cabinet-navigation.mjs';
 
 // Lookup-first navigation only. Never authenticates, links accounts, mints a
 // session or proves the selected frontend can open a cabinet. Deployment is
@@ -93,10 +94,11 @@ export function createReturningBotWorker() {
       if (navigation.status === 'disabled') return ack(); // Denied: no message/button.
       const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
       const linked = navigation.status === 'linked';
+      const staff = linked ? await staffCabinetNavigation(env, context.telegram_user_id) : null;
       return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
         text: GREETINGS[navigation.status], reply_markup: { inline_keyboard: [[{
           text: linked ? 'Kabinet' : 'Kirish / Ro‘yxatdan o‘tish',
-          web_app: { url: linked ? urls.cabinet : urls.signIn },
+          ...(staff ? {url:staff.browser} : {web_app:{url:linked ? urls.cabinet : urls.signIn}}),
         }]] } });
     } catch (error) { return failure(error); }
   } };

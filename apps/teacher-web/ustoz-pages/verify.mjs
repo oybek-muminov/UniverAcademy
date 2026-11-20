@@ -6,7 +6,7 @@ const output = new URL('../../mini-app/dist-teacher-entrance/', import.meta.url)
 const {default:worker} = await import(new URL('_worker.js/index.js', output));
 const rules = JSON.parse(await readFile(new URL('_routes.json', output), 'utf8'));
 assert.equal(rules.version, 1);
-assert.deepEqual([...rules.include].sort(), ['/api/v1/admin/pilot/*','/api/v1/teacher/pilot/*']);
+assert.deepEqual([...rules.include].sort(), ['/api/v1/admin/pilot/*','/api/v1/owner/pilot/dashboard','/api/v1/teacher/pilot/*']);
 assert.deepEqual(rules.exclude, []);
 const origin = 'https://staff.example', upstream = 'https://scoped-node.example';
 const env = {
@@ -26,7 +26,7 @@ globalThis.fetch = async request => {
   return Response.json({data:[]}, {headers:{'cache-control':'no-store'}});
 };
 try {
-  for (const role of ['teacher','admin']) {
+  for (const role of ['teacher','admin','owner']) {
     const path = '/api/v1/'+role+'/pilot/dashboard';
     const response = await worker.fetch(new Request(origin+path,{headers:{authorization:'Bearer fixture'}}),env,context);
     assert.equal(response.status,200);
@@ -34,13 +34,13 @@ try {
     assert.equal(response.headers.get('cache-control'),'no-store');
     assert.equal(forwarded.at(-1),path);
   }
-  for (const path of ['/','/assets/example.js','/api/v1/teacher/cabinet','/api/v1/student/pilot/dashboard']) {
+  for (const path of ['/','/owner','/api/v1/owner/pilot/commands/createGroup','/assets/example.js','/api/v1/teacher/cabinet','/api/v1/student/pilot/dashboard']) {
     const response = await worker.fetch(new Request(origin+path),env,context);
     assert.equal(await response.text(),'static asset');
   }
   const disabled = await worker.fetch(new Request(origin+'/api/v1/teacher/pilot/dashboard'),
     {...env,UA_CABINET_STAGING_ENABLED:'false'},context);
   assert.equal(disabled.status,404);
-  assert.equal(forwarded.length,2);
-  writeSync(1, 'Compiled Pages worker verified. Teacher and Admin pass through the gateway. Other paths use ASSETS.\n');
+  assert.equal(forwarded.length,3);
+  writeSync(1, 'Compiled Pages worker verified. Teacher, Admin and the read-only Owner dashboard pass through the gateway. Other paths use ASSETS.\n');
 } finally { globalThis.fetch=original; }

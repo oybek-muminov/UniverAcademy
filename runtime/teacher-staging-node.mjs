@@ -32,7 +32,7 @@ export function createTeacherStageNode(readEnv,createApi=createFromEnvironment) 
   let warm;
   return {async fetch(request){
     const url=new URL(request.url),env=readEnv();
-    if(env.UA_CABINET_STAGING_ENABLED!=='true'||!teacherStagingPath(url.pathname))return deny('NOT_FOUND',404);
+    if(env.UA_CABINET_STAGING_ENABLED!=='true'||!teacherStagingPath(url.pathname,request.method))return deny('NOT_FOUND',404);
     if(!validOrigin(env.UA_CABINET_STAGING_NODE_ORIGIN)||url.origin!==env.UA_CABINET_STAGING_NODE_ORIGIN||
       !sameSecret(env.UA_CABINET_STAGING_PROXY_SECRET,request.headers.get('x-univeracademy-pilot-proxy'))) return deny('FORBIDDEN',403);
     if(!cabinetQueryAllowed(url,request.method)||url.hash)return deny('NOT_FOUND',404);

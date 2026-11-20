@@ -1,0 +1,318 @@
+{
+  "format_version": 1,
+  "base_commit": "ff76a3e641bba28f6cf773239ea1850b38d5c87a",
+  "files": [
+    {
+      "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+      "previous_sha256": "d5c8c45c60b289854a86b2aeddd1d6337d782415221114c1132d7dcb33c43cc7",
+      "bytes": 5481,
+      "sha256": "baceb2ccb20c9cf8fba0214609939733c8b9040381753ceed06a49362ff92eac"
+    },
+    {
+      "path": "apps/mini-app/src/flow.ts",
+      "previous_sha256": "edd60615fcbcf7365e32642ee867c15fbfc298ee25597b6b5c085dc2ae53d48b",
+      "bytes": 12369,
+      "sha256": "d872bcfca57631562eaa4cef197b9c7e63b2ec4a2ebfecc9d8705323fe0b2aed"
+    },
+    {
+      "path": "apps/mini-app/src/main.tsx",
+      "previous_sha256": "56407db28f2775a56e7b297706801429a851c6c28ce054e7ca20ff1c3bbaf6db",
+      "bytes": 1938,
+      "sha256": "bf3162676a6e145c1a64d97835bda79096e971a7a8a05daa3d6b8b811999e52b"
+    },
+    {
+      "path": "apps/mini-app/src/owner-port.ts",
+      "previous_sha256": "e12000db2bbf4dc4be6f91a43a7d7224180b422799dddc7c9bfb0c39378853d5",
+      "bytes": 15205,
+      "sha256": "ca130e4bb784ecb5dc1cb3d09cd7dca012a05274c1c43c0f24357009f758000b"
+    },
+    {
+      "path": "apps/mini-app/src/staff-browser-entry.tsx",
+      "previous_sha256": null,
+      "bytes": 1448,
+      "sha256": "7a7bd6504e7cab85a716f4cc7219ed946f41a8c393b9245c195b33494903891b"
+    },
+    {
+      "path": "apps/mini-app/src/staff-cabinets.ts",
+      "previous_sha256": null,
+      "bytes": 964,
+      "sha256": "05aaab1aeb8dcc83d908e5576c5955f21044d005fd9132a37a5894003362a7c9"
+    },
+    {
+      "path": "apps/mini-app/src/staff-menu-handoff.ts",
+      "previous_sha256": null,
+      "bytes": 1260,
+      "sha256": "34e91318f23be78469f52e8718cb1e5b98628389b6c92ccf0b2fa4da9fde9178"
+    },
+    {
+      "path": "apps/mini-app/src/student-app.tsx",
+      "previous_sha256": "6c2e896a56a84b9e71ab6954413b5b35357359b8560373f2ad32bebaf58b393b",
+      "bytes": 18290,
+      "sha256": "dbc04408b9c79316ae2a90486a9a1bde4081bebc693307ad7a430a62d90f2b79"
+    },
+    {
+      "path": "apps/mini-app/src/style.css",
+      "previous_sha256": null,
+      "bytes": 11104,
+      "sha256": "07f6bee1d5f647dd1369387e4957be7dd3906fb73e4248d3eb2802fef1185a7c"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
+      "previous_sha256": "a4cb8a47755f2edbdb454adb5f41ab54d927c1b225a648450bf853f7301f3b55",
+      "bytes": 4511,
+      "sha256": "a485b0771a7c84a01fccbc7d7c3f61822a4fc361c0ad7b10b362474b835ad88e"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-bootstrap.ts",
+      "previous_sha256": "6a80e1a39f9a9d5b9a876c03b69825581d0a67cb2a480f1f3dcac8b79a556413",
+      "bytes": 8912,
+      "sha256": "9fe299698ab7a640d09e5f1174fb9a7a57de2c226de1d0851267daf9193ded5b"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-bridge.ts",
+      "previous_sha256": null,
+      "bytes": 1208,
+      "sha256": "ba32f02e9ad27214fb68cd05e632049167ce8a66ef83853acf463aa73d7dcfe2"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/README.md",
+      "previous_sha256": "c6f556a6139214d6306e2a5340f361cf479ff273fdafc26375aa77226e6e05c7",
+      "bytes": 7375,
+      "sha256": "614bcb655cd669d4718d026e7fc9cf278ba0c24706840b6e2c89ad644a6afd38"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/entry.mjs",
+      "previous_sha256": "33cb8fa2980932a6802f4f2595e7277b6414574b86872ce7d5502d87fd782bde",
+      "bytes": 8789,
+      "sha256": "3e62d953da5bd6617f1d8bdc1f3a09ab4a702be4cbef8c514cefddd6d59dcf30"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/index.html",
+      "previous_sha256": null,
+      "bytes": 412,
+      "sha256": "c0dca53bf82b51d5d6d77178297f4f2c3ecaf89edd95eca7be774a16123fe49c"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-route.mjs",
+      "previous_sha256": null,
+      "bytes": 442,
+      "sha256": "867a234f8d8b9b879e3aa6114fe75e4d86ca479383e903be0175376a07c2f898"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-transport.mjs",
+      "previous_sha256": "e1121728474be2ab92fe6dd5dee94097fb7594a8d76931b6be1725a1948c7e9a",
+      "bytes": 7446,
+      "sha256": "0feb72361c996fc481b8f9e13a1ccdae8e2b66a010c6f14d1ffc515f5c489e10"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-views.mjs",
+      "previous_sha256": "efb1b1eff292a53abce05af86000ff857d4527e007eb100f6bb88c127c6d0d0c",
+      "bytes": 4454,
+      "sha256": "889916d3394702eef8e30ab4b6d5e93dae65ed0fb99882448c7986001aef8fec"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-workspace.mjs",
+      "previous_sha256": "1d1a4e528e10ff17b5c1afd17c502b0bf5fdd45a7bd46823fcb00ca39d83142e",
+      "bytes": 5216,
+      "sha256": "ce96f819c63970c9bc7e78149be4f24386ff1669c74dc2c2c696bbf1bd248f17"
+    },
+    {
+      "path": "apps/mini-app/tests/dashboard-render.test.mjs",
+      "previous_sha256": "f95b6b70e155fc7b36cf06e94533e3641fb6e1f918e10029e4621fd368b73dd2",
+      "bytes": 2259,
+      "sha256": "2450c7a6ace07f78a64ffa1ec5a6cd1ae335cc624ccba20c43fa20561bd1a5d3"
+    },
+    {
+      "path": "apps/mini-app/tests/student-pilot-coexistence.test.mjs",
+      "previous_sha256": "a1b7f65e828d19a60f62bf78bba0e0d94cf8dca83782c012ce391fe60dd50ea9",
+      "bytes": 7841,
+      "sha256": "d577654e5cbf153ed1f91d532746464a1a2d84eedac0ef4fef6e2b886f458cc3"
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-atomic-runtime.test.mjs",
+      "previous_sha256": "8fdec9fdab3f7182aec0f27201e3b11b438be5390b17080049cca7ed12536bb3",
+      "bytes": 9374,
+      "sha256": "532a07b6905eaab7cd6fad9172f92995a187e61d7acc933ad50707dc4f6e67ee"
+    },
+    {
+      "path": "apps/teacher-web/ustoz-pages/functions/api/v1/owner/pilot/dashboard.js",
+      "previous_sha256": null,
+      "bytes": 218,
+      "sha256": "0c5c9850b7cc19e17a201ff0556d1d1932168de17fd49a50ebec713e3f204aaa"
+    },
+    {
+      "path": "apps/teacher-web/ustoz-pages/verify-workerd.mjs",
+      "previous_sha256": "efb676fbcf8ec1e724bcde80859e12a1e4efb23fd9d1df6df0b27d1660cf77d0",
+      "bytes": 4590,
+      "sha256": "062f40ae0d6df11edcaf476e6c2fa1b1e6a6e4fcf14070334a7e91f6969180cf"
+    },
+    {
+      "path": "apps/teacher-web/ustoz-pages/verify.mjs",
+      "previous_sha256": null,
+      "bytes": 2694,
+      "sha256": "9760f015a930a15afe0b15035b2e0dddd574729b5fab7f88988a1ed47ae1bc84"
+    },
+    {
+      "path": "apps/telegram-bot/src/login-message-lifecycle.mjs",
+      "previous_sha256": null,
+      "bytes": 8756,
+      "sha256": "b11f57a6fdea3b8ec2a44023c5c642f0fef3460f29f6a4a3a1684de09fc2a9e0"
+    },
+    {
+      "path": "apps/telegram-bot/src/returning-worker.mjs",
+      "previous_sha256": null,
+      "bytes": 5815,
+      "sha256": "71508f56dda8f158894727659275a3f8550d9b7bd86b171ac38d434c23e4f517"
+    },
+    {
+      "path": "apps/telegram-bot/src/staff-cabinet-navigation.mjs",
+      "previous_sha256": null,
+      "bytes": 1166,
+      "sha256": "ae2ff6ebd0ada45c9c8a916a35e0f29701a516ae5a32fd8679e1076ac43256a1"
+    },
+    {
+      "path": "apps/telegram-bot/tests/login-message-lifecycle.test.mjs",
+      "previous_sha256": null,
+      "bytes": 12468,
+      "sha256": "53a326dd67a7c28bbf0d5ff98ffbe1fe75ee9f32b53e7cfb5a43a550200f64b3"
+    },
+    {
+      "path": "apps/telegram-bot/tests/staging-invite.test.mjs",
+      "previous_sha256": null,
+      "bytes": 5176,
+      "sha256": "316f71a900e44bc8b0e93ae2917775b6283fabb1f8a4788708f71a698761bfdb"
+    },
+    {
+      "path": "runtime/cabinet-role.mjs",
+      "previous_sha256": null,
+      "bytes": 260,
+      "sha256": "8d54338a397a56e06711c2680d10a20b88b12ae24786b87e6079f455ba1db4de"
+    },
+    {
+      "path": "runtime/cloudflare-cabinet-route.mjs",
+      "previous_sha256": "4b2e3f365a737e78b046e6e926ad5cb8c4d4e3e41648cc1c520eb675d3b9029d",
+      "bytes": 1330,
+      "sha256": "a52f59402220cd3b5e503e00eaefa03feb66f9f7c2343509521ec542ffad4a0a"
+    },
+    {
+      "path": "runtime/cloudflare-cabinet.mjs",
+      "previous_sha256": "78049562e1ae85ed62b00b6e61c79282d4a9cce0ee37817f1dcb9546c8b72a91",
+      "bytes": 7989,
+      "sha256": "50029502efa51b6d4565e740cdc26301be620bac63723504f52fe278274a3955"
+    },
+    {
+      "path": "runtime/cloudflare-worker.mjs",
+      "previous_sha256": "d8c95521c58170d5df697fa21a66249d07aa6d081307f9d29ffe8854382e9cef",
+      "bytes": 1945,
+      "sha256": "3d90935b66b9b85989a8444d29269d2cff4a0d82d21819e08ea261b9c8746117"
+    },
+    {
+      "path": "runtime/staging-private-start.mjs",
+      "previous_sha256": "61129231a838dd7f41434c3a6a75eef389daef55866c4bab4a21b734619ee940",
+      "bytes": 1312,
+      "sha256": "d04c04a4bd285f65cc836b04a3b3064769cae67d9b270a84e6a9b1c5e05ccb0d"
+    },
+    {
+      "path": "runtime/teacher-cabinet-api.mjs",
+      "previous_sha256": "875873d856c0d4fc33ee97ac393516e9643c93a9bfec460cf735c0d07ab1f76f",
+      "bytes": 11105,
+      "sha256": "f807a0c627c52426e233b36735e5ab519ff4fe5e632c91e161f45e8e936ab280"
+    },
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": "e2b4ecff9d194318cb5e66ce8c4b5f87fa551d2fbb1314d1e0003f693f47782e",
+      "bytes": 6693,
+      "sha256": "aed4ba095de440aeca6c129b48e8cfb52cc111811629e3e5d10898ec363134df"
+    },
+    {
+      "path": "runtime/teacher-staging-delivery.mjs",
+      "previous_sha256": "e7de0515ede92307f2c9b4b8a584d8c55ccb98ca13eaa1ef18f3fe695ceb5e21",
+      "bytes": 4924,
+      "sha256": "42d54752cc8f4cf8597872664e879b564e10a42720c46dbde99b5e2911e43355"
+    },
+    {
+      "path": "runtime/teacher-staging-node.mjs",
+      "previous_sha256": null,
+      "bytes": 3742,
+      "sha256": "636790eb3a2f8c35875d4513121ea832964c69e62ea44d776d4709f850042d46"
+    },
+    {
+      "path": "runtime/teacher-staging-proxy.mjs",
+      "previous_sha256": "a4900314f06a4a1cc19e81550d33d4260701d26a4e1d389b95d5796ef2ee050e",
+      "bytes": 3240,
+      "sha256": "11bf58a22d71a14f89b167aef5dac697e3422039f4f1db6b91b5cb26c883fad9"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "53e7f49d93049cff0782240462f149483ae272ca9cc12cbc43750de287710f98",
+      "bytes": 17717,
+      "sha256": "1dedb7678c0e7298ad237bcbc97277bfcad7939c92e638ec298e3b525e2a1a4f"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-clerk-entry-rows.ts",
+      "previous_sha256": "df6973acc9f579dff12fc2144838d7e000b63f2f491c01de674967a55ddba891",
+      "bytes": 8361,
+      "sha256": "3189d718b4c084e52681e978f7af7b07150a484e91811dd5f7f467a255332b7a"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-request-clock.ts",
+      "previous_sha256": null,
+      "bytes": 687,
+      "sha256": "94be379f0dff2face7dfd29300de4537461ab10c552121e06096494e0051b79d"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-return-rows.ts",
+      "previous_sha256": "ca9e1d5c8e418cda1ff4938f969f200a66eac9fb6c1eba4188bee0e33601d5b4",
+      "bytes": 16975,
+      "sha256": "17fd30a02e4764992b09d2ecc722e2921c04a1bc0bc42063a90419f0ff117587"
+    },
+    {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "previous_sha256": "33c79b3d1afc6cca747d07c331cc753677690acd764ec54aa92551797e6c3917",
+      "bytes": 43568,
+      "sha256": "efe117926e4e9c808ff11bf5a4ad217ec8d818a46baec5a8581fa61874a01824"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/native.test.mjs",
+      "previous_sha256": "75cba97451466a9b3a0484c173c8f4cca575173ea633d5fb9f9ce5048bab46df",
+      "bytes": 37073,
+      "sha256": "47f0f089576216bb36410a5e1d5f23a7bffa8dc27f5affa081b49f700946cb33"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "7dfbfec9c260341db113f80a14f48385cbf23f66294b649fa6f1c5fdc6399e71",
+      "bytes": 29660,
+      "sha256": "9457e98d516cc0a9c929f9b7c7884b5ab14da9d3b458947d57b5b20264155413"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/teacher-notice-delivery.test.mjs",
+      "previous_sha256": "278884fff3347cf1a1b84a2ee8f0741890d4f6683e04c14446295edfd4ac435c",
+      "bytes": 6310,
+      "sha256": "7c4dd358aa3f0c8c56571b158fad01e3d46eba7001a158936e9042d4b591e49a"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/telegram-browser-handoff.test.mjs",
+      "previous_sha256": null,
+      "bytes": 5792,
+      "sha256": "304b0ff91055fdf1fbc3604e2f3c1164616824255d0e7a1a51dd27da37993654"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/workerd-acceptance.mjs",
+      "previous_sha256": "beea9b0affd6944e95b813cd1ea3d4d50cb99a47121ba27680f3cd292b473c23",
+      "bytes": 13945,
+      "sha256": "4d38bd54e7ce7a5c524487257044e7870e2de768f65540f99ab87d68450a5b17"
+    },
+    {
+      "path": "tests/telegram-entry/atomic.test.mjs",
+      "previous_sha256": "a70a9fbe3574b5cdc288260da1720813870ba989566f52d0e1ff3749db83bd06",
+      "bytes": 6614,
+      "sha256": "845fc7a5f3d776209618dc824c1b4497a827cb8c58ca6bfaecac25eea1accb07"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "f9530862aee7e641398af4a8120adaff9240e834e2c22e65690525023b869820",
+      "bytes": 5413,
+      "sha256": "bffade6fda4f3e36f2ace408a2a4902ab5c99095d5f3f4c4a6a3bd571d4ced6d"
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview
 import {dashboard} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia']),
- student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup'])};
+ student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup']),owner:new Set(['dashboard'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
 async function actorFor(tx,{personId,role}){
@@ -18,6 +18,13 @@ async function actorFor(tx,{personId,role}){
     if(!p?.enabled||!p.roles.includes(role))fail('FORBIDDEN',403);
     if(!p.profile.registration_complete)fail('PROFILE_INCOMPLETE',409);
     return {personId,role,roles:p.roles,enabled:true,profile:p.profile,cabinetId:p.univeracademy_id};
+  }
+  if(role==='owner'){
+    const [profile]=await query(tx,`SELECT p.profile->>'first_name' AS first_name,p.profile->>'last_name' AS last_name
+      FROM ua_private.people_registration p JOIN ua_private.staff_access a ON a.person_id=p.id
+      WHERE p.id=$1 AND p.enabled AND 'owner'=ANY(p.roles) AND a.approved FOR SHARE OF a`,[personId]);
+    if(!profile)fail('FORBIDDEN',403);
+    return {personId,role,profile};
   }
   // The current request still locks each live authorization row, including subject and group grants.
   const s=(await query(tx,`WITH staff AS MATERIALIZED (

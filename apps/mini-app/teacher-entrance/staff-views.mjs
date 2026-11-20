@@ -9,7 +9,7 @@ import { uuid } from './staff-transport.mjs';
 import '../src/rich-blocks.css';
 import '../../teacher-web/local-pilot/styles.css';
 
-import { button } from './staff-workspace.mjs';
+import { alternateCabinet, button } from './staff-workspace.mjs';
 
 function checkedInvite(data) {
   const link = new URL(data.telegramUrl);
@@ -26,7 +26,7 @@ export function teacherView(host, port, first, lifecycle) {
   fragment.innerHTML = template;
   host.replaceChildren(fragment.content.cloneNode(true));
   const actionBar = host.querySelector('#workspace-actions');
-  actionBar.append(button(doc, 'Admin bo‘limi', lifecycle.admin), button(doc, 'Chiqish', lifecycle.signout));
+  actionBar.append(alternateCabinet(doc, 'teacher'), button(doc, 'Chiqish', lifecycle.signout));
   for (const [ext, url] of [['txt',sampleText], ['json',sampleJson]]) host.querySelector('a[href="./sample.' + ext + '"]').href = url;
   host.querySelector('.skip').onclick = event => {event.preventDefault(); host.querySelector('#main').focus();};
   const loading = new Map();
@@ -57,7 +57,8 @@ export function adminView(host, initial, lifecycle) {
   const doc = host.ownerDocument;
   const main = doc.createElement('section');
   main.className = 'card';
-  const title = doc.createElement('h1'); title.textContent = 'Guruhlar';
+  const title = doc.createElement('h1'); title.textContent = 'Admin kabineti';
+  const groupsTitle = doc.createElement('h2'); groupsTitle.textContent = 'Guruhlar';
   const rows = doc.createElement('ul');
   const notice = doc.createElement('p'); notice.setAttribute('role','status');
   function paint(dashboard) {
@@ -77,7 +78,7 @@ export function adminView(host, initial, lifecycle) {
       if (!lifecycle.signal.aborted) notice.textContent = error.message;
     } finally { refresh.disabled = false; }
   });
-  main.append(title, refresh, rows, notice, button(doc,'O‘qituvchi kabineti',lifecycle.teacher),
+  main.append(title, groupsTitle, refresh, rows, notice, alternateCabinet(doc, 'admin'),
     button(doc,'Chiqish',lifecycle.signout));
   host.replaceChildren(main);
   paint(initial);

@@ -3,6 +3,7 @@ const limits = { json: 1024 * 1024, media: 2 * 1024 * 1024 };
 const permitted = {
   teacher: new Set(['createGroup','addMember','createInvite','sendInvite','importTest','previewTest','readDraft','updateDraft','publishTest','assignTest']),
   admin: new Set(),
+  owner: new Set(),
 };
 const messages = {
   INVALID_TIME_WINDOW: 'Boshlanish vaqtini tekshiring. Toshkent vaqti bo‘yicha kelajakdagi sana va vaqtni tanlang.',
@@ -44,7 +45,7 @@ async function boundedBytes(response, limit) {
 }
 
 export function createStaffTransport({origin, role, expected, identity, getCurrentClerkToken, fetch: send, signal, onDenied}) {
-  if (!permitted[role] || typeof getCurrentClerkToken !== 'function' || !expected?.generation || !expected.userId ||
+  if (!Object.hasOwn(permitted,role) || typeof getCurrentClerkToken !== 'function' || !expected?.generation || !expected.userId ||
       new URL(origin).protocol !== 'https:' || new URL(origin).origin !== origin || location.origin !== origin) throw fail();
   async function perform(path, options, binary) {
     const bound = AbortSignal.any([signal, AbortSignal.timeout(15000), ...(options.signal ? [options.signal] : [])]);

@@ -9,9 +9,9 @@ async function signed(telegramId=10001,query=crypto.randomUUID()){
  const key=await crypto.subtle.importKey('raw',await crypto.subtle.sign('HMAC',seed,enc.encode(botKey)),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  p.set('hash',Buffer.from(await crypto.subtle.sign('HMAC',key,enc.encode(data))).toString('hex'));return p.toString();
 }
-function fixture(){
+function fixture(workerNow){
  const pool=new Pool();let count=0,failLive=false;
- const deps={mode:'local_candidate',sessionPolicy:testPolicy,numericPresentation:testNumbers,verifier:{issuer:who.issuer,now:()=>pool.time},
+ const deps={mode:'local_candidate',sessionPolicy:testPolicy,numericPresentation:testNumbers,verifier:{issuer:who.issuer,now:workerNow??(()=>pool.time)},
   liveness:async identity=>{if(failLive)throw Error('provider down');return {...identity,status:'active',accountEnabled:true,expiresAt:at+60000,firstName:'First',lastName:'Last'};}};
  const entry=new TelegramClerkEntryRows({pool,botToken:botKey,deps,newPersonId:()=>id(++count)});
  const fresh=(p=proof())=>({proof:p,firstFactorVerifiedAfter:at-60000});
@@ -22,6 +22,31 @@ test('new Telegram+Clerk creates one profile, link, family and replays in same c
  assert.equal(result.profile.person_id,id(1));assert.equal(f.pool.state.people[id(1)].telegramId,10001);
  assert.equal(Object.keys(f.pool.state.families).length,1);assert.equal(Object.keys(f.pool.state.replays).length,1);assert.equal(Object.keys(f.pool.state.telegramReplays).length,1);
  assert.equal(f.pool.events.at(-2).name,'ua_clerk_commit');assert.equal(f.pool.state.history.foreign,'unchanged synthetic history');
+});
+test('atomic entry tolerates independent database and Worker clocks inside both signed validity windows',async()=>{
+ for(const offset of [-100,-1,0,1,100]){
+  const f=fixture(()=>at+500+offset);f.pool.time=at+500;
+  const result=await f.entry.enter(f.fresh(),await signed());
+  assert.equal(result.profile.person_id,id(1));
+  assert.equal(f.pool.events.filter(e=>e.name==='ua_clerk_commit').length,1);
+ }
+});
+for(const source of ['database','worker'])test('atomic entry rolls back if the '+source+' clock regresses before commit',async()=>{
+ let worker=at+500;
+ const f=fixture(()=>worker),before=structuredClone(f.pool.state);f.pool.time=worker;
+ f.pool.hook=(name,p)=>{if(name==='ua_clerk_clock'&&p.events.some(e=>e.name==='ua_atomic_replay')){
+  if(source==='database')p.time=at+499;else worker=at+499;
+ }};
+ await assert.rejects(f.entry.enter(f.fresh(),await signed()),e=>e.status===503&&e.outcome==='not_committed');
+ assert.deepEqual(f.pool.state,before);assert.equal(f.pool.events.filter(e=>e.name==='ua_clerk_rollback').length,1);
+});
+test('atomic entry requires the Clerk proof to be valid on both clocks',async()=>{
+ for(const [worker,db] of [[at+499,at+500],[at+500,at+499],[at+500,at+501],[at+501,at+500]]){
+  const f=fixture(()=>worker),before=structuredClone(f.pool.state);f.pool.time=db;
+  const verified=f.fresh({...proof(),notBefore:at+500,expiresAt:at+501});
+  await assert.rejects(f.entry.enter(verified,await signed()),e=>e.code==='CLERK_TOKEN_INVALID');
+  assert.deepEqual(f.pool.state,before);
+ }
 });
 test('new Telegram cannot silently reuse Clerk profile already linked to another Telegram',async()=>{
  const f=fixture();await f.entry.enter(f.fresh(),await signed());const before=structuredClone(f.pool.state);

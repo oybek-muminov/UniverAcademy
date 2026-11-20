@@ -27,6 +27,25 @@ export function createStagingInviteDeliveryStore({pool}){
         if (wakeTeacherNotice) await q('SELECT ua_cabinet.wake_teacher_notification($1::bigint)',[telegramUserId]);
       });
     },
+    async readStaffCabinet({telegramUserId}) {
+      if (!Number.isSafeInteger(telegramUserId) || telegramUserId <= 0) throw Error('INVALID_TELEGRAM_ID');
+      // Presentation hint for this verified private chat. Browser access still requires
+      // its own Clerk identity and the current role/scope checks in the cabinet API.
+      return transaction(async q => {
+        const [row] = await q(`SELECT CASE
+          WHEN 'owner'=ANY(p.roles) THEN 'owner'
+          WHEN 'admin'=ANY(p.roles) THEN 'admin'
+          WHEN 'teacher'=ANY(p.roles) AND EXISTS (
+            SELECT FROM ua_private.teacher_subject_approvals s
+            WHERE s.person_id=p.id AND s.approved AND s.revoked_at_ms IS NULL
+          ) THEN 'teacher' END AS cabinet
+          FROM ua_private.people p
+          JOIN ua_cabinet.private_starts started ON started.telegram_id=p.telegram_id
+          JOIN ua_private.staff_access staff ON staff.person_id=p.id AND staff.approved
+          WHERE p.telegram_id=$1 AND p.enabled`, [telegramUserId]);
+        return row?.cabinet ?? null;
+      });
+    },
     claimInviteDelivery(){
       return transaction(async q=>{
         const claim=randomUUID();

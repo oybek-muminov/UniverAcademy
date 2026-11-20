@@ -41,7 +41,6 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   const mountAuthenticatedWorkspace = await workspace(t);
   const host = document.getElementById('host');
   const el = id => host.querySelector('#'+id);
-  const adminButton = () => [...host.querySelectorAll('button')].find(x=>x.textContent==='Admin bo‘limi');
   async function until(check) {
     for(let i=0;i<200;i++) { if(check()) return; await pause(5); }
     assert.fail('View did not settle: '+host.textContent.slice(0,240));
@@ -197,9 +196,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
     ['createGroup','addMember','addMember','createInvite','sendInvite','assignTest']);
   assert(!calls.some(([path])=>path.includes('/admin/')));
 
-  adminButton().click();
-  await until(()=>host.querySelector('li')?.textContent.includes('8-A · Ustoz · Faol guruh'));
-  assert(!host.textContent.includes('8-B') && !host.textContent.includes('Tasdiqlash'));
+  assert.equal(host.querySelector('a[href="/admin"]').textContent,'Admin bo‘limi');
   assert.equal(tokenCount,calls.length);
   identity={...identityValue,generation:'different'};notify();
   assert.equal(host.childNodes.length,0);
@@ -443,4 +440,73 @@ test('formula input updates the saved source on every edit and typesets only the
   field.value='x^3'; field.dispatchEvent(new window.Event('input')); box.remove();
   await pause(120);
   assert.deepEqual(typeset,['x^2']);
+});
+
+for (const scenario of [
+  {path:'/admin',role:'admin',heading:'Admin kabineti'},
+  {path:'/owner',role:'owner',heading:'Ega kabineti'},
+  {path:'/',role:'teacher',denied:403},
+  {path:'/admin',role:'admin',denied:403},
+  {path:'/owner',role:'owner',denied:403},
+  {path:'/owner',role:'owner',denied:401},
+  {path:'/owner',role:'owner',replyRole:'teacher'},
+  {path:'/admin',role:'admin',replyRole:'owner'},
+]) test('staff destination '+scenario.path+' accepts only its authorized dashboard ('+(scenario.denied??scenario.replyRole??'approved')+')', async t => {
+  const {path,role,denied,replyRole,heading}=scenario;
+  const dom=new JSDOM('<div id="host"></div>',{url:origin+path,pretendToBeVisual:true});
+  context(dom,t);
+  const mount=await workspace(t), host=document.getElementById('host'), reads=[];
+  let identity=identityValue, notify;
+  const dispose=mount(host,{origin,identity:{current:()=>identity,subscribe(fn){notify=fn;return ()=>{};}},
+    getCurrentClerkToken:async ()=>'current-token',fetch:async (url,opts)=>{
+      reads.push(url);
+      assert.equal(opts.method,'GET');
+      assert.equal(opts.headers.get('authorization'),'Bearer current-token');
+      if(denied) return located(new Response(null,{status:denied,headers:{'cache-control':'no-store'}}),url);
+      const data={role:replyRole??role,person_id:person,name:'Ega <b>Ism</b>'};
+      if(data.role==='admin') data.groups=[{name:'8-A',teacherName:'Ustoz',status:'active'}];
+      return located(success(data),url);
+    }});
+  t.after(dispose);
+  const expected = heading ?? (denied === 401 ? 'Kirish sessiyasini tekshiring' : 'ruxsat berilmagan');
+  for(let i=0;i<200&&!host.textContent.includes(expected);i++) await pause(5);
+  assert(host.textContent.includes(expected),host.textContent);
+  assert.deepEqual(reads,[origin+'/api/v1/'+role+'/pilot/dashboard']);
+  if(heading) {
+    assert.equal(host.querySelector('h1').textContent,heading);
+    if(role==='owner') {
+      assert(host.textContent.includes('Ega <b>Ism</b>'));
+      assert.equal(host.querySelector('b,form,a'),null);
+      assert.deepEqual([...host.querySelectorAll('button')].map(b=>b.textContent),['Chiqish']);
+    } else {
+      assert.equal(host.querySelector('li').textContent,'8-A · Ustoz · Faol guruh');
+      assert.equal(host.querySelector('a').href,origin+'/');
+    }
+    identity={...identityValue,generation:'another-session'};notify();
+    assert.equal(host.childNodes.length,0);
+  } else {
+    assert(!host.querySelector('h1,li') && !host.textContent.includes('Ega <b>Ism</b>'));
+    assert([...host.querySelectorAll('button')].some(b=>b.textContent==='Chiqish'));
+  }
+});
+
+test('staff entrance accepts three canonical URLs and never treats role or session hints as a destination', async () => {
+  const {staffDestination}=await import('../../apps/mini-app/teacher-entrance/staff-route.mjs');
+  for(const [path,role] of [['/','teacher'],['/admin','admin'],['/owner','owner']]) assert.equal(staffDestination(new URL(origin+path)).role,role);
+  for(const url of [origin+'/student',origin+'/admin/',origin+'/?role=owner',origin+'/owner#session',origin+'/teacher','https://example.test/owner']) {
+    assert.equal(staffDestination(new URL(url)),null);
+  }
+});
+
+test('owner transport exposes a single dashboard read and refuses commands, imports and private teacher assets', async t => {
+  const dom=new JSDOM('',{url:origin+'/owner'});context(dom,t);
+  let calls=0;
+  const port=createStaffTransport({origin,role:'owner',expected:identityValue,identity:{current:()=>identityValue},
+    signal:new AbortController().signal,getCurrentClerkToken:async ()=>'token',fetch:()=>{calls++;}});
+  assert.throws(()=>port.request('commands/createGroup',{name:'x'}));
+  assert.throws(()=>port.request('import-preview',{text:'x'}));
+  assert.throws(()=>port.availableStudents(person,null,new AbortController().signal));
+  assert.throws(()=>port.image(person));
+  await assert.rejects(port.upload(new Blob()));
+  assert.equal(calls,0);
 });

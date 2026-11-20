@@ -45,6 +45,7 @@ try {
   const delivery=await createServiceLogin(cluster,'qa_workerd_delivery',[{role:'ua_cabinet_delivery',inherit:false,set:true}]);
   const lookup=await createServiceLogin(cluster,'qa_workerd_lookup',[{role:'ua_api_login',inherit:true,set:false}]);
   const clerk=await testClerk(), teacher=await provisionStaff(db,'Muallim','teacher'),admin=await provisionStaff(db,'Tasdiq','admin');
+  const owner=await provisionStaff(db,'Loyiha egasi','owner'),ownerJwt=await clerk.sign(owner.subject);
   const account=await provisionStudent(db,'O‘quvchi','0000000017',710300035,{clerk});
   const invitee=await provisionStudent(db,'Taklifli','0000000018',710300036,{clerk});
   const botOrigin='https://bot.stage-classroom.example.com', webhookSecret=randomBytes(24).toString('hex');
@@ -89,6 +90,13 @@ try {
   const browser={fetch:async request=>mf.dispatchFetch(request.url,{method:request.method,headers:Object.fromEntries(request.headers),
     ...(request.body ? {body:Buffer.from(await request.arrayBuffer())} : {}),redirect:'manual'})};
   const teacherUI=routes(browser,'teacher',teacherJwt),adminUI=routes(browser,'admin',adminJwt),student=routes(browser,'student',account.token);
+  const ownerUI=routes(browser,'owner',ownerJwt),ownerDashboard=await ownerUI.dashboard();
+  assert.equal(ownerDashboard.headers.get('cache-control'),'no-store');
+  assert.deepEqual(await good(ownerDashboard),{role:'owner',person_id:owner.id,name:'Loyiha egasi Sinov'});
+  for(const token of [teacherJwt,adminJwt]) await rejected(routes(browser,'owner',token).dashboard(),403);
+  await rejected(routes(browser,'owner',account.token).dashboard(),401);
+  await rejected(ownerUI.call('dashboard','POST'),404);
+  assert.equal((await mf.dispatchFetch(apiOrigin+'/api/v1/owner/pilot/dashboard',{headers:{authorization:'Bearer '+ownerJwt}})).status,404);
   assert.equal((await good(teacherUI.dashboard())).role,'teacher');
   assert.equal((await good(adminUI.dashboard())).role,'admin');
   assert.equal((await good(student.dashboard())).univeracademy_id,account.cabinetId);

@@ -47,6 +47,13 @@ try {
       assert.equal(relay.headers[name],value);
     for(const name of ['cookie','forwarded','x-forwarded-host','x-univeracademy-actor','x-univeracademy-pilot-proxy']) assert.equal(relay.headers[name],undefined);
   }
+  const ownerPath='/api/v1/owner/pilot/dashboard';
+  const ownerResponse=await staff.fetch(origin+ownerPath,{headers:{origin,authorization:'Bearer fixture'}});
+  assert.equal(ownerResponse.status,200);
+  assert.equal((await ownerResponse.json()).url,origin+ownerPath);
+  assert.equal((await staff.fetch(origin+ownerPath,{method:'POST'})).status,404);
+  assert.equal((await staff.fetch(origin+ownerPath+'?role=owner')).status,404);
+  assert.equal((await staff.fetch(origin+ownerPath,{headers:{origin:'https://untrusted.example'}})).status,403);
   assert.equal((await staff.fetch(origin+path,{headers:{origin:'https://untrusted.example'}})).status,403);
   assert.equal((await staff.fetch('https://wrong.example'+path)).status,404);
   assert.equal((await staff.fetch(origin+path+'?actor=other')).status,404);
@@ -55,5 +62,5 @@ try {
   for(const [worker,status] of [['off',404],['invalid',503],['missing',503]]) {
     assert.equal((await (await mf.getWorker(worker)).fetch(origin+path)).status,status);
   }
-  console.log('PASS workerd. The compiled Ustoz gateway reaches only the named Teacher/Admin service and respects the origin, binding and activation gates.');
+  console.log('PASS workerd. The compiled Ustoz gateway reaches only the named staff service, including read-only Owner access, and respects the origin, binding and activation gates.');
 } finally {await mf.dispose();}

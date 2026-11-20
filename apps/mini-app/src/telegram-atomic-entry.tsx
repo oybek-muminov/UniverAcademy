@@ -1,3 +1,4 @@
+import {StaffBrowserChoices} from './staff-browser-entry.tsx';
 import {AccountDeletionHost} from './account-deletion-candidate/host.tsx';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {SignIn,useClerk,useSession,useReverification} from '@clerk/react';
@@ -45,5 +46,7 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
       <p role="status">{state.phase==='blocked'?'Telegram botida /start orqali yangidan oching.':'Kirish tekshirilmoqda…'}</p>
       {state.phase!=='blocked'&&<button type="button" onClick={()=>runtime.cancel()}>Bekor qilish</button>}
     </>}
-  </section></main>;
+  </section>
+    {(state.phase === 'blocked' || state.phase === 'choose') && <StaffBrowserChoices />}
+  </main>;
 }

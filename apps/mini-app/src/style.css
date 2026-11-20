@@ -39,6 +39,11 @@ small { line-height: 1.5; }
 .secondary:not(:disabled):hover { background: #eef4ea; }
 .text-button { background: transparent; color: #235b45; font-size: .83rem; padding-left: 0; padding-right: 0; }
 .card > .primary { width: 100%; margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+.cabinet-browser-button { min-height: 46px; border-radius: 12px; padding: 12px 18px; font-weight: 650; text-decoration: none; }
+.cabinet-recheck { display: block; text-align: center; margin-top: 14px; }
+.staff-browser-choices { margin-top: 12px; }
+.staff-browser-choices summary { cursor: pointer; }
+.staff-browser-choices li + li { margin-top: 10px; }
 .card > .text-button { display: block; margin: 5px auto 0; }
 label:not(.option) { display: block; font-size: .82rem; font-weight: 650; margin: 20px 0 8px; }
 input:not([type=radio]), select { width: 100%; min-height: 48px; padding: 12px; color: #192e28; background: #fafbf9; border: 1px solid #bccdbf; border-radius: 10px; }

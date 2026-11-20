@@ -20,6 +20,10 @@ export class TelegramPilotDirectory extends WorkerEntrypoint {
     const { recordStagingPrivateStart } = await import('./staging-private-start.mjs');
     return recordStagingPrivateStart(input, this.env);
   }
+  async readStaffCabinet(input) {
+    const { readStagingStaffCabinet } = await import('./staging-private-start.mjs');
+    return readStagingStaffCabinet(input, this.env);
+  }
   async fetch() { return new Response(null, {status:404}); }
 }
 // Ustoz Pages binds directly to this staff-only entry point.

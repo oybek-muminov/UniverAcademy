@@ -25,6 +25,30 @@ test('abandoned entry deletes message at expiry without cabinet', async () => {
   assert.ok(h.calls.some(c => c.method === 'deleteMessage' && c.body.message_id === 100));
   assert.equal(h.state().receipts.length, 0);
 });
+test('private menu reconciles the current staff handoff and falls back to the ordinary Mini on revocation or hint failure', async () => {
+  const h = harness();
+  let role='teacher', reads=0;
+  h.setStatus('linked');
+  h.env.TELEGRAM_TEACHER_PILOT_ENABLED='true';
+  h.env.TELEGRAM_PILOT_DIRECTORY={async readStaffCabinet(input) {
+    assert.deepEqual(input,{telegramUserId:context.telegram_user_id}); reads++;
+    if (role==='unavailable') throw Error('SERVICE_UNAVAILABLE');
+    return role;
+  }};
+  const lastMenu=()=>h.calls.filter(c=>c.method==='setChatMenuButton').at(-1)?.body.menu_button;
+  await h.engine.start(context);
+  assert.equal(lastMenu().web_app.url,h.env.MINI_CABINET_URL+'open-staff/teacher');
+  for (const hint of ['admin','owner',null,'unavailable']) {
+    role=hint; await h.engine.reconcile();
+    const path = hint==='admin'||hint==='owner' ? 'open-staff/'+hint : '';
+    assert.deepEqual(lastMenu(),{type:'web_app',text:'Kabinet',web_app:{url:h.env.MINI_CABINET_URL+path}});
+  }
+  assert.equal(reads,5);
+  h.setStatus('disabled'); await h.engine.reconcile();
+  assert.deepEqual(lastMenu(),{type:'commands'});
+  assert.equal(reads,5);
+  assert.equal(h.calls.filter(c=>c.method==='sendMessage').length,0);
+});
 test('expiry cleanup works even when database lookup fails', async () => {
   const h = harness(); await h.engine.start(context); h.advance(60000); h.failLookup(); await h.engine.drain();
   assert.equal(h.state().receipts.length, 0);

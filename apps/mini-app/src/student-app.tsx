@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { StaffBrowserEntry } from './staff-browser-entry.tsx';
 import { AccountDashboard } from './account-dashboard.tsx';
 import { localizeServerDisplay, historySummary } from './display.ts';
 import type { ReactNode } from 'react';
@@ -14,20 +15,10 @@ type StudentAppProps = {
   onEnter?: () => Promise<void>; onLogout?: () => Promise<void>; demoControls?: ReactNode;
   onDeleteAccount?: () => void; deletionBusy?: boolean; stagingPilot?:boolean;
 };
-const teacherCabinetUrl = 'https://ustoz.univeracademy.uz/';
-
-function TeacherCabinetEntry() {
-  useEffect(() => { window.location.replace(teacherCabinetUrl); }, []);
-  return <main className="shell"><section className="card">
-    <h1>O‘qituvchi kabineti</h1><p role="status">Kabinet ochilmoqda…</p>
-    <a href={teacherCabinetUrl} referrerPolicy="no-referrer">O‘qituvchi kabinetini ochish</a>
-  </section></main>;
-}
-
 export function StudentApp(props: StudentAppProps) {
   const { studentFlow } = props;
   const s = useSyncExternalStore(studentFlow.subscribe, studentFlow.snapshot, studentFlow.snapshot);
-  if (props.mode === 'telegram' && s.student?.teacherCabinet) return <TeacherCabinetEntry />;
+  if (props.mode === 'telegram' && s.student?.staffCabinet) return <StaffBrowserEntry role={s.student.staffCabinet} />;
   return <StudentCabinet {...props} state={s} />;
 }
 

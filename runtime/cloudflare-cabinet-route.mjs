@@ -1,3 +1,4 @@
+import { cabinetRole } from './cabinet-role.mjs';
 import { cabinetQueryAllowed } from './teacher-student-directory.mjs';
 const headers = {'cache-control':'no-store','x-content-type-options':'nosniff'};
 const deny = (code,status) => Response.json({error:{code,message:code}}, {status,headers});
@@ -9,10 +10,10 @@ export async function fetchNativeCabinet(request, env, surface) {
     return deny('NOT_FOUND',404);
   const url = new URL(request.url);
   const staff = surface === 'staff';
-  const route = staff ? /^\/api\/v1\/(?:teacher|admin)\/pilot\// : /^\/api\/v1\/student\/pilot\//;
+  const role = cabinetRole(url.pathname,request.method);
   const origin = staff ? env.UA_CABINET_TEACHER_ORIGIN : env.UA_API_ORIGIN;
   if ((!staff && surface !== 'student') || url.protocol !== 'https:' || url.origin !== origin ||
-      !cabinetQueryAllowed(url,request.method) || url.hash || !route.test(url.pathname) || !['GET','POST','OPTIONS'].includes(request.method))
+      !cabinetQueryAllowed(url,request.method) || url.hash || !role || (staff ? role==='student' : role!=='student') || !['GET','POST','OPTIONS'].includes(request.method))
     return deny('NOT_FOUND',404);
   try {
     const { cabinet } = await import('./cloudflare-cabinet-composition.mjs');

@@ -37,17 +37,20 @@ test('enabling a group pilot keeps ordinary assignments and their original clien
   assert.deepEqual(c.paths,['/auth/clerk','/exams']);
 });
 
-test('Clerk admission uses the current server profile when the teacher role changes', async () => {
+test('Clerk admission selects the current highest staff role without fetching student exams', async () => {
   const teacher = {...profile, roles: ['student', 'teacher']};
-  for (const [loginProfile, current, expectsTeacher] of [[profile, teacher, true], [teacher, profile, false]]) {
+  const admin = {...profile, roles: ['student','teacher','admin']};
+  const owner = {...profile, roles: ['student','admin','teacher','owner']};
+  for (const [loginProfile, current, expected] of [[profile, teacher, 'teacher'], [teacher, profile, undefined],
+    [owner, admin, 'admin'], [admin, owner, 'owner']]) {
     const c = await student(() => ok([]), () => assert.fail('Unexpected student pilot lookup'), true, current, loginProfile);
     const runtime = createSignInController({context:'browser', provider:{current:async () => ({proof:'fixture'})},
       authorize:async () => ({person:c.auth.person(), port:c.port})});
     await runtime.continueSession();
     const entry = runtime.snapshot();
     assert.equal(entry.step, 'ready');
-    assert.equal(Boolean(entry.flow.snapshot().student.teacherCabinet), expectsTeacher);
-    assert.deepEqual(c.paths, expectsTeacher ? ['/auth/clerk','/me'] : ['/auth/clerk','/me','/exams']);
+    assert.equal(entry.flow.snapshot().student.staffCabinet, expected);
+    assert.deepEqual(c.paths, expected ? ['/auth/clerk','/me'] : ['/auth/clerk','/me','/exams']);
   }
 });
 
