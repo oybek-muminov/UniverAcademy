@@ -1,0 +1,48 @@
+SET LOCAL search_path=pg_catalog;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='90s';
+DO $managed$
+DECLARE cap text; my_role oid:=current_user::regrole; expected_tables integer;
+BEGIN
+ IF current_user<>session_user OR current_setting('server_version_num')::integer/10000<>17 OR
+   NOT EXISTS(SELECT FROM pg_roles WHERE oid=my_role AND NOT rolsuper AND rolcreaterole AND rolbypassrls) OR
+   (SELECT datdba FROM pg_database WHERE datname=current_database())<>my_role OR
+   has_database_privilege('ua_owner',current_database(),'CREATE') OR
+   current_setting('createrole_self_grant')<>'' THEN RAISE EXCEPTION 'Unexpected managed operator authority'; END IF;
+ IF current_setting('ua.cabinet_operation')='up' THEN
+   IF to_regnamespace('ua_cabinet') IS NOT NULL OR to_regnamespace('ua_cabinet_retained') IS NOT NULL OR
+    to_regrole('ua_cabinet_stage') IS NOT NULL OR to_regrole('ua_cabinet_delivery') IS NOT NULL THEN RAISE EXCEPTION 'Expected a clean first installation'; END IF;
+ ELSE
+   IF to_regrole('ua_cabinet_stage') IS NULL OR to_regrole('ua_cabinet_delivery') IS NULL
+     OR (to_regnamespace('ua_cabinet') IS NOT NULL) IS DISTINCT FROM (current_setting('ua.cabinet_operation')='down')
+     OR (to_regnamespace('ua_cabinet_retained') IS NOT NULL) IS DISTINCT FROM (current_setting('ua.cabinet_operation')='restore')
+     OR NOT EXISTS(SELECT FROM pg_namespace WHERE nspname IN ('ua_cabinet','ua_cabinet_retained') AND nspowner='ua_owner'::regrole
+         AND obj_description(oid,'pg_namespace')='UniverAcademy teacher staging v1') THEN RAISE EXCEPTION 'Unexpected installed or retained schema'; END IF;
+ END IF;
+ IF (SELECT nspowner FROM pg_namespace WHERE nspname='ua_private') IS DISTINCT FROM 'ua_owner'::regrole::oid
+    OR (SELECT relowner FROM pg_class WHERE oid=to_regclass('ua_private.people_registration')) IS DISTINCT FROM 'ua_owner'::regrole::oid
+    OR (SELECT proowner FROM pg_proc WHERE oid=to_regprocedure('ua_private.ratio_shape(jsonb)')) IS DISTINCT FROM 'ua_owner'::regrole::oid
+    OR NOT EXISTS(SELECT FROM pg_attribute WHERE attrelid='ua_private.people'::regclass AND attname='univeracademy_id' AND NOT attisdropped)
+    OR EXISTS(SELECT FROM pg_attribute WHERE attrelid='ua_private.people'::regclass AND attname='qadam_id' AND NOT attisdropped)
+    THEN RAISE EXCEPTION 'Unexpected storage or cabinet ID contract'; END IF;
+ SELECT count(*) INTO expected_tables FROM pg_class WHERE relnamespace='ua_private'::regnamespace AND relkind='r'
+    AND relowner='ua_owner'::regrole AND relrowsecurity AND relforcerowsecurity AND relname=ANY(ARRAY['people','groups','memberships','staff_access','teacher_subject_approvals','staff_group_scope','staff_subject_scope','demos','test_versions','draft_questions','assignments','grants','attempts','exam_series','answers','ordinary_results','command_receipts','staff_receipts','staff_audit']);
+ IF expected_tables<>19 THEN RAISE EXCEPTION 'Canonical table ownership or RLS differs'; END IF;
+ IF (SELECT count(*) FROM pg_proc WHERE oid IN(to_regprocedure('ua_private.assert_deletion_writable(text,jsonb)'),to_regprocedure('ua_private.assert_deletion_staff_writable(jsonb,jsonb)')) AND proowner='ua_deletion_executor'::regrole)<>2 THEN RAISE EXCEPTION 'Reviewed deletion gate required'; END IF;
+ FOREACH cap IN ARRAY ARRAY['ua_owner','ua_deletion_executor'] LOOP
+  IF pg_has_role(current_user,cap,'SET') OR pg_has_role(current_user,cap,'USAGE') OR
+     (SELECT count(*) FROM pg_auth_members WHERE roleid=cap::regrole AND member=my_role)<>1 OR
+     NOT EXISTS(SELECT FROM pg_auth_members WHERE roleid=cap::regrole AND member=my_role AND grantor<>my_role AND admin_option AND NOT inherit_option AND NOT set_option)
+    THEN RAISE EXCEPTION 'Unexpected managed membership in %',cap; END IF;
+ END LOOP;
+ PERFORM set_config('ua.cabinet_operator_acl',
+   (SELECT md5(string_agg(format('%s/%s/%s/%s',a.grantor,a.grantee,a.privilege_type,a.is_grantable),',' ORDER BY a.grantor,a.grantee,a.privilege_type,a.is_grantable))
+    FROM pg_database d CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a WHERE d.datname=current_database()),true);
+ PERFORM set_config('ua.cabinet_operator_memberships',
+   (SELECT md5(string_agg(format('%s/%s/%s/%s/%s/%s',roleid,member,grantor,admin_option,inherit_option,set_option),',' ORDER BY roleid,member,grantor))
+    FROM pg_auth_members WHERE roleid IN ('ua_owner'::regrole,'ua_deletion_executor'::regrole)),true);
+END $managed$;
+GRANT ua_owner,ua_deletion_executor TO CURRENT_USER WITH ADMIN FALSE,INHERIT FALSE,SET TRUE GRANTED BY CURRENT_USER;
+DO $grant_create$ BEGIN
+ EXECUTE format('GRANT CREATE ON DATABASE %I TO ua_owner',current_database());
+END $grant_create$;

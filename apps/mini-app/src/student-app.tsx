@@ -2,13 +2,14 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalSt
 import { AccountDashboard } from './account-dashboard.tsx';
 import { localizeServerDisplay, historySummary } from './display.ts';
 import type { ReactNode } from 'react';
+import {readStagingInvite} from './staging-student-port.ts';
 import { StudentFailure } from './transport.ts';
 import type { StudentFlow } from './flow.ts';
 
 const StagingStudentPanel = lazy(() => import('./staging-student-panel.tsx'));
 const letters = ['A', 'B', 'C', 'D'];
 
-export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls, onDeleteAccount, deletionBusy = false, stagingPilot = false }: {
+export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls, onDeleteAccount, deletionBusy = false, stagingPilot = true }: {
   studentFlow: StudentFlow; mode: 'demo' | 'local_fixture' | 'telegram';
   onEnter?: () => Promise<void>; onLogout?: () => Promise<void>; demoControls?: ReactNode;
   onDeleteAccount?: () => void; deletionBusy?: boolean; stagingPilot?:boolean;
@@ -66,6 +67,20 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls,
   const title = { welcome: 'Testga xush kelibsiz', profile: 'Avval tanishib olaylik', exams: 'Mening testlarim',
     instructions: 'Boshlashga tayyormisiz?', attempt: 'Fizika testi', lifecycle: 'Urinish holati', result: 'Natijangiz', history: 'Urinishlar tarixi' }[s.screen];
 
+  function ordinaryExams(groupAssignments?:ReadonlySet<string>) {
+    return <>
+      {s.exams.filter(exam => !groupAssignments?.has(exam.id)).map(exam => <article className="card exam-card" key={exam.id}>
+        <div className="card-top"><span className="subject-icon" aria-hidden="true">⚛</span><span className="pill green">Sizga biriktirilgan</span></div>
+        <h2>{exam.title}</h2><p>{exam.group}</p>
+        <div className="exam-facts"><span><strong>{exam.count}</strong> savol</span><span><strong>{exam.durationLabel}</strong> vaqt</span></div>
+        <button className="primary" disabled={s.busy} onClick={() => void flow.openExam(exam)}>Testni ko‘rish →</button>
+        <button className="text-button" disabled={s.busy} onClick={() => void flow.showHistory(exam)}>Shu testning tarixi →</button>
+      </article>)}
+      {!s.exams.length && !groupAssignments && <section className="card"><h2>Hozircha test yo‘q</h2><p>Guruh testiga o‘qituvchi yoki administrator biriktiradi.</p></section>}
+      <button className="text-button" disabled={s.busy} onClick={() => void (pilot ? flow.enter() : flow.showExams())}>Testlar ro‘yxatini yangilash</button>
+    </>;
+  }
+
   return <main className={`shell${testing ? ' test-shell' : ''}`}>
     {!testing && <><header className="brand"><span className="brand-mark" aria-hidden="true">U</span>
       <span className="account-name">{[s.student?.firstName, s.student?.lastName].filter(Boolean).join(' ') || 'UniverAcademy'}<small>O‘quvchi kabineti</small></span>
@@ -95,20 +110,10 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls,
       <button className="primary" disabled={s.busy}>Davom etish →</button>
     </form>}
 
-    {s.screen === 'exams' && pilot && s.student && <Suspense fallback={<p role="status">Guruh ochilmoqda…</p>}>
-      <StagingStudentPanel key={s.student.person} port={pilot} person={s.student.person} onAuthLost={()=>flow.fail(new StudentFailure('auth','FRESH_LAUNCH_REQUIRED'))}/>
-    </Suspense>}
-    {s.screen === 'exams' && !pilot && <>
-      {s.exams.map(exam => <article className="card exam-card" key={exam.id}>
-        <div className="card-top"><span className="subject-icon" aria-hidden="true">⚛</span><span className="pill green">Sizga biriktirilgan</span></div>
-        <h2>{exam.title}</h2><p>{exam.group}</p>
-        <div className="exam-facts"><span><strong>{exam.count}</strong> savol</span><span><strong>{exam.durationLabel}</strong> vaqt</span></div>
-        <button className="primary" disabled={s.busy} onClick={() => void flow.openExam(exam)}>Testni ko‘rish →</button>
-        <button className="text-button" disabled={s.busy} onClick={() => void flow.showHistory(exam)}>Shu testning tarixi →</button>
-      </article>)}
-      {!s.exams.length && <section className="card"><h2>Hozircha test yo‘q</h2><p>Guruh testiga o‘qituvchi yoki administrator biriktiradi.</p></section>}
-      <button className="text-button" disabled={s.busy} onClick={() => void flow.showExams()}>Testlar ro‘yxatini yangilash</button>
-    </>}
+    {s.screen === 'exams' && (pilot && s.student && (s.student.activeGroupId || readStagingInvite()) ?
+      <Suspense fallback={ordinaryExams()}><StagingStudentPanel key={s.student.person} port={pilot} person={s.student.person}
+        ordinaryExams={ordinaryExams} onJoined={()=>flow.enter()} onAuthLost={()=>flow.fail(new StudentFailure('auth','FRESH_LAUNCH_REQUIRED'))}/>
+      </Suspense> : ordinaryExams())}
 
     {s.screen === 'instructions' && <section className="card">
       <span className="pill green">{s.exam?.group}</span><h2>{s.exam?.title}</h2>

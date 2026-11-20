@@ -14,7 +14,7 @@ test('the staged dashboard and commands use the original student proof and carry
   const h=harness(async req => {
     assert.equal(req.headers.get('Authorization'),'Bearer opaque-test');
     assert.equal(req.credentials,'omit'); assert.equal(req.redirect,'error');
-    if(req.method==='GET')return Response.json({data:{role:'student',person_id:'student-one',assignments:[],results:[]}});
+    if(req.method==='GET')return Response.json({data:{role:'student',person_id:'student-one',group:null,assignments:[],results:[]}});
     assert.equal(req.headers.get('Idempotency-Key'),'the-same-retry-key');
     assert.deepEqual(await req.json(),{token:'grp_token'});
     return Response.json({data:{id:'g',name:'Fizika'}});

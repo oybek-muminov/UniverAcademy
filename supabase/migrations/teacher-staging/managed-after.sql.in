@@ -1,0 +1,45 @@
+RESET ROLE;
+DO $revoke_create$ BEGIN
+ EXECUTE format('REVOKE CREATE ON DATABASE %I FROM ua_owner',current_database());
+END $revoke_create$;
+REVOKE ua_owner,ua_deletion_executor FROM CURRENT_USER GRANTED BY CURRENT_USER;
+DO $verify$
+DECLARE app text; acl_sig text; role_sig text;
+BEGIN
+ SELECT md5(string_agg(format('%s/%s/%s/%s',a.grantor,a.grantee,a.privilege_type,a.is_grantable),',' ORDER BY a.grantor,a.grantee,a.privilege_type,a.is_grantable))
+   INTO acl_sig FROM pg_database d CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a WHERE d.datname=current_database();
+ SELECT md5(string_agg(format('%s/%s/%s/%s/%s/%s',roleid,member,grantor,admin_option,inherit_option,set_option),',' ORDER BY roleid,member,grantor))
+   INTO role_sig FROM pg_auth_members WHERE roleid IN ('ua_owner'::regrole,'ua_deletion_executor'::regrole);
+ IF acl_sig IS DISTINCT FROM current_setting('ua.cabinet_operator_acl') OR role_sig IS DISTINCT FROM current_setting('ua.cabinet_operator_memberships')
+    OR has_database_privilege('ua_owner',current_database(),'CREATE') THEN RAISE EXCEPTION 'Temporary administration or database permissions survived'; END IF;
+ IF current_setting('ua.cabinet_operation')='down' THEN
+   IF to_regnamespace('ua_cabinet') IS NOT NULL OR to_regnamespace('ua_cabinet_retained') IS NULL
+      OR has_schema_privilege('ua_cabinet_stage','ua_cabinet_retained','USAGE') OR has_schema_privilege('ua_cabinet_delivery','ua_cabinet_retained','USAGE')
+      OR has_table_privilege('ua_cabinet_stage','ua_cabinet_retained.media','SELECT') OR has_table_privilege('ua_cabinet_delivery','ua_cabinet_retained.invite_delivery','SELECT')
+      OR has_function_privilege('ua_cabinet_stage','ua_private.assert_deletion_writable(text,jsonb)','EXECUTE')
+      OR EXISTS(SELECT FROM pg_policy WHERE polrelid IN (SELECT oid FROM pg_class WHERE relnamespace='ua_private'::regnamespace) AND polname LIKE 'cabinet_stage_%')
+      THEN RAISE EXCEPTION 'Staging capability survived withdrawal'; END IF;
+   RETURN;
+ END IF;
+ IF (SELECT nspowner FROM pg_namespace WHERE nspname='ua_cabinet') IS DISTINCT FROM 'ua_owner'::regrole::oid OR
+   (SELECT count(*) FROM pg_class WHERE relnamespace='ua_cabinet'::regnamespace AND relkind='r' AND relowner='ua_owner'::regrole)<>8
+   OR (SELECT proowner FROM pg_proc WHERE oid='ua_cabinet.forget_private_start()'::regprocedure) IS DISTINCT FROM 'ua_owner'::regrole::oid THEN RAISE EXCEPTION 'Unexpected supplemental ownership'; END IF;
+ IF (SELECT count(*) FROM pg_roles WHERE rolname IN('ua_cabinet_stage','ua_cabinet_delivery') AND NOT rolcanlogin AND NOT rolinherit AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication)<>2
+    OR NOT has_function_privilege('ua_cabinet_stage','ua_private.assert_deletion_writable(text,jsonb)','EXECUTE')
+    OR NOT has_function_privilege('ua_cabinet_stage','ua_private.assert_deletion_staff_writable(jsonb,jsonb)','EXECUTE')
+    OR NOT has_function_privilege('ua_cabinet_stage','ua_private.ratio_shape(jsonb)','EXECUTE')
+    OR NOT has_table_privilege('ua_cabinet_stage','ua_cabinet.media','INSERT') OR NOT has_column_privilege('ua_cabinet_delivery','ua_cabinet.invite_delivery','claimed_at','UPDATE')
+    THEN RAISE EXCEPTION 'Incomplete service role ACL'; END IF;
+ -- Inspector roles such as pg_read_all_data remain an existing administrative capability.
+ -- Reject grants to PUBLIC or other grantees on the newly created private objects.
+ IF EXISTS(SELECT FROM pg_namespace n CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.oid='ua_cabinet'::regnamespace
+           AND a.grantee NOT IN('ua_owner'::regrole,'ua_cabinet_stage'::regrole,'ua_cabinet_delivery'::regrole))
+    OR EXISTS(SELECT FROM pg_class c CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE c.relnamespace='ua_cabinet'::regnamespace AND c.relkind='r'
+           AND a.grantee NOT IN('ua_owner'::regrole,'ua_cabinet_stage'::regrole,'ua_cabinet_delivery'::regrole))
+    OR EXISTS(SELECT FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid='ua_cabinet.forget_private_start()'::regprocedure AND a.grantee<>p.proowner)
+    THEN RAISE EXCEPTION 'Unexpected private object exposure'; END IF;
+ FOREACH app IN ARRAY ARRAY['anon','authenticated','service_role','ua_api_login','ua_runtime'] LOOP
+   IF to_regrole(app) IS NOT NULL AND (pg_has_role(app,'ua_cabinet_stage','MEMBER') OR pg_has_role(app,'ua_cabinet_delivery','MEMBER')
+      OR has_schema_privilege(app,'ua_cabinet','USAGE')) THEN RAISE EXCEPTION 'Existing client acquired a staging capability: %',app; END IF;
+ END LOOP;
+END $verify$;

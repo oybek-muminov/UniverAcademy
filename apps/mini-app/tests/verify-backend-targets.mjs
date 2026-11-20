@@ -723,6 +723,7 @@ for (const file of brand.files) {
 const STAGING_OVERLAY_SHA256 = '68b0bd4a828aeede2f211ed45fb2fafeb645197ae2ba9278280b583b4cdbf7a6';
 const REGISTRATION_OVERLAY_SHA256 = '4a71790fcf1f584065ccadcee06452edc2ca67ad3179f02f6a541ac93d34ef09';
 const PROFILE_RELEASE_OVERLAY_SHA256 = '8b875d66e42c0705192d6836c9e52570bf27143f941e7a7aa01d3efd0de9a249';
+const LIVE_OVERLAY_SHA256 = '876c8c64421b09ad35f0ffefbc79bbca24184029fd499a922836997e5783e514';
 function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
   const raw = readTarget('apps/mini-app/tests/fixtures/' + filename);
   assert.equal(sha256(raw), expectedHash, diagnostic + '_OVERLAY_MISMATCH');
@@ -741,6 +742,7 @@ function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
 applySourceTransition('teacher-staging-overlay.json', STAGING_OVERLAY_SHA256, 'ce9bade40533020117cdc111b20b7763ef6d0e59', 'STAGING');
 applySourceTransition('registration-storage-overlay.json', REGISTRATION_OVERLAY_SHA256, 'deb3636755c2f5b222dc3460e8e410aaa37c1fc5', 'REGISTRATION');
 applySourceTransition('profile-release-order-overlay.json', PROFILE_RELEASE_OVERLAY_SHA256, 'd19fe4f9483586fe29f1ab54b34a9377f743ce7a', 'PROFILE_RELEASE');
+applySourceTransition('teacher-live-overlay.json', LIVE_OVERLAY_SHA256, 'aecead4fda3c4e518a5e3eb47b0536d8f4619a52', 'LIVE');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

@@ -11,3 +11,12 @@ O‘qituvchining shaxsiy taklifi bazaga navbat yozuvi sifatida tushadi. Telegram
 - `sent` Telegram javobidagi chat va xabar raqami tasdiqlanganini anglatadi. `retry` Telegram belgilagan kutish vaqtidan keyin navbatga qaytadi. `unconfirmed` yoki yuborish orasida uzilish yuz bersa, o‘sha xabarni qo‘lda tekshiring. Qabul qilingan bo‘lishi mumkin bo‘lgan xabar avtomatik takrorlanmaydi. `rejected` bo‘lsa, bot bloklanganini yoki chatga yuborish mumkinligini tekshiring. `empty` tayyor xabar yo‘qligini bildiradi.
 
 Bayroqlar odatda o‘chiq. Jadval va provider sozlamalarini staging egasi alohida tanlaydi.
+
+## API Worker orqali avtomatik yuborish
+
+1. Tasdiqlangan bazada `ua_cabinet.private_starts`, `ua_cabinet.invites`, `ua_cabinet.invite_delivery` va `ua_cabinet_delivery` roli mavjudligini tekshiring. API Worker’dagi alohida `TEACHER_PILOT_HYPERDRIVE` shu bazaga ulanadi. Uning loginiga `SET ROLE ua_cabinet_delivery` huquqi kerak. Hyperdrive’da bazagacha TLS tekshiruvini yoqing va so‘rov keshini o‘chiring.
+2. Yuqoridagi private-start binding va bayroqlarni ulang. O‘quvchi o‘z Telegramini kabinetiga bog‘laydi va botdagi shaxsiy chatda `/start` yuboradi. O‘qituvchining `sendInvite` javobidagi `queued` shu o‘quvchi uchun taklif navbatga tushganini bildiradi.
+3. API Worker’da `UA_CABINET_STUDENT_ORIGIN`ni tasdiqlangan Mini App originiga o‘rnating. Shu origin `UA_ALLOWED_ORIGINS` ro‘yxatida bo‘lishi kerak. Operator avtomatik yuborishga ruxsat bergach, `UA_TELEGRAM_PILOT_DISPATCH_ENABLED=true`ni yoqadi. Handler xabar jo‘natish uchun shu API Worker’dagi mavjud `UA_TELEGRAM_BOT_TOKEN` siridan foydalanadi.
+4. API Worker’ning `scheduled` handleriga egasi tanlagan Cron Trigger’ni ulang. Har chaqiruv navbatdagi bitta tayyor taklifni qayta ishlaydi. Masalan, har daqiqalik jadval bir daqiqada bitta taklifni yuborishga urinadi. Birinchi yuborishda navbat yozuvi `sent`ga o‘tganini va o‘quvchi bot xabaridagi tugma orqali o‘z kabinetida taklifni qabul qilganini tekshiring.
+
+`retry` yozuvlari Telegram belgilagan vaqtdan keyin qayta olinadi. `claimed` holatida qolgan yoki `unconfirmed` yozuv uchun operator Telegramdagi natijani tekshiradi. Avtomatik yuborishni to‘xtatish uchun API Worker’da dispatch bayrog‘ini o‘chiring va unga biriktirilgan Cron Trigger’ni olib tashlang.

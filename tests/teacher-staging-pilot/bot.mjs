@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomInt } from 'node:crypto';
 import { createReturningBotWorker } from '../../apps/telegram-bot/src/returning-worker.mjs';
-import { dispatchStagingInvite } from '../../apps/telegram-bot/src/staging-invite-dispatch.mjs';
+import { createInviteSchedule } from '../../runtime/cloudflare-invite-schedule.mjs';
 import { studentOrigin } from './requests.mjs';
 
-export function testBot(directory) {
+export function testBot(directory, deliveryUrl) {
   const secret=randomBytes(24).toString('base64url');
   const worker=createReturningBotWorker();
   const ends={cabinet:studentOrigin+'/',signIn:studentOrigin+'/sign-in'};
@@ -27,11 +27,18 @@ export function testBot(directory) {
     assert.equal(message.chat_id,telegramUserId);
     return new URL(message.reply_markup.inline_keyboard[0][0].web_app.url);
   }
-  return {start,async dispatch(delivered) {
-    return dispatchStagingInvite(directory,async(method,input)=>{
-      assert.equal(method,'sendMessage');
-      delivered.push(input);
-      return {kind:'ok',result:{chat:{id:input.chat_id},message_id:42}};
-    },ends);
-  }};
+  function schedule(reply) {
+    const testToken = '17:' + randomBytes(24).toString('hex');
+    const scheduled = createInviteSchedule({ fetcher: async (url, init) => {
+      assert.equal(url, 'https://api.telegram.org/bot' + testToken + '/sendMessage');
+      assert.equal(init.method, 'POST');
+      return reply(JSON.parse(init.body));
+    } });
+    return () => scheduled({}, {
+      UA_TELEGRAM_PILOT_DISPATCH_ENABLED: 'true', UA_TELEGRAM_BOT_TOKEN: testToken,
+      UA_CABINET_STUDENT_ORIGIN: studentOrigin, UA_ALLOWED_ORIGINS: JSON.stringify([studentOrigin]),
+      TEACHER_PILOT_HYPERDRIVE: { connectionString: deliveryUrl }
+    });
+  }
+  return { start, schedule };
 }

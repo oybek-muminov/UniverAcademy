@@ -17,8 +17,16 @@ const deny=()=>{throw unavailable();};
 // to make the existing composition shape look ready for scoring operations.
 const unavailableNumbers=Object.freeze({policyId:"registration-only-scoring-unavailable",
   toFiniteNumber:deny,toDisplayString:deny,toStudentPointsDisplayString:deny});
+// These bindings share the API Worker with registration. Only the pilot route,
+// directory RPC and scheduled handler consume their own values.
+const pilotEnvironmentKeys=[
+  "UA_CABINET_STAGING_ENABLED","UA_CABINET_STAGING_NODE_ORIGIN","UA_CABINET_STAGING_PROXY_SECRET",
+  "UA_CABINET_STUDENT_ORIGIN","UA_TELEGRAM_PILOT_DIRECTORY_ENABLED","UA_TELEGRAM_PILOT_DISPATCH_ENABLED",
+  "TEACHER_PILOT_HYPERDRIVE",
+];
 const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
-  "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS",...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys];
+  "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS","UA_TELEGRAM_START_MODE",
+  ...pilotEnvironmentKeys,...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys];
 const policyKeys=["initDataMaxAgeSeconds","futureSkewSeconds","accessTtlMs",
   "familyTtlMs","logoutTombstoneMs","identityCollisionAttempts","newLogin"];
 

@@ -84,7 +84,7 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
   const student=routes(router,'student',byId.token),invitee=routes(router,'student',byInvite.token);
   const bystander=routes(router,'student',outsider.token);
   const directory=createStagingInviteDeliveryStore({pool:deliveryPool});
-  const bot=testBot(directory);
+  const bot=testBot(directory,deliveryUrl);
   const scalar=async (sql,values=[])=>Number((await db.query(sql,values)).rows[0].n);
   let group,invitation,media,draft,assignment,attempt,answerId;
   await t.test('issuer, subject, opaque families and database roles determine separate access',async()=>{
@@ -144,8 +144,12 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     const [first,again]=await Promise.all([good(teacher.command('sendInvite',input,key)),good(teacher.command('sendInvite',input,key))]);
     assert.equal(first.token,again.token);assert.equal(first.delivery,'queued');
     const delivered=[];
-    const statuses=await Promise.all([bot.dispatch(delivered),bot.dispatch(delivered)]);
-    assert.deepEqual(statuses.sort(),['empty','sent']);
+    const tick=bot.schedule(payload=>{
+      delivered.push(payload);
+      return Response.json({ok:true,result:{chat:{id:payload.chat_id},message_id:42}});
+    });
+    await Promise.all([tick(),tick()]);
+    assert.equal(await scalar("SELECT count(*) n FROM ua_cabinet.invite_delivery WHERE token=$1 AND status='sent'",[first.token]),1);
     assert.equal(delivered.length,1);assert.equal(delivered[0].chat_id,byInvite.telegramId);
     const target=new URL(delivered[0].reply_markup.inline_keyboard[0][0].web_app.url);
     assert.equal(target.origin,studentOrigin);
@@ -157,6 +161,25 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     assert.equal(a.id,group.id);assert.equal(b.id,group.id);
     assert.equal(await scalar('SELECT count(*) n FROM ua_private.memberships WHERE active AND affinity_group_id=$1',[group.id]),2);
     assert.equal(await scalar('SELECT count(*) n FROM ua_cabinet.redemptions WHERE student_id=$1',[byInvite.id]),1);
+  });
+
+  await t.test('scheduled delivery delays a Telegram rate limit and keeps an ambiguous send out of future ticks',async()=>{
+    const target=await good(teacher.command('sendInvite',{groupId:group.id,univeracademy_id:byInvite.cabinetId}));
+    const sends=[];
+    const tick=bot.schedule(payload=>{
+      sends.push(payload.chat_id);
+      if(sends.length===1) return Response.json({ok:false,error_code:429,parameters:{retry_after:60}},{status:429});
+      throw Error('lost provider response');
+    });
+    await tick();
+    await tick();
+    assert.deepEqual(sends,[byInvite.telegramId]);
+    assert.equal(await scalar("SELECT count(*) n FROM ua_cabinet.invite_delivery WHERE token=$1 AND status='retry' AND available_at>clock_timestamp()",[target.token]),1);
+    await db.query("UPDATE ua_cabinet.invite_delivery SET available_at=clock_timestamp() WHERE token=$1",[target.token]);
+    await tick();
+    await tick();
+    assert.deepEqual(sends,[byInvite.telegramId,byInvite.telegramId]);
+    assert.equal(await scalar("SELECT count(*) n FROM ua_cabinet.invite_delivery WHERE token=$1 AND status='unconfirmed'",[target.token]),1);
   });
 
   await t.test('rich test import, teacher preview, publish and group assignment preserve private question assets',async()=>{

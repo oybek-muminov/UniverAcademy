@@ -30,6 +30,8 @@ jobs:
       - run: node --test apps/mini-app/tests/path-containment.test.mjs
       - run: npm ci --prefix tests/account-deletion/tooling --no-audit --no-fund
       - run: npm ci --ignore-scripts --prefix apps/mini-app --no-audit --no-fund
+      - run: npm ci --ignore-scripts --prefix tests/teacher-local-pilot/tooling --no-audit --no-fund
+      - run: node --test tests/teacher-staging-pilot/*.test.mjs apps/mini-app/tests/student-pilot-coexistence.test.mjs apps/mini-app/tests/staging-student-port.test.mjs
       - run: node --test tests/enrollment/profile-release-order.test.mjs
         env:
           UA_REQUIRE_PROFILE_RELEASE_HISTORY: '1'

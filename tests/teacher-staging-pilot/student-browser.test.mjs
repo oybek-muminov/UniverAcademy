@@ -31,17 +31,17 @@ test('normal ready StudentApp accepts a scoped invitation and saves and submits 
   const {createElement}=mini('react'),{createRoot}=mini('react-dom/client');
   const {StudentApp}=await import('../../apps/mini-app/src/student-app.tsx');
   const {StudentFlow}=await import('../../apps/mini-app/src/flow.ts');
-  const group={id:'g',name:'Fizika'}, score={title:'Harakat',attemptId:'a',earned:'1.0',maximum:'1.0',percentage:'100.00'};
+  const group={id:'g',name:'Fizika',status:'active'}, score={title:'Harakat',attemptId:'a',earned:'1.0',maximum:'1.0',percentage:'100.00'};
   const data={role:'student',person_id:person,univeracademy_id:'0123456789',name:'Ali',group:null,assignments:[],results:[]};
   const testAttempt={id:'a',status:'in_progress',deadlineAt:new Date(Date.now()+60000).toISOString(),answers:[],questions:[{
     id:'q',prompt_blocks:[{type:'text',markdown:'Tezlik?'},{type:'formula',latex:'v=s/t',display:'inline'}],
     options:[{id:'y',blocks:[{type:'text',markdown:'5 m/s'}]}],
   },{id:'q2',prompt_blocks:[{type:'text',markdown:'Ikkinchi savol'}],options:[{id:'z',blocks:[{type:'text',markdown:'Soniyalar'}]}]}]};
-  const seen=[];
+  const seen=[];let dashboardReply=()=>Response.json({data});
   const port=createStagingStudentPort({baseUrl:'https://api.example.org/api/v1',person,current:()=>person,access:fn=>fn('account-proof-in-memory'),
     fetcher: async req=>{
       const path=new URL(req.url).pathname.split('/').at(-1);seen.push(path);assert.equal(req.headers.get('authorization'),'Bearer account-proof-in-memory');
-      if(path==='dashboard')return Response.json({data});
+      if(path==='dashboard')return dashboardReply();
       const body=await req.json();assert(req.headers.get('Idempotency-Key'));
       if(path==='acceptInvite'){assert.deepEqual(body,{token});data.group=group;data.assignments=[{id:'assignment',title:'Harakat',attemptId:null,status:'available'}];return Response.json({data:group});}
       if(path==='startAttempt'){data.assignments[0].status='in_progress';data.assignments[0].attemptId='a';return Response.json({data:testAttempt});}
@@ -49,15 +49,25 @@ test('normal ready StudentApp accepts a scoped invitation and saves and submits 
       if(path==='saveAnswer'){assert.deepEqual(body,{attemptId:'a',questionId:'q',optionId:'y',expectedRevision:0});const row={questionId:'q',optionId:'y',revision:1};testAttempt.answers=[row];return Response.json({data:row});}
       assert.equal(path,'submitAttempt');data.assignments[0].status='submitted';data.results=[score];return Response.json({data:score});
     }});
-  const flow=new StudentFlow({stagingPilot:expected=>{assert.equal(expected,person);return port}});
-  flow.patch({screen:'exams',student:{person,displayId:'0123456789',firstName:'Ali',lastName:'S',registrationComplete:true}});
+  const student=()=>({person,activeGroupId:data.group?.id??null,displayId:'0123456789',firstName:'Ali',lastName:'S',registrationComplete:true});
+  const flow=new StudentFlow({stagingPilot:expected=>{assert.equal(expected,person);return port},profile:async()=>student(),exams:async()=>[ordinary,overlap]});
+  const ordinary={id:'ordinary',title:'Oddiy imtihon',group:'Fan',count:4,durationLabel:'5 daqiqa'};
+  const overlap={...ordinary,id:'assignment',title:'Oddiy manbada ham mavjud'};
+  flow.patch({screen:'exams',exams:[ordinary,overlap],student:student()});
   const root=createRoot(document.querySelector('#root'));
   mountedRoot=root;
   root.render(createElement(StudentApp,{studentFlow:flow,mode:'telegram',stagingPilot:true}));
   async function until(read){for(let i=0;i<250;i++){const found=read();if(found)return found;await delay(10);}throw Error('Student DOM timeout: '+document.body.textContent);}
   const button=label=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent===label&&!b.disabled);
   const click=async label=>(await until(()=>button(label))).click();
-  await click('Taklifni qabul qilish');await click('Testni boshlash');
+  await until(()=>button('Taklifni qabul qilish'));
+  assert(document.body.textContent.includes(ordinary.title));
+  assert(document.body.textContent.includes(overlap.title));
+  assert(!button('Testni boshlash'));
+  await click('Taklifni qabul qilish');await until(()=>button('Testni boshlash'));
+  assert(document.body.textContent.includes(ordinary.title));
+  assert(!document.body.textContent.includes(overlap.title));
+  await click('Testni boshlash');
   assert(!seen.includes('startAttempt'));await click('Ortga');await click('Testni boshlash');await click('Ha, boshlash');
   await until(()=>document.querySelector('math'));assert(!location.search.includes('invite'));
   (await until(()=>document.querySelector('input[type=radio]'))).click();
@@ -71,4 +81,29 @@ test('normal ready StudentApp accepts a scoped invitation and saves and submits 
   await click('Testni yakunlash');assert(!seen.includes('submitAttempt'));await click('Testga qaytish');assert(!seen.includes('submitAttempt'));await click('Testni yakunlash');await click('Ha, javoblarni yuborish');
   await until(()=>document.body.textContent.includes('100.00%'));assert(seen.includes('resumeAttempt'));
   assert(!document.body.textContent.includes('Sinov hisobiga'));
+  await click('Kabinetga qaytish');
+  dashboardReply=()=>Response.json({data:{...data,person_id:'another',group:{...group,name:'Begona guruh'}}});
+  await click('Guruhni yangilash');await until(()=>document.body.textContent.includes(overlap.title));
+  assert(!document.body.textContent.includes('Begona guruh'));
+  assert(!button('Testni boshlash'));
+  // An ID-enrolled student discovers the group directly, without the invitation in the URL.
+  dashboardReply=()=>Response.json({data});
+  await click('Guruhni yangilash');
+  await until(()=>document.body.textContent.includes('Guruh testlari'));
+  assert(!document.body.textContent.includes(overlap.title));
+  assert(document.body.textContent.includes(ordinary.title));
+  // Removing membership drops group content and restores overlapping ordinary exam IDs.
+  dashboardReply=()=>Response.json({data:{...data,group:null}});
+  await click('Guruhni yangilash');
+  await until(()=>document.body.textContent.includes(overlap.title));
+  assert(!document.body.textContent.includes('Guruhim'));
+  assert(!document.body.textContent.includes('Harakat'));
+  const before=seen.length;
+  data.group=null;
+  await click('Testlar ro‘yxatini yangilash');await delay(50);
+  assert.equal(seen.length,before,'ordinary refresh of an ungrouped student never probes the pilot');
+  data.group=group;
+  dashboardReply=()=>Response.json({data});
+  await click('Testlar ro‘yxatini yangilash');await until(()=>document.body.textContent.includes('Guruh testlari'));
+  assert(!location.search.includes('invite'));
 });

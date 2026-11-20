@@ -1,4 +1,4 @@
-import {createStagingStudentPort} from './staging-student-port.ts';
+import {createStagingStudentPort,readStagingInvite} from './staging-student-port.ts';
 import {createDeletionHttpPort} from './account-deletion-candidate/http-port.ts';
 import {createPublicRecoveryStatus} from './account-deletion-candidate/recovery-status-port.ts';
 import type {DeletionPort} from './account-deletion-candidate/controller.ts';
@@ -98,17 +98,36 @@ export function createOwnerPort(options: OwnerPortOptions) {
       },
     },
   });
+  // Keep only this connection's last authorized membership hint. It can avoid
+  // a pilot discovery request, and cannot authorize any group read or write.
+  let ungroupedPerson:string|null = null;
+  function projectProfile(profile:StudentSchema['Profile']) {
+    ungroupedPerson = transport.person() === profile.person_id && profile.active_group_id === null ? profile.person_id : null;
+    return {...mapper.profile(profile),activeGroupId:profile.active_group_id};
+  }
   const context = (assignmentId: string, metadata?: StudentSchema['Meta']) => ({ assignmentId, ...options.view(assignmentId, metadata) });
+  const stagingPilot = options.mode === 'production' && options.stagingPilotEnabled ?
+    (person:string) => createStagingStudentPort({baseUrl:options.baseUrl, person, current:transport.person, access:transport.withAccess, fetcher}) : undefined;
   const port: StudentPort = {
-    ...(options.mode === 'production' && options.stagingPilotEnabled ? {stagingPilot: (person:string) => createStagingStudentPort({
-      baseUrl:options.baseUrl, person, current:transport.person, access:transport.withAccess, fetcher,
-    })} : {}),
-    profile: () => transport.withAccess(async access => mapper.profile((await call(client => client.me(access))).data)),
+    ...(stagingPilot ? {stagingPilot} : {}),
+    profile: () => transport.withAccess(async access => (await call(client => client.me(access))).data).then(projectProfile),
     register: (firstName, lastName) => transport.withAccess(async access =>
-      mapper.profile((await call(client => client.updateProfile(access, { first_name: firstName, last_name: lastName }))).data), true),
-    // The staging group panel reads its own authenticated dashboard after profile admission.
-    exams: () => options.stagingPilotEnabled && options.mode === 'production' ? Promise.resolve([]) : transport.withAccess(async access => (await call(client => client.exams(access))).data.map(meta =>
-      mapper.exam(meta, context(meta.assignment_id, meta)))),
+      (await call(client => client.updateProfile(access, { first_name: firstName, last_name: lastName }))).data, true).then(projectProfile),
+    async exams() {
+      const person = transport.person();
+      try {
+        return await transport.withAccess(async access => (await call(client => client.exams(access))).data
+          .map(meta => mapper.exam(meta, context(meta.assignment_id, meta))));
+      } catch (error) {
+        // Registration-only deployments can lack GET /exams. A signed-in pilot
+        // participant or invitee can still reach the separate group panel.
+        if (!stagingPilot || !person || !(error instanceof StudentFailure) || error.kind !== 'missing' || error.code !== 'NOT_FOUND') throw error;
+        if (ungroupedPerson === person && !readStagingInvite()) throw error;
+        const dashboard = await stagingPilot(person).dashboard();
+        if (dashboard.group?.status === 'active' || readStagingInvite()) return [];
+        throw error;
+      }
+    },
     current: assignmentId => transport.withAccess(async access => {
       const meta = (await call(client => client.exam(access, assignmentId))).data;
       const attemptId = meta.series.current_attempt_id;

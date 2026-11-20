@@ -2,6 +2,7 @@ import {withTelegramMenuCompletion} from './telegram-menu-completion.mjs';
 import {WorkerEntrypoint} from 'cloudflare:workers';
 import api from './cloudflare-entry.mjs';
 import {createTelegramDirectory} from './cloudflare-telegram-directory.mjs';
+import {createInviteSchedule} from './cloudflare-invite-schedule.mjs';
 
 const directory=createTelegramDirectory(); // Inert factory; no client/config read.
 // Bind the Bot to THIS named entrypoint, never the public/default fetch export.
@@ -20,4 +21,4 @@ export class TelegramPilotDirectory extends WorkerEntrypoint {
   }
   async fetch() { return new Response(null, {status:404}); }
 }
-export default withTelegramMenuCompletion(api);
+export default {...withTelegramMenuCompletion(api), scheduled:createInviteSchedule()};

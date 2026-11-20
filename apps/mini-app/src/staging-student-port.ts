@@ -10,7 +10,7 @@ export type PilotAttempt = {
 };
 export type PilotResult = {attemptId?:string; title?:string; earned:string; maximum:string; percentage:string};
 export type PilotDashboard = {
-  role:'student'; person_id:string; univeracademy_id:string; name:string; group:{id:string;name:string}|null;
+  role:'student'; person_id:string; univeracademy_id:string; name:string; group:{id:string;name:string;status:string}|null;
   assignments:{id:string;title:string;attemptId:string|null;status:string}[]; results:PilotResult[];
 };
 export type PilotCommands = {
@@ -23,6 +23,13 @@ type Access = <T>(action:(access:string)=>Promise<T>,mutation?:boolean)=>Promise
 const actions: ReadonlySet<string> = new Set(['acceptInvite','startAttempt','resumeAttempt','saveAnswer','submitAttempt']);
 const failures:Record<number,FailureKind> = {401:'auth',403:'forbidden',404:'missing',409:'conflict',410:'conflict',422:'validation',429:'limited'};
 const invalid = () => new StudentFailure('protocol','RESPONSE_INVARIANT_FAILED');
+// The URL is an invitation intent. Membership is established by the authenticated server.
+export function readStagingInvite(url = globalThis.location?.href):string|null {
+  if (!url) return null;
+  const values = new URL(url).searchParams.getAll('invite');
+  const token = values[0];
+  return values.length === 1 && token.length === 36 && /^grp_[A-Za-z0-9_-]{32}$/.test(token) ? token : null;
+}
 export function createStagingStudentPort(config: {
   baseUrl:string; person:string; current:()=>string|null; access:Access; fetcher:(request:Request)=>Promise<Response>;
 }) {
@@ -43,7 +50,10 @@ export function createStagingStudentPort(config: {
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         const code = typeof error?.error?.code === 'string' ? error.error.code : 'UNCONFIRMED';
-        throw new StudentFailure(failures[response.status] ?? 'temporary',code);
+        // A misconfigured optional gateway must not revoke a working ordinary session.
+        const kind = response.status === 401 && !['SESSION_REVOKED','CLERK_SESSION_REVOKED','APP_SESSION_EXPIRED'].includes(code)
+          ? 'forbidden' : failures[response.status] ?? 'temporary';
+        throw new StudentFailure(kind,code);
       }
       const data = await decode(response);
       check();
@@ -59,6 +69,12 @@ export function createStagingStudentPort(config: {
     async dashboard() {
       const value = await call('dashboard',json<PilotDashboard>);
       if (value.role !== 'student' || value.person_id !== config.person || !Array.isArray(value.assignments) || !Array.isArray(value.results)) throw invalid();
+      if (value.group !== null && (!value.group || typeof value.group.id !== 'string' || !value.group.id ||
+          typeof value.group.name !== 'string' || !value.group.name || typeof value.group.status !== 'string')) throw invalid();
+      if (value.assignments.some(row => !row || typeof row.id !== 'string' || !row.id || typeof row.title !== 'string' ||
+          typeof row.status !== 'string' || !(row.attemptId === null || typeof row.attemptId === 'string')) ||
+          value.results.some(row => !row || typeof row.earned !== 'string' || typeof row.maximum !== 'string' || typeof row.percentage !== 'string' ||
+          (row.title !== undefined && typeof row.title !== 'string') || (row.attemptId !== undefined && typeof row.attemptId !== 'string'))) throw invalid();
       return value;
     },
     command<K extends keyof PilotCommands>(action:K, body:PilotCommands[K][0], key:string):Promise<PilotCommands[K][1]> {

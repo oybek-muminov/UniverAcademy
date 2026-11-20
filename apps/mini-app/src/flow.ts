@@ -7,7 +7,7 @@ export const lifecycleLabel: Record<Lifecycle, string> = {
   ready: 'Qayta urinish tayyor', in_progress: 'Davom etmoqda', submitted: 'Topshirilgan',
   expired: 'Vaqti tugagan', forced: 'Majburiy yakunlangan', cancelled: 'Bekor qilingan', recovery_lapsed: 'Qayta urinish oynasi tugagan',
 };
-export type Student = { person: string; firstName: string; lastName: string; displayId: string; registrationComplete: boolean };
+export type Student = { person: string; firstName: string; lastName: string; displayId: string; registrationComplete: boolean; activeGroupId?: string|null };
 export type DisplayBlock = { kind: 'text'; text: string } | { kind: 'formula'; latex: string; display: 'inline' | 'block' } |
   { kind: 'image'; assetId: string; url: string; expiresAt: string; contentType: string; alt: string; caption: string | null };
 export type SeriesView = { currentAttemptId: string | null; generation: number; officialResultAttemptId: string | null; recovery: 'none' | 'ready' | 'active' | 'lapsed' };
