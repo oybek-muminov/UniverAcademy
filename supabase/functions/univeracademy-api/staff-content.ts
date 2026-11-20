@@ -17,24 +17,30 @@ function editable(record: DraftRecord, expected: number): void {
   if (record.wire.revision !== expected) fail("RESOURCE_REVISION_CONFLICT", 409);
   if (record.wire.status !== "draft" || record.publishedSnapshot) fail("VERSION_FROZEN", 409);
 }
-function contentChecks(q: AuthoredQuestion): void {
+type VerifyImage = (assetId: string) => void;
+function checkImages(blocks: AuthoredQuestion["prompt_blocks"], verify?: VerifyImage): void {
+  for (const block of blocks) {
+    if (block.type !== "image") continue;
+    if (!verify) fail("SERVICE_UNAVAILABLE", 503);
+    verify(block.asset_id);
+  }
+}
+function contentChecks(q: AuthoredQuestion, verify?: VerifyImage): void {
   if (!Number.isSafeInteger(q.position)) fail("SERVICE_UNAVAILABLE", 503);
   const options = q.options.map((o) => o.id);
   if (options.length !== 4 || new Set(options).size !== 4 || !options.includes(q.correct_option_id))
     fail("INVALID_OPTION", 422);
-  if ([...q.prompt_blocks, ...q.explanation_blocks, ...q.options.flatMap((o) => o.blocks)]
-      .some((block) => block.type === "image")) fail("SERVICE_UNAVAILABLE", 503);
-  // No media validator/store is connected in this local candidate. No asset is silently trusted.
+  checkImages([...q.prompt_blocks, ...q.explanation_blocks, ...q.options.flatMap((o) => o.blocks)], verify);
   if (q.individual_points != null) parseIndividualQuestionPoints(q.individual_points);
 }
 
 // Caller already holds current staff/content authorization and the version transaction lock.
 export function writeDraftQuestion(state: StaffState, record: DraftRecord, body: QuestionWrite,
-  key: string, payload: string, actorId: string, now: number): Version {
+  key: string, payload: string, actorId: string, now: number, verify?: VerifyImage): Version {
   const prior = replay(state, record, key, payload);
   if (prior) return prior;
   editable(record, body.expected_revision);
-  contentChecks(body);
+  contentChecks(body, verify);
   if (Object.values(record.questions ?? {}).some((q) => q.id !== body.id && q.position === body.position))
     fail("VALIDATION_ERROR", 422);
   const { expected_revision: _, ...question } = body;
@@ -47,7 +53,8 @@ export function writeDraftQuestion(state: StaffState, record: DraftRecord, body:
 }
 
 export function publishDraft(state: StaffState, record: DraftRecord, body: Publish, key: string,
-  payload: string, actorId: string, now: number, validate: (schema: string, value: unknown) => boolean): Version {
+  payload: string, actorId: string, now: number, validate: (schema: string, value: unknown) => boolean,
+  verify?: VerifyImage): Version {
   const prior = replay(state, record, key, payload);
   if (prior) return prior;
   editable(record, body.expected_revision);
@@ -57,11 +64,11 @@ export function publishDraft(state: StaffState, record: DraftRecord, body: Publi
     const q = record.questions?.[id];
     if (!q || q.id !== id || !validate("QuestionWrite", { ...q, expected_revision: body.expected_revision }))
       fail("INVALID_GRADING_CONFIG", 422);
-    contentChecks(q);
+    contentChecks(q, verify);
     return q;
   }).sort((a, b) => a.position - b.position);
   if (new Set(questions.map((q) => q.position)).size !== questions.length) fail("VALIDATION_ERROR", 422);
-  if (record.wire.instructions_blocks.some((b) => b.type === "image")) fail("SERVICE_UNAVAILABLE", 503);
+  checkImages(record.wire.instructions_blocks, verify);
   const durationMs = record.wire.duration_seconds * 1000;
   if (!Number.isSafeInteger(durationMs)) fail("SERVICE_UNAVAILABLE", 503);
   const individualEnabled = record.wire.grading_config.individual_enabled;

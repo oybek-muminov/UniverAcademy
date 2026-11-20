@@ -8,6 +8,9 @@
   },
   "scripts": {
     "start": "node runtime/configured-server.mjs",
+    "start:teacher-pilot": "node runtime/teacher-local-pilot.mjs",
+    "test:teacher-pilot-dom": "node tests/teacher-local-pilot/dom.mjs",
+    "test:teacher-pilot": "node --test tests/teacher-local-pilot/*.test.mjs",
     "test": "node --test tests/local-content-pilot.test.mjs",
     "test:backend-flow": "node --test tests/local-content-pilot.test.mjs",
     "setup:validator": "npm ci --ignore-scripts --prefix tests/backend/validator/tooling",

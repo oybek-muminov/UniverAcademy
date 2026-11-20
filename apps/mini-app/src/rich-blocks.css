@@ -1,0 +1,31 @@
+.pilot-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pilot-formula, .pilot-formula-block {
+  display: inline-block;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+
+.pilot-formula-block, .pilot-media, .pilot-caption {
+  display: block;
+  margin-block: .4rem;
+}
+
+.pilot-media img {
+  max-inline-size: 100%;
+  max-block-size: 24rem;
+  height: auto;
+  object-fit: contain;
+}
+
+.pilot-caption, .pilot-media-error {
+  font-size: .9em;
+}
+
+fieldset, .option > span {
+  min-inline-size: 0;
+}

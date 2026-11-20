@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>O‘qituvchi kabineti · UniverAcademy</title>
+  <link rel="stylesheet" href="/pilot/vendor/katex.min.css">
+  <link rel="stylesheet" href="/pilot/rich-blocks.css">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./teacher.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Asosiy bo‘limga o‘tish</a>
+  <header class="masthead">
+    <div class="wrap header-row">
+      <div class="identity"><span class="brand">UniverAcademy</span><span class="product">O‘qituvchi kabineti</span></div>
+      <div class="identity account"><span id="identity-name"></span><span class="local">Mahalliy sinov</span></div>
+    </div>
+  </header>
+  <div class="wrap layout">
+    <nav aria-label="Kabinet bo‘limlari">
+      <a href="#guruhlar" aria-current="page">Guruhlar</a>
+      <a href="#testlar">Testlar</a>
+      <a href="#natijalar">Natijalar</a>
+    </nav>
+    <main id="main" tabindex="-1">
+      <div id="notice" role="status" aria-live="polite"></div>
+      <div id="problem" role="alert"></div>
+      <section id="guruhlar" class="page">
+        <div class="page-heading"><h1>Guruhlar</h1><button type="button" id="refresh-groups">Yangilash</button></div>
+        <div class="card">
+          <h2>Guruh yaratish</h2>
+          <form id="group-form" class="line-form">
+            <label>Guruh nomi<input id="group-name" name="group" maxlength="100" placeholder="Masalan, Fizika · 1-guruh" required autocomplete="off"></label>
+            <button class="primary" type="submit">Guruh yaratish</button>
+          </form>
+        </div>
+        <p class="pilot-links"><a href="/admin/" target="_blank" rel="noopener">Mahalliy Admin sahifasi</a><a href="/student/" target="_blank" rel="noopener">Mahalliy o‘quvchi kabineti</a></p>
+        <div class="card">
+          <h2>Guruh a’zolari</h2>
+          <div id="group-empty" class="empty">O‘quvchi qo‘shish uchun avval guruh yarating.</div>
+          <div id="group-content" hidden>
+            <label>Guruh<select id="member-group"></select></label>
+            <p id="group-status" class="hint"></p>
+            <form id="member-form" class="line-form">
+              <label>O‘quvchining UniverAcademy ID raqami<input id="student-number" name="student_id" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" required autocomplete="off" placeholder="10 xonali raqam"></label>
+              <div class="actions"><button type="submit">O‘quvchi qo‘shish</button><button type="submit" name="intent" value="send">Bot orqali yuborish</button></div>
+            </form>
+            <ul class="list" id="members"></ul>
+            <div class="invite" id="invite-section">
+              <h3>Bot orqali taklif</h3>
+              <button id="invite-button" type="button">Taklif havolasini yaratish</button>
+              <div id="invite-detail" hidden>
+                <label>Taklif havolasi<input id="invite-url" readonly></label>
+                <div class="actions"><button id="copy-invite" type="button">Havolani nusxalash</button><a id="open-invite" target="_blank" rel="noreferrer noopener"></a></div>
+                <p id="invite-note" class="hint"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="testlar" class="page" hidden>
+        <h1>Testlar</h1>
+        <div class="card">
+          <h2>Test tuzish</h2>
+          <div id="question-editor"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Test faylini yuklash</h2><span class="pilot-links"><a href="./sample.txt" download="univeracademy-test-namunasi.txt">TXT namunasi</a><a href="./sample.json" download="univeracademy-test-namunasi.json">JSON namunasi</a></span></div>
+          <form id="test-form">
+            <label>Test fayli (TXT yoki JSON)<input id="test-file" type="file" accept=".txt,.json,text/plain,application/json" required aria-describedby="test-format"></label>
+            <p id="test-format" class="hint">TXT namunasini matn muharririda ochib, savollar va javoblarni almashtiring. Har bir savolda 4 ta variant bo‘lishi kerak. TXT faylni UTF-8 kodlashda saqlang.</p>
+            <div id="preview" hidden></div>
+            <div class="actions"><button type="button" id="edit-file" disabled>Faylni muharrirda ochish</button><button type="submit" id="save-draft" disabled>Fayldan qoralama saqlash</button></div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Mening testlarim</h2>
+          <p id="tests-empty" class="empty">Hali test yuklanmagan.</p>
+          <div id="test-content" hidden>
+            <label>Test<select id="saved-test"></select></label>
+            <p id="test-meta" class="hint"></p>
+            <button id="view-saved" type="button">Saqlangan savollarni ko‘rish</button>
+            <section id="saved-preview" hidden aria-label="Saqlangan test ko‘rinishi"></section>
+            <button id="publish-button" type="button">Testni nashr qilish</button>
+            <form id="assign-form" class="line-form" hidden>
+              <label>Test beriladigan guruh<select id="assignment-group" required></select></label>
+              <button type="submit" class="primary">Guruhga tayinlash</button>
+            </form>
+            <p id="assignment-info" class="hint"></p>
+          </div>
+        </div>
+      </section>
+      <section id="natijalar" class="page" hidden>
+        <div class="page-heading"><h1>Natijalar</h1><button type="button" id="refresh-results">Yangilash</button></div>
+        <div class="card">
+          <h2>Guruh natijalari</h2>
+          <label>Guruh<select id="result-group"></select></label>
+          <p id="results-empty" class="empty"></p>
+          <div class="table-scroll" id="results-wrap" hidden>
+            <table><caption>Topshirilgan testlar</caption><thead><tr><th scope="col">O‘quvchi</th><th scope="col">Test</th><th scope="col">Ball</th><th scope="col">Foiz</th></tr></thead><tbody id="results-body"></tbody></table>
+          </div>
+        </div>
+      </section>
+      <noscript>Kabinetdan foydalanish uchun brauzerda JavaScript yoqilgan bo‘lishi kerak.</noscript>
+    </main>
+  </div>
+</body>
+</html>

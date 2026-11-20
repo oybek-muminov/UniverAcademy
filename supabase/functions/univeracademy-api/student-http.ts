@@ -10,12 +10,15 @@ import type { NumericPresentation, SessionPolicy, StudentState, StudentTransacti
 import { answerWire, attemptWire, historyWire, metaWire, profileWire, scoreWire, utc }
   from "./student-wire.ts";
 
+import type { AttemptImage } from "./student-wire.ts";
+
 type Completion = { render(): unknown };
 export type StudentHttpDependencies = {
   transactions: StudentTransactions;
   botToken?: string;
   sessionPolicy?: SessionPolicy;
   numericPresentation?: NumericPresentation;
+  projectAttemptImage?: AttemptImage;
 };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function body(raw: string, required: readonly string[], optional: readonly string[] = []) {
@@ -222,7 +225,7 @@ export function createStudentHttpHandler(deps: StudentHttpDependencies) {
               const resumed = studentView(accessFor(state, personId), existing,
                 { id: series.currentAttemptId, generation: series.generation }, now);
               persist(state, resumed.record);
-              return projection(state, (s) => attemptWire(s, s.attempts[existing.id], now));
+              return projection(state, (s) => attemptWire(s, s.attempts[existing.id], now, deps.projectAttemptImage));
             }
             const next = startAttempt({ access: accessFor(state, personId),
               admission: { ...assignment.admission, ...grant,
@@ -234,7 +237,7 @@ export function createStudentHttpHandler(deps: StudentHttpDependencies) {
               recoveryState: "none", recovery: null };
             persist(state, next);
             state.receipts[key] = { payload, attemptId: next.id };
-            return projection(state, (s) => attemptWire(s, s.attempts[next.id], now));
+            return projection(state, (s) => attemptWire(s, s.attempts[next.id], now, deps.projectAttemptImage));
           }
         }
         const attempt = path.match(/^\/attempts\/([^/]+)(?:\/(submit|result|answers\/([^/]+)))?$/);
@@ -248,7 +251,7 @@ export function createStudentHttpHandler(deps: StudentHttpDependencies) {
           if (!attempt[2] && request.method === "GET") {
             const next = studentView(accessFor(state, personId), record, current, now);
             persist(state, next.record);
-            return projection(state, (s) => attemptWire(s, s.attempts[id], now));
+            return projection(state, (s) => attemptWire(s, s.attempts[id], now, deps.projectAttemptImage));
           }
           if (attempt[3] && request.method === "PUT") {
             if (!uuid.test(attempt[3])) fail("NOT_FOUND", 404);

@@ -1,0 +1,16 @@
+{
+  "title": "Mexanika asoslari",
+  "duration_seconds": 600,
+  "questions": [
+    {
+      "text": "12 m/s tezlikda tekis harakat qilayotgan jism 5 sekundda qancha yo‘l bosadi?",
+      "options": ["17 m", "60 m", "2,4 m", "120 m"],
+      "correctIndex": 1
+    },
+    {
+      "text": "Massasi 2 kg bo‘lgan jismga 6 N natijaviy kuch ta’sir qilsa, uning tezlanishi qancha bo‘ladi?",
+      "options": ["12 m/s²", "8 m/s²", "3 m/s²", "0,33 m/s²"],
+      "correctIndex": 2
+    }
+  ]
+}

@@ -40,7 +40,29 @@ function publishedContent(state: StaffState, version: DraftRecord):
 // Narrow local provisioning candidate, not a complete roster/assignment subsystem.
 export function addInitialMember(state: StaffState, staff: StaffAccessRecord, groupId: string,
   body: MemberWrite, key: string, payload: string, now: number): MembershipMutation {
-  requireRosterAuthority(staff); // Owner/delegated Admin only in this narrow driver.
+  requireRosterAuthority(staff);
+  return applyInitialMember(state, staff, groupId, body, key, payload, now);
+}
+
+// The local cabinet calls these entry points after resolving its session. Its
+// ownership fields are server-owned additions to the pilot state; ordinary
+// production group/version records cannot satisfy these predicates.
+function requirePilotTeacherGroup(state: StaffState, staff: StaffAccessRecord, groupId: string): void {
+  const group = state.groups[groupId];
+  if (!staff.enabled || !staff.approved || !staff.roles.includes("teacher")) fail("FORBIDDEN", 403);
+  if (!group || group.status !== "active" || !("teacherPersonId" in group) || group.teacherPersonId !== staff.personId ||
+      !("subjectId" in group) || typeof group.subjectId !== "string" || !staff.approvedSubjectIds.includes(group.subjectId) ||
+      !staff.scope.group_ids.includes(groupId)) fail("NOT_FOUND", 404);
+}
+
+export function addTeacherPilotMember(state: StaffState, staff: StaffAccessRecord, groupId: string,
+  body: MemberWrite, key: string, payload: string, now: number): MembershipMutation {
+  requirePilotTeacherGroup(state, staff, groupId);
+  return applyInitialMember(state, staff, groupId, body, key, payload, now);
+}
+
+function applyInitialMember(state: StaffState, staff: StaffAccessRecord, groupId: string,
+  body: MemberWrite, key: string, payload: string, now: number): MembershipMutation {
   const group = state.groups[groupId];
   if (!group || !groupScope(staff, groupId)) fail("NOT_FOUND", 404);
   const studentId = body.student_id.toLowerCase(), person = state.student.people[studentId];
@@ -91,6 +113,20 @@ export function createPilotAssignment(state: StaffState, staff: StaffAccessRecor
     if (!staff.roles.includes("admin")) fail("SERVICE_UNAVAILABLE", 503); // Teacher delegation is a later step.
     if (!staff.capabilities.manage_content) fail("CAPABILITY_REQUIRED", 403);
   }
+  return applyAssignment(state, staff, body, key, payload, now, assignmentId);
+}
+
+export function createTeacherPilotAssignment(state: StaffState, staff: StaffAccessRecord, body: AssignmentCreate,
+  key: string, payload: string, now: number, assignmentId: () => string): Assignment {
+  requirePilotTeacherGroup(state, staff, body.group_id);
+  const version = state.versions[body.version_id], group = state.groups[body.group_id];
+  if (!version || !("teacherPersonId" in version) || version.teacherPersonId !== staff.personId ||
+      !("subjectId" in group) || group.subjectId !== version.subjectId) fail("NOT_FOUND", 404);
+  return applyAssignment(state, staff, body, key, payload, now, assignmentId);
+}
+
+function applyAssignment(state: StaffState, staff: StaffAccessRecord, body: AssignmentCreate,
+  key: string, payload: string, now: number, assignmentId: () => string): Assignment {
   const group = state.groups[body.group_id], version = state.versions[body.version_id];
   if (!group || group.status !== "active" || !version || version.wire.demo_id !== body.demo_id ||
       !groupScope(staff, body.group_id) || (!owner(staff) && !staff.scope.all_subjects &&

@@ -1,4 +1,5 @@
 import { fail } from "./fault.ts";
+import type { components } from "../../../packages/api-client/student-types.d.ts";
 import type { AnswerAck, AttemptRecord } from "./attempts.ts";
 import type { Ratio } from "./ordinary.ts";
 import { seriesKey } from "./student-state.ts";
@@ -87,7 +88,9 @@ export function scoreWire(state: StudentState, record: AttemptRecord,
   };
 }
 
-function blocksWire(blocks: unknown[]) {
+type PrivateImageLink = components["schemas"]["AssetLink"];
+export type AttemptImage = (assetId: string, attempt: AttemptRecord) => PrivateImageLink;
+export function blocksWire(blocks: unknown[], projectImage?: (assetId: string) => PrivateImageLink) {
   return blocks.map((input) => {
     if (!input || typeof input !== "object") fail("RESPONSE_INVARIANT_FAILED", 500);
     const b = input as Record<string, unknown>;
@@ -98,8 +101,13 @@ function blocksWire(blocks: unknown[]) {
       (b.display === "inline" || b.display === "block")) {
       return { type: "formula", latex: b.latex, display: b.display };
     }
-    // Private-media signing/validation is not implemented. Never pass an internal asset through.
-    if (b.type === "image") fail("SERVICE_UNAVAILABLE", 503);
+    if (b.type === "image") {
+      if (!projectImage) fail("SERVICE_UNAVAILABLE", 503);
+      if (typeof b.asset_id !== "string" || typeof b.alt !== "string" ||
+          (b.caption !== undefined && typeof b.caption !== "string")) fail("RESPONSE_INVARIANT_FAILED", 500);
+      return { type: "image", asset: projectImage(b.asset_id), alt: b.alt,
+        ...(b.caption === undefined ? {} : { caption: b.caption }) };
+    }
     fail("RESPONSE_INVARIANT_FAILED", 500);
   });
 }
@@ -125,7 +133,8 @@ export function answerWire(answer: AnswerAck) {
     revision: answer.revision, saved_at: utc(answer.savedAt),
     series_state_revision: answer.seriesStateRevision };
 }
-export function attemptWire(state: StudentState, record: AttemptRecord, now: number) {
+export function attemptWire(state: StudentState, record: AttemptRecord, now: number, projectImage?: AttemptImage) {
+  const image = projectImage && ((id: string) => projectImage(id, record));
   const assignment = state.assignments[record.assignmentId];
   if (!assignment || assignment.published.versionId !== record.published.versionId) {
     fail("RESPONSE_INVARIANT_FAILED", 500);
@@ -142,10 +151,10 @@ export function attemptWire(state: StudentState, record: AttemptRecord, now: num
     questions: record.status !== "in_progress" ? [] : record.questionOrder.map((q, index) => {
       const content = assignment.contents[q.questionId];
       if (!content) fail("RESPONSE_INVARIANT_FAILED", 500);
-      return { id: q.questionId, display_position: index + 1, prompt_blocks: blocksWire(content.prompt),
+      return { id: q.questionId, display_position: index + 1, prompt_blocks: blocksWire(content.prompt, image),
         options: q.optionIds.map((id, position) => {
           if (!content.options[id]) fail("RESPONSE_INVARIANT_FAILED", 500);
-          return { id, display_position: position + 1, blocks: blocksWire(content.options[id]) };
+          return { id, display_position: position + 1, blocks: blocksWire(content.options[id], image) };
         }) };
     }),
     answers: record.status === "in_progress" ? record.answers.map(answerWire) : [],

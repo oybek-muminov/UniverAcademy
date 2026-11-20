@@ -1,0 +1,46 @@
+// Small, explicit file format for the first physics pilot. It produces a staff draft only.
+const DEFAULT_DURATION = 300;
+const labels = ['A', 'B', 'C', 'D'];
+function invalid(line, reason) {
+  throw Object.assign(new Error(reason), {
+    status: 422, code: 'INVALID_TEXT_IMPORT', detail: line + '-qator. ' + reason,
+  });
+}
+
+export function parseTeacherTestText(text) {
+  if (typeof text !== 'string') invalid(1, 'UTF-8 matn yuboring.');
+  const source = text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/);
+  const lines = source.map((value, index) => ({ value: value.trim(), line: index + 1 }))
+    .filter(row => row.value.length > 0);
+  let cursor = 0;
+  function take(pattern, note) {
+    const row = lines[cursor];
+    const match = row && pattern.exec(row.value);
+    if (!match) invalid(row?.line ?? source.length, note);
+    cursor += 1;
+    return { row, value: match[1].trim() };
+  }
+  const title = take(/^Nomi:\s*(.+)$/iu, 'Test sarlavhasini «Nomi: …» shaklida yozing.').value;
+  if (title.length > 160) invalid(lines[0].line, 'Sarlavhani 160 belgigacha qisqartiring.');
+  let duration_seconds = DEFAULT_DURATION;
+  if (/^Vaqt\b/iu.test(lines[cursor]?.value ?? '')) {
+    const duration = take(/^Vaqt\s*\(soniya\):\s*(\d+)$/iu, 'Vaqtni «Vaqt (soniya): 300» shaklida yozing.');
+    duration_seconds = Number(duration.value);
+    if (!Number.isSafeInteger(duration_seconds) || duration_seconds < 1)
+      invalid(duration.row.line, 'Davomiylik musbat butun son bo‘lishi kerak.');
+  }
+  const questions = [];
+  while (cursor < lines.length) {
+    const number = questions.length + 1;
+    const row = lines[cursor];
+    const question = /^(\d+)[.)]\s*(.+)$/u.exec(row.value);
+    if (!question || Number(question[1]) !== number) invalid(row.line, 'Navbatdagi savolni «' + number + '. …» shaklida yozing.');
+    cursor += 1;
+    const options = labels.map(label => take(new RegExp('^' + label + '[.)]\\s*(.+)$', 'iu'),
+      number + '-savol uchun «' + label + ') …» varianti kutilgan.').value);
+    const answer = take(/^Javob:\s*([ABCD])$/iu, number + '-savol oxirida «Javob: A», B, C yoki D yozing.');
+    questions.push({ text:question[2].trim(), options, correctIndex:labels.indexOf(answer.value.toUpperCase()) });
+  }
+  if (!questions.length) invalid(source.length, 'Sarlavhadan so‘ng kamida bitta savol kiriting.');
+  return { title, duration_seconds, questions };
+}
