@@ -14,7 +14,7 @@ async function fallback(request,apiOrigin,allowedOrigins){
     return await withPublicCors(async()=>fault(),allowedOrigins)(request);
   }catch{return fault();} // Invalid public settings cannot authorize an origin.
 }
-function ownBody(request){
+export function ownBody(request){
   if(!request.body)return {request,close(){}};
   let reader,controller,finished=false;
   const release=()=>{if(reader){try{reader.releaseLock();}catch{}}};
@@ -41,7 +41,7 @@ function ownBody(request){
       redirect:"manual",credentials:"omit",cache:"no-store",duplex:"half"}),close};
   }catch(error){close();throw error;}
 }
-async function untilAborted(work,signal){
+export async function untilAborted(work,signal){
   let abort;
   try{
     if(signal.aborted)throw unavailable();

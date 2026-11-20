@@ -54,7 +54,7 @@ function harness(options = {}) {
   } });
   sdk.setSession(sdk.makeSession('sess_SyntheticInitial'));
   const session = () => ({ token_type: 'Bearer', access_token: ACCESS, refresh_token: REFRESH,
-    expires_at: '2035-01-01T00:00:00.000Z', profile: { ...profile } });
+    expires_at: '2035-01-01T00:00:00.000Z', refresh_expires_at: '2035-01-02T00:00:00.000Z', profile: { ...profile } });
   async function send(request) {
     const item = { url: request.url, path: new URL(request.url).pathname, method: request.method,
       auth: request.headers.get('authorization'), body: request.method === 'GET' ? undefined : await request.clone().json() };

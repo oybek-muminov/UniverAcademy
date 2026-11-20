@@ -25,6 +25,10 @@ test('API source configuration never provides private secrets or stale temporary
   assert.equal(config.keep_vars,true);
   assert.equal(config.workers_dev,false);
   assert.equal(config.preview_urls,false);
-  assert.deepEqual(config.hyperdrive,[{binding:'HYPERDRIVE',id:'075d873d9cdd4ad48a027b5e5a6f7acf'}]);
+  assert.deepEqual(config.hyperdrive,[
+    {binding:'HYPERDRIVE',id:'075d873d9cdd4ad48a027b5e5a6f7acf'},
+    {binding:'CABINET_HYPERDRIVE',id:'3b8bc95acda546bf804d36678a1b37a3'},
+    {binding:'TEACHER_PILOT_HYPERDRIVE',id:'ac6d5e78608a4004b67e5c6bdc6a2936'}
+  ]);
   assert.doesNotMatch(raw,/quick-zebra|clerk\.accounts\.dev|sk_live_[A-Za-z0-9]+/);
 });

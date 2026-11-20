@@ -233,7 +233,8 @@ test('new Wrangler entry is explicitly dynamic, with no invented URLs/binding ta
   const config = JSON.parse(await readFile(new URL('../wrangler.json', import.meta.url), 'utf8'));
   assert.deepEqual(config, { name: 'univeracademy-bot', main: 'src/lifecycle-cloudflare-entry.mjs',
     compatibility_date: '2026-11-11', keep_vars: true,
-    services: [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' }],
+    services: [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' },
+      { binding: 'TELEGRAM_PILOT_DIRECTORY', service: 'univeracademy-api', entrypoint: 'TelegramPilotDirectory' }],
     vars: { MINI_CABINET_URL: 'https://mini.univeracademy.uz/', MINI_SIGN_IN_URL: 'https://mini.univeracademy.uz/sign-in', TELEGRAM_MESSAGE_LIFECYCLE_ENABLED: 'true', LOGIN_MESSAGE_TTL_SECONDS: '86400' },
     durable_objects: { bindings: [{ name: 'LOGIN_MESSAGE_LIFECYCLE', class_name: 'LoginMessageLifecycleObject' }] },
     migrations: [{ tag: 'menu-lifecycle-v1', new_sqlite_classes: ['LoginMessageLifecycleObject'] }],

@@ -1,3 +1,4 @@
+import {fetchNativeCabinet} from './cloudflare-cabinet-route.mjs';
 import {withTelegramMenuCompletion} from './telegram-menu-completion.mjs';
 import {WorkerEntrypoint} from 'cloudflare:workers';
 import api from './cloudflare-entry.mjs';
@@ -20,5 +21,9 @@ export class TelegramPilotDirectory extends WorkerEntrypoint {
     return recordStagingPrivateStart(input, this.env);
   }
   async fetch() { return new Response(null, {status:404}); }
+}
+// Ustoz Pages binds directly to this staff-only entry point.
+export class TeacherCabinetGateway extends WorkerEntrypoint {
+  async fetch(request) { return fetchNativeCabinet(request,this.env,'staff'); }
 }
 export default {...withTelegramMenuCompletion(api), scheduled:createInviteSchedule()};

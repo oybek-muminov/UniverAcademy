@@ -12,7 +12,9 @@
     "traces": {"enabled": true}
   },
   "hyperdrive": [
-    {"binding": "HYPERDRIVE", "id": "075d873d9cdd4ad48a027b5e5a6f7acf"}
+    {"binding": "HYPERDRIVE", "id": "075d873d9cdd4ad48a027b5e5a6f7acf"},
+    {"binding": "CABINET_HYPERDRIVE", "id": "3b8bc95acda546bf804d36678a1b37a3"},
+    {"binding": "TEACHER_PILOT_HYPERDRIVE", "id": "ac6d5e78608a4004b67e5c6bdc6a2936"}
   ],
   "services": [{ "binding": "TELEGRAM_MENU_SYNC", "service": "univeracademy-bot", "entrypoint": "TelegramMenuSync" }],
   "vars": {
@@ -23,7 +25,7 @@
     "UA_CLERK_PROVIDER_SETTINGS": "{\"issuer\":\"https://clerk.univeracademy.uz\",\"authorizedParties\":[\"https://mini.univeracademy.uz\"],\"audience\":{\"kind\":\"clerk_default_no_audience\"},\"jwksCacheMs\":60000,\"jwksCooldownMs\":5000,\"timeoutMs\":3000,\"maxJwksBytes\":65536}",
     "UA_TELEGRAM_LOOKUP_TIMEOUT_MS": "3000"
   }
-  // Existing production build target. Reuses the existing Hyperdrive resource.
+  // Registration, cabinet and Telegram delivery each use their own restricted connection.
   // Preserve separately reviewed dashboard vars during main auto-deploys.
   // keep_vars does not replace explicit resource bindings or provision secrets.
   // Omitting UA_TELEGRAM_START_MODE selects the reviewed database default.

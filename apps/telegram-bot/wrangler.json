@@ -8,6 +8,11 @@
       "binding": "TELEGRAM_START_LOOKUP",
       "service": "univeracademy-api",
       "entrypoint": "TelegramAccountDirectory"
+    },
+    {
+      "binding": "TELEGRAM_PILOT_DIRECTORY",
+      "service": "univeracademy-api",
+      "entrypoint": "TelegramPilotDirectory"
     }
   ],
   "vars": {

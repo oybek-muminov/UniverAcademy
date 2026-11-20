@@ -1,0 +1,228 @@
+{
+  "format_version": 1,
+  "base_commit": "210033f666e19ef20d7bd7a174777e3427ce765f",
+  "files": [
+    {
+      "path": "apps/mini-app/teacher-entrance/README.md",
+      "previous_sha256": null,
+      "bytes": 7155,
+      "sha256": "bec006ed7a92dda4187a5056ae41d9521d061552f4df8c054f2fb8af2e52d9a1"
+    },
+    {
+      "path": "apps/mini-app/tests/clerk-first-production-boundary.test.mjs",
+      "previous_sha256": null,
+      "bytes": 3098,
+      "sha256": "8228ac3ced22e4ca87127fadb2d6bc668dabc9ab7a7db5b624382e70616bc4bc"
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-return-flow.test.mjs",
+      "previous_sha256": null,
+      "bytes": 26811,
+      "sha256": "4c6206d5de4a213bd7d1ad82359d263f802b49ee2dd47cb98ce02abf39704003"
+    },
+    {
+      "path": "apps/teacher-web/ustoz-pages/package.json",
+      "previous_sha256": null,
+      "bytes": 776,
+      "sha256": "d5accfa061731ba1ef79025cad0a12a967d339eb9da64f39206d80ea579303ce"
+    },
+    {
+      "path": "apps/teacher-web/ustoz-pages/verify-workerd.mjs",
+      "previous_sha256": null,
+      "bytes": 4019,
+      "sha256": "efb676fbcf8ec1e724bcde80859e12a1e4efb23fd9d1df6df0b27d1660cf77d0"
+    },
+    {
+      "path": "apps/telegram-bot/tests/returning-worker.test.mjs",
+      "previous_sha256": null,
+      "bytes": 17913,
+      "sha256": "18de4224efd4112966b7ac93878cc5b2c71e2ede79f56b4f7f424156d2034197"
+    },
+    {
+      "path": "apps/telegram-bot/tests/worker.test.mjs",
+      "previous_sha256": null,
+      "bytes": 16001,
+      "sha256": "e2da29eeff5e2cbb125273b92a92e5f34fcc78aafe67976972ccdd5a1c802b6e"
+    },
+    {
+      "path": "apps/telegram-bot/wrangler.json",
+      "previous_sha256": null,
+      "bytes": 1148,
+      "sha256": "3246221f431437558997cf3152cb54295b393b22b4f1526472cf4a02e3ff81aa"
+    },
+    {
+      "path": "docs/teacher-staging-pilot.md",
+      "previous_sha256": "f19ff1a7c6ea855e2d656025d0cb76790022e301701d234e300249425f0be3b1",
+      "bytes": 13145,
+      "sha256": "ce30b919e721d28267d865918f34e7ade0cf3358e6d12561ae85885338828114"
+    },
+    {
+      "path": "package-lock.json",
+      "previous_sha256": "40a0ee1c0f4265c05ba3dcc24bf5252730cb1ae4b717422b14bf9614fae1ba65",
+      "bytes": 46674,
+      "sha256": "a6d1d104d8f92fa105a12cb313b5d7f9bffdf3872ef00e4f86a124b73c30cefa"
+    },
+    {
+      "path": "package.json",
+      "previous_sha256": "0502b4c6a0e0c6db247f932cd94a3e92582ef3aa452af4269ed50ee60c738fa0",
+      "bytes": 2170,
+      "sha256": "2403188bcdd580cd4cbf381a0349b9af6258639809b9a6a4b0081d9b2f579757"
+    },
+    {
+      "path": "packages/contract-validation/teacher-cabinet.mjs",
+      "previous_sha256": null,
+      "bytes": 39928,
+      "sha256": "db7305a0adc75209c5ba5870b15b2d4e3f49a2dabba2bd7ba1c265812f0274d8"
+    },
+    {
+      "path": "packages/test-content/fonts/LICENSE.txt",
+      "previous_sha256": null,
+      "bytes": 2928,
+      "sha256": "1541435a16e3f739ad865a9b966b3d9ba070db85c3809a20a53a2641cc33bae1"
+    },
+    {
+      "path": "packages/test-content/fonts/diagram-sans.bin",
+      "previous_sha256": null,
+      "bytes": 194724,
+      "sha256": "1a660986cac9b51d682e07659cd498c330e5cbc63bfd596f6fdea71de771fd00"
+    },
+    {
+      "path": "packages/test-content/image-policy.mjs",
+      "previous_sha256": null,
+      "bytes": 4525,
+      "sha256": "118b476de24998c2b2efc1aa99d63bac93bdb70f4c1c4af69095cb5de24dda63"
+    },
+    {
+      "path": "packages/test-content/private-image.mjs",
+      "previous_sha256": null,
+      "bytes": 939,
+      "sha256": "86a56c65b7a14489bd6785f7bf391f9484446c76763ab0eceafdc81ed5ee8160"
+    },
+    {
+      "path": "packages/test-content/worker-private-image.mjs",
+      "previous_sha256": null,
+      "bytes": 3865,
+      "sha256": "0595b3f1e55242b48118ac4ae81207893c05c22bdabd242865321a784d1758bc"
+    },
+    {
+      "path": "runtime/cloudflare-api.mjs",
+      "previous_sha256": "d98825f44a16c564f4995bf1a24d4e250d6e5e42ddb437f14a92d28fd0b16567",
+      "bytes": 4972,
+      "sha256": "f47a48aea1df7915fc594fc4526cd55452b707d41a8e0ad5013def6f026aeedd"
+    },
+    {
+      "path": "runtime/cloudflare-cabinet-composition.mjs",
+      "previous_sha256": null,
+      "bytes": 414,
+      "sha256": "f3a80df150d5bf1facd212e0f0f927479d1b294a8876a21197f4c1a43dd16efc"
+    },
+    {
+      "path": "runtime/cloudflare-cabinet-route.mjs",
+      "previous_sha256": null,
+      "bytes": 1192,
+      "sha256": "55a4bd6ae933141ac4dbe97ba74bf0e7dc6dad937e65b5be6e59704a01781ffb"
+    },
+    {
+      "path": "runtime/cloudflare-cabinet.mjs",
+      "previous_sha256": null,
+      "bytes": 7868,
+      "sha256": "e72c91149e1fdcd374b6a2bb1155af7cf86d3f9a4d4d5f11d97b303f77e2959d"
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "previous_sha256": "5e5afc9d96d0fc04c84d2c001e77c06f1b795eabf8cc49541add03329d7c5e42",
+      "bytes": 10198,
+      "sha256": "7d34c4d266114b3dd8404f92ff64740853bd015259047b8242888bf65ae8ba30"
+    },
+    {
+      "path": "runtime/cloudflare-worker.mjs",
+      "previous_sha256": "8e3f484799f2fe2dd1115797472a234437bee35f667eeb259f49daa6d6e1f05c",
+      "bytes": 1769,
+      "sha256": "d8c95521c58170d5df697fa21a66249d07aa6d081307f9d29ffe8854382e9cef"
+    },
+    {
+      "path": "runtime/teacher-cabinet-api.mjs",
+      "previous_sha256": null,
+      "bytes": 10852,
+      "sha256": "8d0eca47285c040aff4cbd0d922d090aaf85fdc84a0fd3b96e8b1e48159ca9d1"
+    },
+    {
+      "path": "runtime/teacher-staging-api.mjs",
+      "previous_sha256": "c960ee8c9ac8178407390ba3f15c76a96bb6058dc9c987bb77d3e8030b75c89c",
+      "bytes": 313,
+      "sha256": "26916ffce594ecc7e5dffc1b6c1bc2c4c36e8465aa95dcfbfc8a8bdf9c99375a"
+    },
+    {
+      "path": "runtime/teacher-staging-contract.mjs",
+      "previous_sha256": null,
+      "bytes": 159,
+      "sha256": "bb3f13695ba78bbbfe9ddac895dbb431a680c11f445c4247e467e0a9f7cf0a37"
+    },
+    {
+      "path": "runtime/teacher-staging-proxy.mjs",
+      "previous_sha256": null,
+      "bytes": 3138,
+      "sha256": "5bab210225fe2bdb632d30f352021b95ae4745366772a7e5018e122688c78ff5"
+    },
+    {
+      "path": "tests/cloudflare/cabinet.test.mjs",
+      "previous_sha256": null,
+      "bytes": 5177,
+      "sha256": "85b80b0895f3a7afb2e7486d46e1cda56fd112b0318da25861b7e869005af4bf"
+    },
+    {
+      "path": "tests/cloudflare/fixtures/private-image-worker.mjs",
+      "previous_sha256": null,
+      "bytes": 425,
+      "sha256": "98af322bf887f4cbd344229bbe20719e11b0e0f30343ca6d01b0cc37ed5e8a52"
+    },
+    {
+      "path": "tests/cloudflare/private-image-workerd.test.mjs",
+      "previous_sha256": null,
+      "bytes": 7401,
+      "sha256": "7e2808e3c7b2844f9ab27f7d6f678c282436ec1b2d9269eccaab6ab3852dc0c9"
+    },
+    {
+      "path": "tests/cloudflare/production-config.test.mjs",
+      "previous_sha256": null,
+      "bytes": 2260,
+      "sha256": "cb1fd8fe59da928e77b375d90be70f8e99925607bb48a536c3b43bcecf64a822"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/shared-worker-env.test.mjs",
+      "previous_sha256": "fe6ffbea42d4d79f8be1bf689d820eb44c518a7c95e5e39ca202722b15d20ca6",
+      "bytes": 6177,
+      "sha256": "4f9a1b8e689124487e521bda0c153a10dfba29409a05ce111b61ef41aacbe93c"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/worker-database.test.mjs",
+      "previous_sha256": null,
+      "bytes": 5749,
+      "sha256": "3274f2949386c982bd6c6c88b44fcbb45964c23c60bf5101780ac3041c03be58"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/workerd-acceptance.mjs",
+      "previous_sha256": null,
+      "bytes": 10693,
+      "sha256": "9a32b306be0a8f93bae29e4da4f037e7c6676cb6c0b22bd739dc94f4810f94db"
+    },
+    {
+      "path": "tests/teacher-worker-cabinet/validators.test.mjs",
+      "previous_sha256": null,
+      "bytes": 6119,
+      "sha256": "4ea20f17af3c539076235343250055789a1044c0ea3550de63812e5b78f1df14"
+    },
+    {
+      "path": "tools/generate-teacher-cabinet-validator.mjs",
+      "previous_sha256": null,
+      "bytes": 2650,
+      "sha256": "bfd6dbc42e6c1818e8c895a831ac570f2777cdb852b2dfdc2a7d43cb963a3744"
+    },
+    {
+      "path": "wrangler.api.registration-only.jsonc",
+      "previous_sha256": null,
+      "bytes": 2117,
+      "sha256": "53272dbef092fe236df0abbf8718ef98708b64cbf8ab88046e50d165e8d00c38"
+    }
+  ]
+}

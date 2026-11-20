@@ -12,6 +12,8 @@ const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
 const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
 const liveOverlay = 'apps/mini-app/tests/fixtures/teacher-live-overlay.json';
 const liveFiles = JSON.parse(readFileSync(join(source, liveOverlay), 'utf8')).files;
+const workerCabinetOverlay = 'apps/mini-app/tests/fixtures/teacher-worker-overlay.json';
+const workerCabinetFiles = JSON.parse(readFileSync(join(source, workerCabinetOverlay), 'utf8')).files;
 const profileReleaseOverlay = 'apps/mini-app/tests/fixtures/profile-release-order-overlay.json';
 const profileReleaseFiles = JSON.parse(readFileSync(join(source,profileReleaseOverlay),'utf8')).files;
 const registrationOverlay = 'apps/mini-app/tests/fixtures/registration-storage-overlay.json';
@@ -52,7 +54,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['LIVE_OVERLAY_MISMATCH', liveOverlay],['PROFILE_RELEASE_OVERLAY_MISMATCH', profileReleaseOverlay],['REGISTRATION_OVERLAY_MISMATCH', registrationOverlay],['STAGING_OVERLAY_MISMATCH', stagingOverlay],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
+const manifestErrors = new Map([['WORKER_CABINET_OVERLAY_MISMATCH', workerCabinetOverlay],['LIVE_OVERLAY_MISMATCH', liveOverlay],['PROFILE_RELEASE_OVERLAY_MISMATCH', profileReleaseOverlay],['REGISTRATION_OVERLAY_MISMATCH', registrationOverlay],['STAGING_OVERLAY_MISMATCH', stagingOverlay],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -60,7 +62,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, liveOverlay, ...liveFiles.map(file => file.path), profileReleaseOverlay, ...profileReleaseFiles.map(file => file.path), registrationOverlay, ...registrationFiles.map(file => file.path), stagingOverlay, ...stagingManifest.files.map(file => file.path), brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, workerCabinetOverlay, ...workerCabinetFiles.map(file => file.path), liveOverlay, ...liveFiles.map(file => file.path), profileReleaseOverlay, ...profileReleaseFiles.map(file => file.path), registrationOverlay, ...registrationFiles.map(file => file.path), stagingOverlay, ...stagingManifest.files.map(file => file.path), brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -118,6 +120,9 @@ test('current guard accepts exact corrected types base plus two Backend correcti
 test('the live cabinet transition pins its selected files', () => check(root => {
   appendFileSync(join(root, liveOverlay), '\n');
 }, 'LIVE_OVERLAY_MISMATCH'));
+test('the Worker cabinet transition pins its selected files', () => check(root => {
+  appendFileSync(join(root, workerCabinetOverlay), '\n');
+}, 'WORKER_CABINET_OVERLAY_MISMATCH'));
 test('the mixed-release client manifest is fixed by its reviewed digest', () => check(root => {
   appendFileSync(join(root, profileReleaseOverlay), '\n');
 }, 'PROFILE_RELEASE_OVERLAY_MISMATCH'));

@@ -1,3 +1,4 @@
+import {fetchNativeCabinet} from './cloudflare-cabinet-route.mjs';
 import {forwardTeacherStaging} from './teacher-staging-proxy.mjs';
 import {telegramMenuEnvironmentKeys} from './telegram-menu-completion.mjs';
 import {createTelegramClerkEntryApi,atomicEntryEnabled,atomicAuthorizedParties,atomicEntryEnvironmentKeys} from "./telegram-clerk-entry-api.mjs";
@@ -22,7 +23,7 @@ const unavailableNumbers=Object.freeze({policyId:"registration-only-scoring-unav
 const pilotEnvironmentKeys=[
   "UA_CABINET_STAGING_ENABLED","UA_CABINET_STAGING_NODE_ORIGIN","UA_CABINET_STAGING_PROXY_SECRET",
   "UA_CABINET_STUDENT_ORIGIN","UA_TELEGRAM_PILOT_DIRECTORY_ENABLED","UA_TELEGRAM_PILOT_DISPATCH_ENABLED",
-  "TEACHER_PILOT_HYPERDRIVE",
+  "TEACHER_PILOT_HYPERDRIVE","CABINET_HYPERDRIVE","UA_CABINET_RUNTIME","UA_CABINET_TEACHER_ORIGIN","UA_CABINET_ALLOW_LEGACY_TELEGRAM",
 ];
 const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
   "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS","UA_TELEGRAM_START_MODE",
@@ -92,6 +93,9 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
     try{
       if(!(request instanceof Request))throw unavailable();
       if (new URL(request.url).pathname.startsWith('/api/v1/student/pilot/')) {
+        const mode=env?.UA_CABINET_RUNTIME;
+        if (mode==='worker') return fetchNativeCabinet(request,env,'student');
+        if (mode!==undefined && mode!=='node') return response('NOT_FOUND',404);
         return forwardTeacherStaging(request,env,{surface:'student',transport});
       }
       publics=publicBindings(env);

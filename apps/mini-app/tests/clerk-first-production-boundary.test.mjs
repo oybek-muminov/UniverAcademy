@@ -31,7 +31,11 @@ test('main deploy preserves reviewed vars and explicit API/bot resource bindings
   const bot = JSON.parse(read('../../telegram-bot/wrangler.json'));
   assert.equal(api.keep_vars, true);
   assert.equal(api.name, 'univeracademy-api');
-  assert.deepEqual(api.hyperdrive, [{ binding: 'HYPERDRIVE', id: '075d873d9cdd4ad48a027b5e5a6f7acf' }]);
+  assert.deepEqual(api.hyperdrive, [
+    { binding: 'HYPERDRIVE', id: '075d873d9cdd4ad48a027b5e5a6f7acf' },
+    { binding: 'CABINET_HYPERDRIVE', id: '3b8bc95acda546bf804d36678a1b37a3' },
+    { binding: 'TEACHER_PILOT_HYPERDRIVE', id: 'ac6d5e78608a4004b67e5c6bdc6a2936' }
+  ]);
   assert.deepEqual(Object.keys(api.vars).sort(), ['UA_ALLOWED_ORIGINS', 'UA_API_ORIGIN', 'UA_CLERK_PROVIDER_SETTINGS', 'UA_SESSION_POLICY', 'UA_TELEGRAM_LOOKUP_TIMEOUT_MS', 'UA_TELEGRAM_MENU_SYNC_ENABLED']);
   assert.equal(api.vars.UA_TELEGRAM_MENU_SYNC_ENABLED, 'true');
   assert.deepEqual(api.services, [{binding:'TELEGRAM_MENU_SYNC',service:'univeracademy-bot',entrypoint:'TelegramMenuSync'}]);
@@ -44,5 +48,6 @@ test('main deploy preserves reviewed vars and explicit API/bot resource bindings
   assert.equal(mini.workers_dev, true);
   assert.equal(mini.preview_urls, false);
   assert.equal(bot.keep_vars, true);
-  assert.deepEqual(bot.services, [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' }]);
+  assert.deepEqual(bot.services, [{ binding: 'TELEGRAM_START_LOOKUP', service: 'univeracademy-api', entrypoint: 'TelegramAccountDirectory' },
+      { binding: 'TELEGRAM_PILOT_DIRECTORY', service: 'univeracademy-api', entrypoint: 'TelegramPilotDirectory' }]);
 });

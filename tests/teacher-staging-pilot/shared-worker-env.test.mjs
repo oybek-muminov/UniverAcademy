@@ -36,6 +36,7 @@ test('normal API, bot directory and deletion status coexist with unread pilot bi
   const reads = [];
   for (const key of [
     'UA_CABINET_STAGING_ENABLED','UA_CABINET_STAGING_NODE_ORIGIN','UA_CABINET_STAGING_PROXY_SECRET',
+    'UA_CABINET_RUNTIME','CABINET_HYPERDRIVE','UA_CABINET_TEACHER_ORIGIN','UA_CABINET_ALLOW_LEGACY_TELEGRAM',
     'UA_CABINET_STUDENT_ORIGIN','UA_TELEGRAM_PILOT_DIRECTORY_ENABLED','UA_TELEGRAM_PILOT_DISPATCH_ENABLED','TEACHER_PILOT_HYPERDRIVE'
   ]) {
     Object.defineProperty(env, key, {enumerable:true, get() { reads.push(key); throw Error('Unexpected pilot binding read'); }});

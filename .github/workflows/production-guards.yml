@@ -19,7 +19,9 @@ jobs:
           node-version: '24.15.0'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm ci --prefix apps/teacher-web/ustoz-pages --no-audit --no-fund
       - run: npm run setup:validator
+      - run: node tools/generate-teacher-cabinet-validator.mjs --check
       - run: node tools/generate-account-deletion-pins.mjs --check
       - run: node apps/mini-app/tests/verify-backend-targets.mjs
       - run: node --test apps/telegram-bot/tests/*.test.mjs
@@ -31,6 +33,10 @@ jobs:
       - run: npm ci --prefix tests/account-deletion/tooling --no-audit --no-fund
       - run: npm ci --ignore-scripts --prefix apps/mini-app --no-audit --no-fund
       - run: npm ci --ignore-scripts --prefix tests/teacher-local-pilot/tooling --no-audit --no-fund
+      - run: npm --prefix apps/teacher-web/ustoz-pages run build
+      - run: npm --prefix apps/teacher-web/ustoz-pages run verify
+      - run: node --test tests/teacher-worker-cabinet/*.test.mjs
+      - run: node tests/teacher-staging-pilot/workerd-acceptance.mjs
       - run: node --test tests/teacher-staging-pilot/*.test.mjs apps/mini-app/tests/student-pilot-coexistence.test.mjs apps/mini-app/tests/staging-student-port.test.mjs
       - run: node --test tests/enrollment/profile-release-order.test.mjs
         env:

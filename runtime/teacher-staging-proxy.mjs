@@ -1,4 +1,4 @@
-// Public edge adapter. Only the original reviewed origin and a fixed Node upstream may exchange this credential.
+// Pages sends staff requests to a named Worker service or the configured legacy Node upstream.
 const noStore={'cache-control':'no-store','cdn-cache-control':'no-store','x-content-type-options':'nosniff'};
 const error=(code,status)=>Response.json({error:{code,message:code}},{status,headers:noStore});
 export const teacherStagingPath=path=>/^\/api\/v1\/(?:teacher|admin|student)\/pilot\//.test(path);
@@ -12,18 +12,32 @@ export async function forwardTeacherStaging(request,env,{surface,transport=fetch
   if (env?.UA_CABINET_STAGING_ENABLED!=='true'||!role||
       (surface==='teacher'?!['teacher','admin'].includes(role):surface!=='student'||role!=='student')||url.search||url.hash) return error('NOT_FOUND',404);
   const external=origin(surface==='teacher'?env.UA_CABINET_TEACHER_ORIGIN:env.UA_API_ORIGIN);
-  const upstream=origin(env.UA_CABINET_STAGING_NODE_ORIGIN);
-  const secret=env.UA_CABINET_STAGING_PROXY_SECRET;
-  if (!external||!upstream||external===upstream||typeof secret!=='string'||secret.length<32||/[\r\n]/u.test(secret))
-    return error('SERVICE_UNAVAILABLE',503);
+  if (!external) return error('SERVICE_UNAVAILABLE',503);
   if (url.origin!==external || !['GET','POST','OPTIONS'].includes(request.method))return error('NOT_FOUND',404);
+  const runtime=env.UA_CABINET_RUNTIME;
+  let destination,secret,send;
+  if (runtime==='worker') {
+    if (surface!=='teacher') return error('NOT_FOUND',404);
+    const callerOrigin=request.headers.get('origin');
+    if (callerOrigin!==null && callerOrigin!==external) return error('FORBIDDEN',403);
+    const api=env.UA_CABINET_API;
+    if (typeof api?.fetch!=='function') return error('SERVICE_UNAVAILABLE',503);
+    destination=external;
+    send=req=>api.fetch(req);
+  } else if (runtime===undefined || runtime==='node') {
+    destination=origin(env.UA_CABINET_STAGING_NODE_ORIGIN);
+    secret=env.UA_CABINET_STAGING_PROXY_SECRET;
+    if (!destination || external===destination || typeof secret!=='string' || secret.length<32 || /[\r\n]/u.test(secret))
+      return error('SERVICE_UNAVAILABLE',503);
+    send=transport;
+  } else return error('SERVICE_UNAVAILABLE',503);
   try {
     const headers=new Headers();
     for (const k of ['authorization','content-type','content-length','accept','idempotency-key','origin','access-control-request-method','access-control-request-headers']) {
       const value=request.headers.get(k);if(value!==null)headers.set(k,value);
     }
-    headers.set('x-univeracademy-pilot-proxy',secret);
-    const r=await transport(new Request(upstream+url.pathname,{method:request.method,headers,
+    if (secret!==undefined) headers.set('x-univeracademy-pilot-proxy',secret);
+    const r=await send(new Request(destination+url.pathname,{method:request.method,headers,
       ...(request.body?{body:request.body,duplex:'half'}:{}),signal:request.signal,redirect:'manual'}));
     if (r.status>=300&&r.status<400)return error('SERVICE_UNAVAILABLE',503);
     const output=new Headers(noStore);
