@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createProductionOwnerConnection} from '../src/production-connection.ts';
 import {STUDENT_CONTRACT_SHA256} from '../src/owner-client/student-client.ts';
+import {createSignInController} from '../src/sign-in-controller.ts';
 import {readStagingInvite} from '../src/staging-student-port.ts';
 
 const packet = JSON.parse(readFileSync(new URL('./fixtures/wire.json',import.meta.url),'utf8'));
@@ -11,7 +12,7 @@ const group = {id:profile.active_group_id,name:'Fizika',status:'active'};
 const dashboard = {role:'student',person_id:profile.person_id,group:null,assignments:[],results:[]};
 const ok = data => Response.json({data});
 const failure = (status,code) => Response.json({error:{code,request_id:crypto.randomUUID()}},{status});
-async function student(exams,pilot,enabled=true,currentProfile=profile) {
+async function student(exams,pilot,enabled=true,currentProfile=profile,loginProfile=currentProfile) {
   const paths=[];
   const connection=createProductionOwnerConnection({
     mode:'production',baseUrl:'https://api.example.test/api/v1',contractSha256:STUDENT_CONTRACT_SHA256
@@ -19,7 +20,7 @@ async function student(exams,pilot,enabled=true,currentProfile=profile) {
     const path=new URL(request.url).pathname.split('/api/v1')[1];
     paths.push(path);
     if(path==='/auth/clerk') return ok({access_token:'test-access',refresh_token:'test-refresh',token_type:'Bearer',
-      expires_at:new Date(Date.now()+60000).toISOString(),refresh_expires_at:new Date(Date.now()+120000).toISOString(),profile:currentProfile});
+      expires_at:new Date(Date.now()+60000).toISOString(),refresh_expires_at:new Date(Date.now()+120000).toISOString(),profile:loginProfile});
     assert.equal(request.headers.get('Authorization'),'Bearer test-access');
     if(path==='/me') return ok(currentProfile);
     if(path==='/exams') return exams();
@@ -34,6 +35,20 @@ test('enabling a group pilot keeps ordinary assignments and their original clien
   const c=await student(()=>ok([source]),()=>assert.fail('Ordinary list cannot depend on the pilot request'));
   assert.equal((await c.port.exams())[0].id,source.assignment_id);
   assert.deepEqual(c.paths,['/auth/clerk','/exams']);
+});
+
+test('Clerk admission uses the current server profile when the teacher role changes', async () => {
+  const teacher = {...profile, roles: ['student', 'teacher']};
+  for (const [loginProfile, current, expectsTeacher] of [[profile, teacher, true], [teacher, profile, false]]) {
+    const c = await student(() => ok([]), () => assert.fail('Unexpected student pilot lookup'), true, current, loginProfile);
+    const runtime = createSignInController({context:'browser', provider:{current:async () => ({proof:'fixture'})},
+      authorize:async () => ({person:c.auth.person(), port:c.port})});
+    await runtime.continueSession();
+    const entry = runtime.snapshot();
+    assert.equal(entry.step, 'ready');
+    assert.equal(Boolean(entry.flow.snapshot().student.teacherCabinet), expectsTeacher);
+    assert.deepEqual(c.paths, expectsTeacher ? ['/auth/clerk','/me'] : ['/auth/clerk','/me','/exams']);
+  }
 });
 
 test('registration-only exam list absence permits only a confirmed pilot member or explicit invitation',async t=>{

@@ -11,7 +11,7 @@ export async function recordStagingPrivateStart(input, env) {
   const { createStagingInviteDeliveryStore } = await import('./teacher-staging-delivery.mjs');
   const db = createCloudflarePostgres(Client, {connectionString}, {signal:AbortSignal.timeout(5000)});
   try {
-    await createStagingInviteDeliveryStore({pool:db.pool}).recordPrivateStart(input);
+    await createStagingInviteDeliveryStore({pool:db.pool}).recordPrivateStart(input,env.UA_TEACHER_NOTICES_ENABLED==='true');
   } finally {
     await db.close();
   }

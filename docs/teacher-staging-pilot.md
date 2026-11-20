@@ -74,6 +74,8 @@ WHERE p.enabled AND 'teacher'=ANY(p.roles)
 
 [ID migratsiyasi](../supabase/migrations/cabinet-id/README.md) · [Staging vakolatlari va ma’lumotni saqlab ortga qaytarish](../supabase/migrations/teacher-staging/README.md)
 
+O‘qituvchiga rol berilgach, botdagi «Kabinet» tugmasi uni Ustoz sahifasiga olib boradi. Faqat o‘quvchi roli bor hisobga o‘quvchi kabineti ochiladi. Bot o‘qituvchiga bir marta tugmasiz xabar yuboradi va 24 soat o‘tgach uni o‘chiradi. Buni mavjud API Worker jadvali bajaradi (`UA_TEACHER_NOTICES_ENABLED=true`). Yangilanishni qaytarishda navbatdagi xabarlarni tozalab, avval [xabar migratsiyasini qaytarish tartibini](../supabase/migrations/teacher-notifications/README.md) bajaring.
+
 ## Pilotning amaliy chegaralari
 
 - O‘quvchi ID satrida o‘nta raqam saqlanadi. Guruh almashishi alohida Admin amalidir. Tayinlash paytidagi ro‘yxat topshiriqqa bog‘lanadi. Shu topshiriqqa kirishi kerak bo‘lgan o‘quvchilarni avval guruhga qo‘shing.

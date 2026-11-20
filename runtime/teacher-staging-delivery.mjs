@@ -1,5 +1,6 @@
 // Only the authenticated private bot/dispatcher can use this separate DB service role.
 import {randomUUID} from 'node:crypto';
+import {teacherNotifications} from './teacher-notification-store.mjs';
 
 export function createStagingInviteDeliveryStore({pool}){
   async function transaction(fn){
@@ -16,12 +17,14 @@ export function createStagingInviteDeliveryStore({pool}){
     }finally{client.release(discard);}
   }
   return {
-    recordPrivateStart({telegramUserId}){
+    teacherNotifications:teacherNotifications(transaction),
+    recordPrivateStart({telegramUserId}, wakeTeacherNotice=false){
       if(!Number.isSafeInteger(telegramUserId)||telegramUserId<=0)throw Error('INVALID_TELEGRAM_ID');
       return transaction(async q=>{
         // A verified prior /start is not proof of enrollment. The worker joins the current
         // enabled, linked person against this same Telegram ID again at send time.
         await q('INSERT INTO ua_cabinet.private_starts(telegram_id) VALUES($1) ON CONFLICT DO NOTHING',[telegramUserId]);
+        if (wakeTeacherNotice) await q('SELECT ua_cabinet.wake_teacher_notification($1::bigint)',[telegramUserId]);
       });
     },
     claimInviteDelivery(){

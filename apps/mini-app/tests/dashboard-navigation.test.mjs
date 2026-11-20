@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {transformWithOxc} from 'vite';
 import {runInNewContext} from 'node:vm';
-function nodes(node){if(!node||typeof node!=='object')return[];return[node,...[node.props?.children].flat(Infinity).flatMap(nodes)];}
+function nodes(node) {
+ if (!node || typeof node !== 'object') return [];
+ if (typeof node.tag === 'function') return nodes(node.tag(node.props));
+ return [node, ...[node.props?.children].flat(Infinity).flatMap(nodes)];
+}
 test('dashboard top-right becomes Testlar and returns to tests, not a second back control',async()=>{
  const source=await readFile(new URL('../src/student-app.tsx',import.meta.url),'utf8');
  const out=await transformWithOxc(source,'student-app.tsx',{jsx:{runtime:'automatic'}});

@@ -10,6 +10,8 @@ from playwright.sync_api import sync_playwright, expect
 args = json.loads(sys.stdin.readline())
 assert all(urlsplit(args[k]).hostname == '127.0.0.1' for k in ['assets', 'api'])
 scenario = args['scenario']
+teacher = scenario in ('teacher-root', 'teacher-invite-root')
+ustoz = 'https://ustoz.univeracademy.uz/'
 match = lambda method, path: lambda r: r.request.method == method and urlsplit(r.url).path == path
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=shutil.which('chromium'), headless=True, args=['--no-sandbox'])
@@ -27,7 +29,20 @@ with sync_playwright() as p:
                 assert '/admin/' not in u.path and not u.path.endswith('/link')
                 headers = {k: v for k, v in r.request.all_headers().items() if k != 'origin'}
                 response = r.fetch(url=args['api'].removesuffix('/api/v1') + u.path, headers=headers)
-                r.fulfill(response=response, headers={**response.headers, 'access-control-allow-origin': 'https://app.example.test'})
+                headers = {**response.headers, 'access-control-allow-origin': 'https://app.example.test'}
+                if teacher and u.path == '/api/v1/me':
+                    assert response.ok
+                    headers.pop('content-length', None)
+                    profile = response.json()
+                    profile['data']['roles'] = ['student', 'teacher']
+                    r.fulfill(status=200, json=profile, headers=headers)
+                else:
+                    r.fulfill(response=response, headers=headers)
+            elif teacher and r.request.url == ustoz:
+                assert r.request.is_navigation_request()
+                assert 'referer' not in r.request.all_headers()
+                assert 'authorization' not in r.request.all_headers()
+                r.fulfill(status=200, content_type='text/html', body='<h1>Ustoz test entrance</h1>')
             else:
                 blocked.append(u.netloc); r.abort()
         page.route('**/*', route)
@@ -48,11 +63,22 @@ with sync_playwright() as p:
             assert exchange.value.status == 200 and exchange.value.request.post_data_json == {}; entered()
         def count(path): return len([r for r in audit if r['path'] == path])
         query = '?cached=1' if scenario == 'cached-session' else '?webview=1' if scenario == 'webview' else ''
+        if teacher:
+            query = '?cached=1'
+            if scenario == 'teacher-invite-root':
+                query += '&invite=grp_' + 'x' * 32
         if scenario.startswith('sdk-browser-'): query = '?sdk_browser=1'
         if scenario.startswith('telegram-empty-'): query = '?telegram_empty=1&cached=1'
         path = '/' if scenario.endswith('-root') else '/sign-in'
         page.goto('https://app.example.test' + path + query)
-        if scenario.startswith('telegram-empty-'):
+        if teacher:
+            proof(0)
+            page.get_by_role('button', name='Tasdiqlangan hisob bilan davom etish', exact=True).click()
+            page.wait_for_url(ustoz)
+            expect(page.get_by_role('heading', name='Ustoz test entrance')).to_be_visible()
+            assert count('/api/v1/me') == 1 and count('/api/v1/exams') == 0
+            assert not any('/student/pilot' in request['path'] for request in audit)
+        elif scenario.startswith('telegram-empty-'):
             if scenario.endswith('-sign-in'):
                 proof(0)
                 page.get_by_role('button', name='Tasdiqlangan hisob bilan davom etish', exact=True).click()
@@ -99,6 +125,7 @@ with sync_playwright() as p:
                     original = state()['session']; mount_count = len(state()['mounts'])
                     page.evaluate('__UA_PREBUILT_TEST_DELAY_SIGNOUT__ = true')
                     with page.expect_response(match('POST', '/api/v1/auth/logout')) as out:
+                        page.get_by_role('button', name='Dashboard', exact=True).click()
                         page.get_by_role('button', name='Chiqish', exact=True).click()
                     assert out.value.status == 200 and 'authorization' not in out.value.request.all_headers()
                     page.wait_for_function('typeof __UA_PREBUILT_TEST_RELEASE_SIGNOUT__ === "function"')
@@ -121,6 +148,7 @@ with sync_playwright() as p:
                 else:
                     original = state()['session']
                     with page.expect_response(match('POST', '/api/v1/auth/logout')) as out:
+                        page.get_by_role('button', name='Dashboard', exact=True).click()
                         page.get_by_role('button', name='Chiqish', exact=True).click()
                     assert out.value.status == 200 and 'authorization' not in out.value.request.all_headers()
                     expect(page.get_by_role('button', name='__SDK_TEST_COMPLETE_FORM__')).to_be_visible()

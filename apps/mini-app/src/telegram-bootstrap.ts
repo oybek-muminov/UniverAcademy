@@ -121,7 +121,7 @@ export function createTelegramBootstrap(options: {
       check(generation);
       if (!student || student.person !== active.auth.person())
         throw new StudentFailure('protocol', 'PROFILE_SESSION_MISMATCH');
-      const exams = student.registrationComplete ? await active.port.exams() : [];
+      const exams = await target.entryExams(student);
       check(generation);
       target!.patch({ student, exams, screen: student.registrationComplete ? 'exams' : 'profile', busy: false });
       update({ phase: 'ready', flow: target!, notice: '', errorCode: null });

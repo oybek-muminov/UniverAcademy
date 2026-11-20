@@ -16,6 +16,11 @@ test('cabinet header and dashboard render accessible controls without placeholde
   assert.match(html,/Namuna O‘quvchi/);
   assert.match(html,/>Dashboard<\/button>/);
   assert.doesNotMatch(html,/Salom,|Tez kunda/);
+  flow.patch({student: {...student, teacherCabinet:true}});
+  const teacherHtml = renderToStaticMarkup(createElement(StudentApp,{studentFlow:flow,mode:'telegram'}));
+  assert.match(teacherHtml, /O‘qituvchi kabineti/);
+  assert.match(teacherHtml, /href="https:\/\/ustoz\.univeracademy\.uz\/"/);
+  assert.doesNotMatch(teacherHtml, /Mening testlarim|Dashboard<\/button>/);
   const panel=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onLogout:async()=>{},onDeleteAccount(){}}));
   assert.match(panel,/UniverAcademy ID: 0000000001</);
   assert.match(panel,/dashboard-first-name/);

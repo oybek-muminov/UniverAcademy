@@ -28,6 +28,8 @@ export function createTelegramDelivery(token, fetcher = fetch) {
       if (value.error_code === 400 && /message can.t be deleted/i.test(value.description || '')) return { kind: 'not_deletable' };
       if (value.error_code === 400 && /message is not modified/i.test(value.description || '')) return { kind: 'unchanged' };
       if (value.error_code === 403) return { kind: 'blocked' };
+      if (method === 'sendMessage' && value.error_code === 400 && /chat not found/i.test(value.description || ''))
+        return { kind: 'rejected', chatUnavailable:true };
       return { kind: response.status >= 500 ? 'unknown' : 'rejected' };
     } catch { return { kind: 'unknown' }; }
   };

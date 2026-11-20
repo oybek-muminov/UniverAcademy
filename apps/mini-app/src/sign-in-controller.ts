@@ -152,8 +152,8 @@ export function createSignInController(options: {
         if (!student.registrationComplete) throw new EntryFailure('APP_DENIED');
       }
     }
-    const exams = student.registrationComplete ? await authorization.port.exams() : []; checked();
     const flow = new StudentFlow(authorization.port, undefined, undefined, 'clerk');
+    const exams = await flow.entryExams(student); checked();
     flow.patch({ student, exams, screen: student.registrationComplete ? 'exams' : 'profile' });
     challenge = null; email = '';
     update({ step: 'ready', maskedEmail: '', notice: '', flow });

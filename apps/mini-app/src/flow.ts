@@ -7,7 +7,7 @@ export const lifecycleLabel: Record<Lifecycle, string> = {
   ready: 'Qayta urinish tayyor', in_progress: 'Davom etmoqda', submitted: 'Topshirilgan',
   expired: 'Vaqti tugagan', forced: 'Majburiy yakunlangan', cancelled: 'Bekor qilingan', recovery_lapsed: 'Qayta urinish oynasi tugagan',
 };
-export type Student = { person: string; firstName: string; lastName: string; displayId: string; registrationComplete: boolean; activeGroupId?: string|null };
+export type Student = { person: string; firstName: string; lastName: string; displayId: string; registrationComplete: boolean; teacherCabinet?: true; activeGroupId?: string|null };
 export type DisplayBlock = { kind: 'text'; text: string } | { kind: 'formula'; latex: string; display: 'inline' | 'block' } |
   { kind: 'image'; assetId: string; url: string; expiresAt: string; contentType: string; alt: string; caption: string | null };
 export type SeriesView = { currentAttemptId: string | null; generation: number; officialResultAttemptId: string | null; recovery: 'none' | 'ready' | 'active' | 'lapsed' };
@@ -77,19 +77,22 @@ export class StudentFlow {
     this.patch({ busy: true, notice: '', failure: null });
     try { await action(); } catch (error) { this.fail(error); } finally { this.patch({ busy: false }); }
   }
+  async entryExams(student: Student | null) {
+    return student?.registrationComplete && !student.teacherCabinet ? this.port.exams() : [];
+  }
   async enter() {
     await this.run(async () => {
       const student = await this.port.profile();
       this.patch({ student, attempt: null, draft: null, result: null, history: [],
         screen: student?.registrationComplete ? 'exams' : 'profile',
-        exams: student?.registrationComplete ? await this.port.exams() : [] });
+        exams: await this.entryExams(student) });
     });
   }
   async register(firstName: string, lastName: string) {
     if (!firstName.trim() || !lastName.trim()) return;
     await this.run(async () => {
       const student = await this.port.register(firstName.trim(), lastName.trim());
-      this.patch({ student, exams: await this.port.exams(), screen: student.registrationComplete ? 'exams' : 'profile' });
+      this.patch({ student, exams: await this.entryExams(student), screen: student.registrationComplete ? 'exams' : 'profile' });
     });
   }
   async openExam(exam: Exam) {

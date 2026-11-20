@@ -27,6 +27,20 @@ test('successful signed resume opens cabinet without Clerk proof and never auto-
  await h.runtime.resume();assert.equal(h.runtime.snapshot().phase,'ready');assert.equal(h.verifications,0);
 });
 
+test('a linked teacher reaches the cabinet without requesting student exams or accepting an invitation', async () => {
+  const student = {person: 'teacher-person', registrationComplete: true, teacherCabinet: true};
+  const h = setup({connect: method => {
+    assert.equal(method, 'telegram_resume');
+    return {auth: {person: () => student.person, login: async () => student.person, clear() {}},
+      port: {profile: async () => student, exams: async () => assert.fail('Student exams requested'),
+        stagingPilot: () => assert.fail('Student pilot requested')}};
+  }});
+  await h.runtime.resume();
+  assert.equal(h.runtime.snapshot().phase, 'ready');
+  assert.equal(h.runtime.snapshot().flow.snapshot().student.teacherCabinet, true);
+  h.runtime.dispose();
+});
+
 test('owner atomic adapter preserves canonical deadline and account-switch abort, headers/body',async t=>{
  const{createOwnerPort}=await import('../src/owner-port.ts');const{STUDENT_CONTRACT_SHA256}=await import('../src/owner-client/student-client.ts');
  t.mock.timers.enable({apis:['setTimeout']});

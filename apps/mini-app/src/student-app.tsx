@@ -9,14 +9,31 @@ import type { StudentFlow } from './flow.ts';
 const StagingStudentPanel = lazy(() => import('./staging-student-panel.tsx'));
 const letters = ['A', 'B', 'C', 'D'];
 
-export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls, onDeleteAccount, deletionBusy = false, stagingPilot = true }: {
+type StudentAppProps = {
   studentFlow: StudentFlow; mode: 'demo' | 'local_fixture' | 'telegram';
   onEnter?: () => Promise<void>; onLogout?: () => Promise<void>; demoControls?: ReactNode;
   onDeleteAccount?: () => void; deletionBusy?: boolean; stagingPilot?:boolean;
-}) {
-  const flow = studentFlow;
+};
+const teacherCabinetUrl = 'https://ustoz.univeracademy.uz/';
+
+function TeacherCabinetEntry() {
+  useEffect(() => { window.location.replace(teacherCabinetUrl); }, []);
+  return <main className="shell"><section className="card">
+    <h1>O‘qituvchi kabineti</h1><p role="status">Kabinet ochilmoqda…</p>
+    <a href={teacherCabinetUrl} referrerPolicy="no-referrer">O‘qituvchi kabinetini ochish</a>
+  </section></main>;
+}
+
+export function StudentApp(props: StudentAppProps) {
+  const { studentFlow } = props;
+  const s = useSyncExternalStore(studentFlow.subscribe, studentFlow.snapshot, studentFlow.snapshot);
+  if (props.mode === 'telegram' && s.student?.teacherCabinet) return <TeacherCabinetEntry />;
+  return <StudentCabinet {...props} state={s} />;
+}
+
+function StudentCabinet({ studentFlow: flow, state: s, mode, onEnter, onLogout, demoControls, onDeleteAccount,
+  deletionBusy = false, stagingPilot = true }: StudentAppProps & {state: ReturnType<StudentFlow['snapshot']>}) {
   const [dashboardPerson, setDashboardPerson] = useState<string | null>(null);
-  const s = useSyncExternalStore(flow.subscribe, flow.snapshot, flow.snapshot);
   const pilot = useMemo(() => stagingPilot && mode === 'telegram' && s.student?.registrationComplete
     ? flow.port.stagingPilot?.(s.student.person) : undefined,[stagingPilot,mode,flow,s.student?.person,s.student?.registrationComplete]);
   const [questionIndex, setQuestionIndex] = useState(0);
