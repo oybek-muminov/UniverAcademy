@@ -12,7 +12,7 @@ import {StaffFixture,validate} from '../tests/backend/staff-fixture.ts';
 import {testNumbers} from '../tests/backend/http-fixture.ts';
 import {studentDirectoryPageSize} from './teacher-student-directory.mjs';
 import {ungroupedSchedule} from './ungrouped-fixture.mjs';
-import {cleanText,importDraft,verifyTeacherImage} from './teacher-pilot-import.mjs';
+import {cleanText,editableDraft,importDraft,replaceDraft,requireEditable,verifyTeacherImage} from './teacher-pilot-import.mjs';
 
 const subject='physics', day=86_400_000;
 const actors = new Map([
@@ -21,7 +21,7 @@ const actors = new Map([
   ['student1',{name:'Aziza Karimova',role:'student',cabinetId:'0100000001'}],
   ['student2',{name:'Bekzod Aliyev',role:'student',cabinetId:'0100000002'}]
 ]);
-const actions = {teacher:['createGroup','addMember','createInvite','sendInvite','importTest','previewTest','publishTest','assignTest'],
+const actions = {teacher:['createGroup','addMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest'],
   admin:['approveGroup'],student:['acceptInvite','startAttempt','saveAnswer','resumeAttempt','submitAttempt']};
 const digest = value => createHash('sha256').update(value).digest('hex');
 const unique = () => randomUUID();
@@ -88,9 +88,9 @@ function testFor(state,actor,id) {
   if (!test || test.teacherPersonId!==actor.personId || test.subjectId!==subject) fail('NOT_FOUND',404);
   return test;
 }
-const groupView=g=>({id:g.id,name:g.name,status:g.status});
+const groupView=g=>({id:g.id,name:g.name,status:g.status,subjectId:g.subjectId});
 const testView=(state,t)=>({id:t.wire.id,title:state.demos[t.wire.demo_id].title,status:t.wire.status,
-  questionCount:t.questionIds.length,duration_seconds:t.wire.duration_seconds});
+  questionCount:t.questionIds.length,duration_seconds:t.wire.duration_seconds,revision:t.wire.revision,subjectId:t.subjectId});
 const assignView=a=>({id:a.admission.assignmentId,groupId:a.admission.groupId,testId:a.published.versionId,title:a.title});
 function scoreView(ordinary) {
   const s=ordinary.display;
@@ -194,6 +194,10 @@ function teacherCommand(state,actor,action,input,key,time) {
     return groupView(group);
   }
   if (action==='importTest') return testView(state,importDraft(state,staff,input,time));
+  if (action==='updateDraft') {
+    const t=testFor(state,actor,input.testId);
+    return testView(state,replaceDraft(state,staff,t,input.draft,input.expectedRevision,time));
+  }
   if (action==='publishTest') {
     const t=testFor(state,actor,input.testId);
     if (t.wire.status!=='published') {
@@ -340,6 +344,7 @@ export function createTeacherPilot({now=Date.now}={}) {
         // Preserve the same underlying idempotency identifier within this actor
         // and operation, even for short caller keys or identical keys on others.
         const commandKey=digest(receiptKey);
+        if (action==='readDraft') return {value:editableDraft(state,testFor(state,actor,input.testId))};
         if (action==='previewTest') return {value:previewTest(state,actor,input.testId,time)};
         if (action==='acceptInvite') return {value:acceptInvite(state,actor,input,commandKey,time)};
         if (actor.role==='student') {
@@ -347,6 +352,7 @@ export function createTeacherPilot({now=Date.now}={}) {
         }
         const request=requestDigest(input), prior=state.pilot.receipts[commandKey];
         if (prior) {
+          if (action==='updateDraft') requireEditable(testFor(state,actor,input.testId));
           if (request!==prior.request) fail('IDEMPOTENCY_CONFLICT',409);
           return {value:structuredClone(prior.value)};
         }

@@ -33,7 +33,7 @@ for (const file of ['student.mjs', 'styles.css']) {
 const mediaTypes = { html: 'text/html', mjs: 'text/javascript', css: 'text/css', json: 'application/json', txt: 'text/plain' };
 const actors = { teacher: ['teacher', 'teacher2'], student: ['student1', 'student2'], admin: ['admin'] };
 const actions = {
-  teacher: new Set(['createGroup', 'addMember', 'createInvite', 'sendInvite', 'previewTest', 'importTest', 'publishTest', 'assignTest']),
+  teacher: new Set(['createGroup', 'addMember', 'createInvite', 'sendInvite', 'previewTest', 'importTest', 'readDraft', 'updateDraft', 'publishTest', 'assignTest']),
   admin: new Set(['approveGroup']),
   student: new Set(['acceptInvite', 'startAttempt', 'resumeAttempt', 'saveAnswer', 'submitAttempt']),
 };

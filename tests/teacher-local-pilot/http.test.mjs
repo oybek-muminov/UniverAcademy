@@ -135,13 +135,24 @@ test('two students join through different entrances, take the uploaded test and 
   assert.equal(success(await teacher.command('publishTest', { testId: draft.id })).status, 'published');
   const assigned = success(await teacher.command('assignTest', { groupId, testId: draft.id }));
   const completed = [];
+  // Exercise two distinct draws without relying on the chance that random orders differ.
+  const randomValues = crypto.getRandomValues.bind(crypto);
+  let draw = 0;
+  t.mock.method(crypto, 'getRandomValues', array =>
+    array instanceof Uint32Array && array.length === 1 ? array.fill(draw) : randomValues(array));
+  let firstOrder;
   for (const [learner, expectedCorrect] of [[byId, 2], [byInvite, 1]]) {
     const dashboard = await learner.dashboard();
     assert.ok(dashboard.assignments.some(item => item.id === assigned.id));
     noAnswerKey(dashboard);
+    draw = learner === byId ? 0 : 1;
     const attempt = success(await learner.command('startAttempt', { assignmentId: assigned.id }));
     noAnswerKey(attempt);
     assert.equal(attempt.questions.length, source.questions.length);
+    const displayed = attempt.questions.find(q => q.text === source.questions[0].text).options.map(o => o.text);
+    assert.deepEqual([...displayed].sort(), [...source.questions[0].options].sort());
+    if (firstOrder) assert.notDeepEqual(displayed, firstOrder);
+    else firstOrder = displayed;
     for (const [position, authored] of source.questions.entries()) {
       const question = attempt.questions.find(q => q.text === authored.text);
       assert.ok(question, authored.text);
@@ -157,6 +168,7 @@ test('two students join through different entrances, take the uploaded test and 
       assert.equal(replay.revision, saved.revision);
     }
     const resumed = success(await learner.command('resumeAttempt', { attemptId: attempt.id }));
+    assert.deepEqual(resumed.questions, attempt.questions);
     assert.equal(resumed.answers.filter(a => a.optionId !== null).length, 2);
     noAnswerKey(resumed);
     const score = success(await learner.command('submitAttempt', { attemptId: attempt.id }));
@@ -221,18 +233,54 @@ test('invalid import never creates a partial draft', async t => {
 });
 
 
+test('a teacher can reopen a saved draft in a new session and continue it without a copy', async t => {
+  const f = await pilot(t);
+  const teacher = await f.actor('teacher');
+  const created = success(await teacher.command('importTest', source));
+  const newSession = await f.actor('teacher');
+  const {id, revision, draft} = success(await newSession.command('readDraft', {testId:created.id}));
+  assert.equal(created.id, id);
+  assert.equal(created.revision, revision);
+  for (const alias of ['teacher2', 'student1']) {
+    const other = await f.actor(alias);
+    denied(await other.command('readDraft', {testId:id}));
+  }
+  const oldKey = draft.questions[0].correct_option_id;
+  draft.questions[0].options.reverse();
+  draft.title = 'Davom ettirilgan test';
+  const input = {testId:id, expectedRevision:revision, draft};
+  const updated = success(await newSession.command('updateDraft', input, 'save-continued'));
+  assert.equal(updated.id, id);
+  assert.ok(updated.revision > revision);
+  assert.deepEqual(success(await newSession.command('updateDraft', input, 'save-continued')), updated);
+  assert.equal((await newSession.command('updateDraft', input, 'stale-save')).response.status, 409);
+  const opened = success(await newSession.command('readDraft', {testId:id}));
+  assert.deepEqual(opened.draft.questions[0].options, draft.questions[0].options);
+  assert.equal(opened.draft.questions[0].correct_option_id, oldKey);
+  assert.equal(opened.draft.title, draft.title);
+  assert.equal((await newSession.dashboard()).tests.length, 1);
+  success(await newSession.command('publishTest', {testId:id}));
+  assert.equal((await newSession.command('readDraft', {testId:id})).response.status, 409);
+  assert.equal((await newSession.command('updateDraft', {...input,expectedRevision:updated.revision})).response.status, 409);
+});
+
 test('TXT preview reports the source line to its teacher and only a valid preview can be saved as a draft', async t => {
   const f = await pilot(t), teacher = await f.actor('teacher'), student = await f.actor('student1');
   const initial = await teacher.dashboard();
   const sample = await f.sampleText();
-  assert.match(sample,/Javob: B/);
+  assert.match(sample,/^\* 5 m\/s$/m);
   denied(await student.preview(sample));
-  const wrongAnswer = await teacher.preview(sample.replace('Javob: B', 'Javob: E'));
+  const wrongAnswer = await teacher.preview(sample.replace('* 5 m/s', '- 5 m/s'));
   assert.equal(wrongAnswer.response.status,422);
-  assert.match(wrongAnswer.payload.error.message,/^9-qator/);
-  const missingOption = await teacher.preview(sample.replace(/^D\) 80 m\/s\n/m,''));
-  assert.equal(missingOption.response.status,422);
-  assert.match(missingOption.payload.error.message,/D\)/);
+  assert.match(wrongAnswer.payload.error.message,/^8-qator/);
+  const doubleKey = await teacher.preview(sample.replace('- 80 m/s', '* 80 m/s'));
+  assert.equal(doubleKey.response.status,422);
+  assert.match(doubleKey.payload.error.message,/bitta to‘g‘ri javob/);
+  const legacy = 'Nomi: Oldingi fayl\n1. Tezlik birligi?\nA) m/s\nB) s\nC) m\nD) N\nJavob: A';
+  assert.deepEqual(success(await teacher.preview(legacy)).questions[0], {
+    text: 'Tezlik birligi?', options: ['m/s', 's', 'm', 'N'], correctIndex: 0,
+  });
+  assert.equal((await teacher.preview(legacy.replace('D) N\n', ''))).response.status, 422);
   const parsed = success(await teacher.preview('\uFEFF' + sample.replaceAll('\n','\r\n')));
   assert.equal(parsed.title, 'Kinematika — qisqa sinov');
   assert.equal(parsed.duration_seconds,300);
@@ -375,7 +423,7 @@ test('invalid LaTeX reports the question, option and block and leaves the teache
   const rejected=await teacher.command('importTest',subject);
   assert.equal(rejected.response.status,422);
   assert.equal(rejected.payload.error.code,'INVALID_FORMULA');
-  assert.match(rejected.payload.error.message,/2-savol, B javobi, 2-blok/);
+  assert.match(rejected.payload.error.message,/2-savol, 2-javob, 2-blok/);
   assert.match(rejected.payload.error.message,/Formula .*LaTeX/);
   assert.deepEqual(await teacher.dashboard(),before);
   options[1].blocks[1]={...fraction,display:'inline'};

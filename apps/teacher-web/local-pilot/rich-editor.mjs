@@ -31,16 +31,15 @@ export function showStudentView(box, draft, renderBlocks) {
     content.className = 'preview-blocks';
     renderBlocks(content, question.prompt_blocks);
     field.append(content);
-    for (const [i, option] of question.options.entries()) {
+    for (const option of question.options) {
       const label = document.createElement('label');
       label.className = 'preview-option';
       const radio = document.createElement('input');
       radio.type = 'radio'; radio.name = box.id + '-' + question.id;
-      const answer = node('span', 'ABCD'[i] + '. ');
       const blocks = document.createElement('span');
       blocks.className = 'preview-blocks';
       renderBlocks(blocks, option.blocks);
-      label.append(radio, answer, blocks);
+      label.append(radio, blocks);
       field.append(label);
     }
     box.append(field);
@@ -78,10 +77,13 @@ function makeLayout(root) {
   buttons.className = 'editor-actions actions';
   const save = action('save-editor', 'Test qoralamasini saqlash', 'submit');
   save.className = 'primary';
-  buttons.append(action('student-preview', 'O‘quvchi ko‘rinishi'), save);
+  buttons.append(action('student-preview', 'O‘quvchi ko‘rinishi'), save, action('new-editor', 'Yangi test'));
   const hint = node('p', 'PNG uchun 2 MiB, SVG uchun 256 KiB gacha rasm yuklashingiz mumkin.');
   hint.className = 'hint';
-  form.append(meta, nav, hint, item('div', 'question-fields'), buttons);
+  const fields = item('fieldset', 'editor-controls');
+  fields.setAttribute('aria-label', 'Test mazmuni');
+  fields.append(meta, nav, hint, item('div', 'question-fields'));
+  form.append(fields, buttons);
   const preview = item('section', 'editor-preview');
   preview.setAttribute('aria-label', 'O‘quvchi ko‘rinishi');
   preview.hidden = true;
@@ -89,14 +91,14 @@ function makeLayout(root) {
 }
 
 // The host supplies the official block renderer, scoped media upload and a QuestionWrite draft saver.
-// Return true from saveDraft only after the write is acknowledged; preserve input on failed saves.
-export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uploadImage, saveDraft, notify: notice}) {
+export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uploadImage, readDraft, saveDraft, onTargetChange, notify: notice}) {
   makeLayout(root);
   const el = id => root.querySelector('#' + id);
   let questions = [newQuestion()];
   let current = 0;
-  let mediaPending = 0;
-  let edits = 0;
+  const uploads = new Set();
+  let dirty = false, busy = false, disposed = false;
+  let target = null;
   let metadata = {};
 
   function hideStudentPreview() {
@@ -104,18 +106,20 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     el('editor-preview').replaceChildren();
   }
   function changed() {
-    edits++;
+    dirty = true;
+    el('save-editor').disabled = busy;
     hideStudentPreview();
   }
-  function blockGroup(blocks, legend, option) {
+  function blockGroup(question, blocks, legend, option) {
     const group = document.createElement('fieldset');
     group.append(node('legend', legend));
     if (option) {
       const radio = document.createElement('input');
       radio.type = 'radio';
       radio.name = 'answer-key';
-      radio.checked = questions[current].correct_option_id === option.id;
-      radio.onchange = () => { questions[current].correct_option_id = option.id; changed(); };
+      radio.value = option.id;
+      radio.checked = question.correct_option_id === option.id;
+      radio.onchange = () => { if (radio.checked) { question.correct_option_id = option.id; changed(); } };
       const label = labelled('To‘g‘ri javob', radio);
       label.className = 'correct-choice';
       group.append(label);
@@ -174,14 +178,20 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     file.onchange = async () => {
       const image = file.files[0];
       if (!image) return;
-      mediaPending++;
+      const upload = {question};
+      uploads.add(upload);
+      changed();
       try {
         notice('Rasm yuklanmoqda…');
         const id = await uploadImage(image);
+        if (disposed || !questions.includes(question)) return;
         blocks.push({ type: 'image', asset_id: id, alt: '' });
-        changed(); drawEditor(); notice('Rasm yuklandi. Uning tavsifini yozing.');
-      } catch (error) { notice('', error.message); }
-      finally { mediaPending--; }
+        changed();
+        if (questions[current] === question) {
+          drawEditor(); notice('Rasm yuklandi. Uning tavsifini yozing.');
+        }
+      } catch (error) { if (!disposed && questions[current] === question) notice('', error.message); }
+      finally { uploads.delete(upload); }
     };
     const imageLabel = labelled('Rasm qo‘shish (PNG yoki SVG)', file);
     tools.append(imageLabel);
@@ -195,10 +205,19 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     el('editor-question').value = question.id;
     el('remove-question').disabled = questions.length === 1;
     el('add-question').disabled = questions.length >= 200;
-    const fields = [blockGroup(question.prompt_blocks, 'Savol mazmuni')];
-    for (const [i, option] of question.options.entries()) {
-      fields.push(blockGroup(option.blocks, 'ABCD'[i] + ' varianti', option));
+    const fields = [];
+    if (metadata.grading_config?.individual_enabled) {
+      const points = document.createElement('input');
+      points.id = 'question-points'; points.inputMode = 'decimal'; points.required = true;
+      points.value = question.individual_points ?? '';
+      points.oninput = () => { question.individual_points = points.value; changed(); };
+      fields.push(labelled('Savol bali', points));
     }
+    fields.push(blockGroup(question, question.prompt_blocks, 'Savol mazmuni'));
+    for (const [i, option] of question.options.entries()) {
+      fields.push(blockGroup(question, option.blocks, (i + 1) + '-javob', option));
+    }
+    fields.push(blockGroup(question, question.explanation_blocks, 'Yechim (ixtiyoriy)'));
     el('question-fields').replaceChildren(...fields);
   }
   function populated(blocks) {
@@ -211,31 +230,36 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     if (!Number.isInteger(duration) || duration < 1 || duration > 86400) {
       el('editor-duration').focus(); throw Error('Vaqtni 1–86400 soniya oralig‘ida kiriting.');
     }
-    if (mediaPending) throw Error('Rasm yuklanishini kuting.');
+    if ([...uploads].some(upload => questions.includes(upload.question))) throw Error('Rasm yuklanishini kuting.');
     const result = questions.map((question, i) => {
       const prompt = populated(question.prompt_blocks);
       const options = question.options.map(option => ({ ...option, blocks: populated(option.blocks) }));
+      const explanation = populated(question.explanation_blocks);
       let issue = '';
-      if (!prompt.length) issue = 'Savol mazmunini kiriting.';
+      if (metadata.grading_config?.individual_enabled && (typeof question.individual_points !== 'string' ||
+        !/^(?:0|[1-9][0-9]?)(?:\.[0-9]{1,3})?(?![\s\S])/.test(question.individual_points) ||
+        Number(question.individual_points) <= 0 || Number(question.individual_points) > 30)) {
+        issue = 'Savol balini 0 dan katta, 30 gacha, nuqtadan keyin ko‘pi bilan uchta raqam bilan kiriting.';
+      } else if (!prompt.length) issue = 'Savol mazmunini kiriting.';
       else if (options.some(option => !option.blocks.length)) issue = 'To‘rtta variantning har biriga javob kiriting.';
-      else if (requireKey && !question.correct_option_id) issue = 'To‘g‘ri javobni belgilang.';
-      else if ([...prompt, ...options.flatMap(option => option.blocks)].some(block => block.type === 'image' && !block.alt.trim())) {
+      else if (requireKey && !options.some(option => option.id === question.correct_option_id)) issue = 'To‘g‘ri javobni belgilang.';
+      else if ([...prompt, ...options.flatMap(option => option.blocks), ...explanation].some(block => block.type === 'image' && !block.alt.trim())) {
         issue = 'Har bir rasmning qisqa tavsifini kiriting.';
       }
       if (issue) { current = i; drawEditor(); throw Error((i + 1) + '-savol. ' + issue); }
-      return { ...question, position: i + 1, prompt_blocks: prompt, options };
+      return { ...question, position: i + 1, prompt_blocks: prompt, options, explanation_blocks: explanation };
     });
     return { ...metadata, title, duration_seconds: duration, questions: result };
   }
   el('editor-question').onchange = event => {
     current = questions.findIndex(question => question.id === event.target.value);
-    drawEditor();
+    hideStudentPreview(); drawEditor(); notice();
   };
   el('add-question').onclick = () => {
     if (questions.length >= 200) return;
     questions.push(newQuestion());
     current = questions.length - 1;
-    changed(); drawEditor();
+    changed(); drawEditor(); notice();
   };
   el('remove-question').onclick = () => {
     if (questions.length < 2) return;
@@ -252,19 +276,18 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     } catch (error) { notice('', error.message); }
   };
 
-  el('editor-form').onsubmit = async event => {
-    event.preventDefault();
-    const revision = edits;
-    try {
-      if (await saveDraft(buildDraft(true)) && revision === edits) {
-        questions = [newQuestion()]; current = 0; edits = 0; metadata = {};
-        el('editor-title').value = ''; el('editor-duration').value = '1800';
-        hideStudentPreview(); drawEditor();
-      }
-    } catch (error) { notice('', error.message); }
-  };
-  function openFile(preview) {
-    if (edits && !window.confirm('Muharrirdagi saqlanmagan test o‘rniga faylni ochasizmi?')) return;
+  function syncControls() {
+    const reload = target && target.revision === null;
+    el('editor-controls').disabled = busy || Boolean(reload);
+    el('editor-form').setAttribute('aria-busy', String(busy));
+    el('save-editor').disabled = busy || Boolean(target && !reload && !dirty);
+    el('new-editor').disabled = busy;
+    el('student-preview').disabled = busy || Boolean(reload);
+    el('save-editor').textContent = reload ? 'Saqlangan qoralamani qayta ochish' :
+      target ? 'O‘zgarishlarni saqlash' : 'Test qoralamasini saqlash';
+    onTargetChange(target?.id ?? null);
+  }
+  function replaceContent(preview, reference, index = 0) {
     metadata = {};
     if (preview.instructions_blocks) metadata.instructions_blocks = structuredClone(preview.instructions_blocks);
     if (preview.grading_config) metadata.grading_config = structuredClone(preview.grading_config);
@@ -278,9 +301,68 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
       q.correct_option_id = q.options[source.correctIndex].id;
       return q;
     });
-    current = 0;
-    changed(); drawEditor(); el('editor-title').focus(); notice('Fayldagi savollar muharrirga olindi.');
+    current = Math.min(index, questions.length - 1);
+    target = reference;
+    dirty = false;
+    hideStudentPreview(); drawEditor(); syncControls();
+  }
+  function canReplace() {
+    return !busy && (!dirty || window.confirm('Muharrirdagi saqlanmagan o‘zgarishlarni bekor qilasizmi?'));
+  }
+  async function loadCanonical(id, stillSelected, index) {
+    const result = await readDraft(id);
+    if (disposed || !stillSelected()) return false;
+    replaceContent(result.draft, {id, revision: result.revision}, index);
+    return true;
+  }
+  async function openSaved(id, stillSelected) {
+    if (!canReplace()) return;
+    busy = true; syncControls(); notice('Qoralama ochilmoqda…');
+    let opened = false;
+    try {
+      opened = await loadCanonical(id, stillSelected, 0);
+      if (opened) notice('Qoralama tahrirlash uchun ochildi.');
+    } catch (error) { if (!disposed && stillSelected()) notice('', error.message); }
+    finally { if (!disposed) { busy = false; syncControls(); } }
+    if (opened && !disposed) el('editor-title').focus();
+  }
+  el('editor-form').onsubmit = async event => {
+    event.preventDefault();
+    if (busy || disposed || (target && target.revision !== null && !dirty)) return;
+    busy = true; syncControls();
+    try {
+      const creating = !target;
+      if (creating || target.revision !== null) {
+        const receipt = await saveDraft(buildDraft(true), target);
+        if (!receipt || disposed) return;
+        if (typeof receipt.id !== 'string' || !receipt.id || (!creating && (receipt.id !== target.id ||
+          !Number.isSafeInteger(receipt.revision) || receipt.revision <= target.revision))) throw Error('Qoralama versiyasini tekshirib bo‘lmadi.');
+        // Import generates canonical question and option IDs. Bind the acknowledged
+        // test immediately so even a failed follow-up read cannot create a duplicate.
+        target = {id:receipt.id, revision: creating ? null : receipt.revision};
+        dirty = false;
+      }
+      if (target.revision === null && await loadCanonical(target.id, () => true, current)) notice('Test qoralamasi saqlandi.');
+    } catch (error) {
+      if (!disposed) notice('', target?.revision === null ? 'Qoralama saqlangan. Davom etish uchun uni qayta oching.' : error.message);
+    } finally { if (!disposed) { busy = false; syncControls(); } }
+  };
+  function reset() {
+    replaceContent({title:'', duration_seconds:1800, questions:[newQuestion()]}, null);
+  }
+  el('new-editor').onclick = () => {
+    if (canReplace()) { reset(); el('editor-title').focus(); notice(); }
+  };
+  function openFile(preview) {
+    if (!canReplace()) return;
+    replaceContent(preview, null);
+    changed(); el('editor-title').focus(); notice('Fayldagi savollar muharrirga olindi.');
   }
   drawEditor();
-  return { openFile };
+  return {
+    openFile, openSaved,
+    readyToPublish(id) { return !busy && (target?.id !== id || !dirty); },
+    published(id) { if (target?.id === id) reset(); },
+    dispose() { disposed = true; },
+  };
 }

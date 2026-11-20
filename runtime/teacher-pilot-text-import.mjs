@@ -20,6 +20,26 @@ export function parseTeacherTestText(text) {
     cursor += 1;
     return { row, value: match[1].trim() };
   }
+  function answers(number) {
+    if (/^[-*]/u.test(lines[cursor]?.value ?? '')) {
+      const options = [];
+      let correctIndex = -1;
+      for (let i = 0; i < 4; i++) {
+        const {row, value} = take(/^[-*]\s+(.+)$/u, number + '-savol uchun javobni «- matn» yoki «* matn» shaklida yozing.');
+        if (row.value.startsWith('*')) {
+          if (correctIndex !== -1) invalid(row.line, 'Faqat bitta to‘g‘ri javobni * bilan belgilang.');
+          correctIndex = i;
+        }
+        options.push(value);
+      }
+      if (correctIndex === -1) invalid(lines[cursor - 1].line, 'To‘g‘ri javobni * bilan belgilang.');
+      return {options, correctIndex};
+    }
+    const options = labels.map(label => take(new RegExp('^' + label + '[.)]\\s*(.+)$', 'iu'),
+      number + '-savol uchun «' + label + ') …» varianti kutilgan.').value);
+    const answer = take(/^Javob:\s*([ABCD])$/iu, number + '-savol oxirida «Javob: A», B, C yoki D yozing.');
+    return {options, correctIndex:labels.indexOf(answer.value.toUpperCase())};
+  }
   const title = take(/^Nomi:\s*(.+)$/iu, 'Test sarlavhasini «Nomi: …» shaklida yozing.').value;
   if (title.length > 160) invalid(lines[0].line, 'Sarlavhani 160 belgigacha qisqartiring.');
   let duration_seconds = DEFAULT_DURATION;
@@ -36,10 +56,7 @@ export function parseTeacherTestText(text) {
     const question = /^(\d+)[.)]\s*(.+)$/u.exec(row.value);
     if (!question || Number(question[1]) !== number) invalid(row.line, 'Navbatdagi savolni «' + number + '. …» shaklida yozing.');
     cursor += 1;
-    const options = labels.map(label => take(new RegExp('^' + label + '[.)]\\s*(.+)$', 'iu'),
-      number + '-savol uchun «' + label + ') …» varianti kutilgan.').value);
-    const answer = take(/^Javob:\s*([ABCD])$/iu, number + '-savol oxirida «Javob: A», B, C yoki D yozing.');
-    questions.push({ text:question[2].trim(), options, correctIndex:labels.indexOf(answer.value.toUpperCase()) });
+    questions.push({ text:question[2].trim(), ...answers(number) });
   }
   if (!questions.length) invalid(source.length, 'Sarlavhadan so‘ng kamida bitta savol kiriting.');
   return { title, duration_seconds, questions };

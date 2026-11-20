@@ -18,5 +18,5 @@ try {
   });
   const actor=routes(api,'student',input.token);
   const resumed=await good(actor.command('resumeAttempt',{attemptId:input.attempt}));
-  process.stdout.write(JSON.stringify({id:resumed.id,answers:resumed.answers}));
+  process.stdout.write(JSON.stringify({id:resumed.id,answers:resumed.answers,questions:resumed.questions}));
 } finally {await pool.end();}

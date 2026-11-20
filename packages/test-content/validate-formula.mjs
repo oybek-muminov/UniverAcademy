@@ -20,7 +20,7 @@ export function validatePilotFormulas(questions, instructions = []) {
   questions.forEach((question,i) => {
     const name = (i + 1) + '-savol';
     check(question.prompt_blocks,name);
-    question.options?.forEach((option,j) => check(option.blocks,name + ', ' + 'ABCD'[j] + ' javobi'));
+    question.options?.forEach((option,j) => check(option.blocks,name + ', ' + (j + 1) + '-javob'));
     check(question.explanation_blocks,name + ', yechim');
   });
 }

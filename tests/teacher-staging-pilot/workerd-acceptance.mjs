@@ -37,6 +37,8 @@ try {
   cluster=await createCluster();
   const db=cluster.admin;
   await db.query(await readFile(join(root,'supabase/migrations/teacher-staging/up.sql'),'utf8'));
+  await db.query('ALTER SCHEMA ua_cabinet OWNER TO ua_owner');
+  await db.query(await readFile(join(root,'supabase/migrations/teacher-staging/draft-edit/001_up.sql'),'utf8'));
   const connection=await createServiceLogin(cluster,'qa_workerd_cabinet',[
     {role:'ua_api_login',inherit:true,set:false},{role:'ua_cabinet_stage',inherit:false,set:true}
   ]);
@@ -122,6 +124,16 @@ try {
   const image=await good(teacherUI.upload(graphSvg,'image/svg+xml'));
   await rejected(student.image(image.id),404);
   const draft=await good(teacherUI.command('importTest',richDocument(image.id)));
+  const open=await good(teacherUI.command('readDraft',{testId:draft.id}));
+  const key=open.draft.questions[0].correct_option_id;
+  open.draft.questions[0].options.reverse();
+  open.draft.title+=' (tahrirlangan)';
+  const saved=await good(teacherUI.command('updateDraft',{testId:draft.id,expectedRevision:open.revision,draft:open.draft}));
+  assert.equal(saved.id,draft.id);
+  const reloaded=await good(teacherUI.command('readDraft',{testId:draft.id}));
+  assert.equal(reloaded.revision,saved.revision);
+  assert.deepEqual(reloaded.draft,open.draft);
+  assert.equal(reloaded.draft.questions[0].correct_option_id,key);
   await good(teacherUI.command('publishTest',{testId:draft.id}));
   const assignment=await good(teacherUI.command('assignTest',{testId:draft.id,groupId:g.id}));
   const attempt=await good(student.command('startAttempt',{assignmentId:assignment.id})),q=attempt.questions[0];
@@ -133,12 +145,15 @@ try {
   assert.equal(png.readUInt32BE(16),96);assert.equal(png.readUInt32BE(20),50);
   const correct=q.options.find(o=>o.blocks.some(b=>b.latex===String.raw`\frac{20}{4}`));
   await good(student.command('saveAnswer',{attemptId:attempt.id,questionId:q.id,optionId:correct.id,expectedRevision:0}));
+  const resumed=await good(student.command('resumeAttempt',{attemptId:attempt.id}));
+  assert.deepEqual(resumed.questions,attempt.questions);
+  assert.equal(resumed.answers[0].optionId,correct.id);
   const score=await good(student.command('submitAttempt',{attemptId:attempt.id}));
   assert.equal(score.percentage,'100.00');
   assert.equal((await good(teacherUI.dashboard())).results.find(r=>r.attemptId===attempt.id).percentage,score.percentage);
   assert.equal((await db.query('SELECT count(*)::int n FROM ua_private.ordinary_results WHERE attempt_id=$1',[attempt.id])).rows[0].n,1);
   assert.ok(clerkCalls.includes('/.well-known/jwks.json'));
-  console.log('PASS workerd. Bundled Ustoz Pages and API verified signed staff JWTs and the student session, created a teacher-owned active group, selected an eligible student from its paged directory, imported/published a rich test, rendered a private PNG, enrolled a second learner via the compiled Telegram bot and both directory bindings, stored answers and returned the persisted grade.');
+  console.log('PASS workerd. Bundled Ustoz Pages and API verified signed staff JWTs and the student session, created a teacher-owned active group, selected an eligible student from its paged directory, resumed, edited and published the same rich test, rendered a private PNG, enrolled a second learner via the compiled Telegram bot and both directory bindings, stored answers and returned the persisted grade.');
 } finally {
   try { await mf?.dispose(); } finally { try {await cluster?.close();} finally {await rm(bundle,{recursive:true,force:true});} }
 }

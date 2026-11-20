@@ -22,9 +22,7 @@ function context(dom,t) {
   t.after(() => dom.window.close());
 }
 
-test('the teacher can use a new group immediately and the staff browser keeps each request bound to its session', async t => {
-  const dom = new JSDOM('<div id="host"></div>',{url:origin+'/',pretendToBeVisual:true});
-  context(dom,t);
+async function workspace(t) {
   const hooks = registerHooks({ resolve(specifier,ctx,next) {
     let value;
     if(specifier.endsWith('?raw')) value = readFileSync(new URL(specifier.split('?')[0],ctx.parentURL),'utf8');
@@ -34,7 +32,13 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
     return {url:'data:text/javascript,'+encodeURIComponent('export default '+JSON.stringify(value)),shortCircuit:true};
   }});
   t.after(() => hooks.deregister());
-  const {mountAuthenticatedWorkspace} = await import('../../apps/mini-app/teacher-entrance/staff-workspace.mjs');
+  return (await import('../../apps/mini-app/teacher-entrance/staff-workspace.mjs')).mountAuthenticatedWorkspace;
+}
+
+test('the teacher can use a new group immediately and the staff browser keeps each request bound to its session', async t => {
+  const dom = new JSDOM('<div id="host"></div>',{url:origin+'/',pretendToBeVisual:true});
+  context(dom,t);
+  const mountAuthenticatedWorkspace = await workspace(t);
   const host = document.getElementById('host');
   const el = id => host.querySelector('#'+id);
   const adminButton = () => [...host.querySelectorAll('button')].find(x=>x.textContent==='Admin bo‘limi');
@@ -181,6 +185,121 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   assert.equal(tokenCount,calls.length);
   identity={...identityValue,generation:'different'};notify();
   assert.equal(host.childNodes.length,0);
+});
+
+test('a delayed image and selected answer stay with their question; the first save binds the canonical draft even if its read must be retried', async t => {
+  let dispose;
+  t.after(()=>dispose?.());
+  const dom = new JSDOM('<!doctype html><div id="host"></div>', {url:origin+'/',pretendToBeVisual:true});
+  context(dom,t);
+  const mount = await workspace(t);
+  const id = crypto.randomUUID(), imageId = crypto.randomUUID(), media = Promise.withResolvers();
+  let record, imports = 0, reads = 0, updates = 0, mediaStarted = false;
+  const host = document.getElementById('host');
+  const el = key => host.querySelector('#'+key);
+  const controls = name => [...el('question-fields').children].find(field => field.querySelector('legend').textContent === name);
+  const type = (control,text) => { control.value=text; control.dispatchEvent(new window.Event('input')); };
+  const ask = key => el(key).dispatchEvent(new window.Event('change'));
+  const submit = () => el('editor-form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+  async function until(check) {
+    for(let i=0;i<200;i++) { if(check()) return; await pause(5); }
+    assert.fail('Editor did not settle: '+el('notice')?.textContent+' / '+el('problem')?.textContent);
+  }
+  dispose = mount(host,{
+    origin,identity:{current:()=>identityValue,subscribe:()=>()=>{},signOut:async()=>{}},getCurrentClerkToken:async()=>'test-bearer',
+    async fetch(url,options) {
+      assert.equal(options.headers.get('authorization'),'Bearer test-bearer');
+      const path = new URL(url).pathname;
+      const summary = () => ({id,title:record.draft.title,subjectId:'physics',status:'draft',revision:record.revision,
+        duration_seconds:record.draft.duration_seconds,questionCount:record.draft.questions.length});
+      if(path.endsWith('/dashboard')) return located(success({role:'teacher',person_id:person,name:'Ustoz',groups:[],subjects:[{id:'physics',title:'Fizika'}],
+        tests: record ? [summary()] : [], assignments:[],results:[]}),url);
+      if(path.endsWith('/media')) {
+        mediaStarted = true; await media.promise; return located(success({id:imageId}),url);
+      }
+      if(path.endsWith('/media/'+imageId)) return located(new Response(Uint8Array.of(137,80,78,71),{
+        headers:{'cache-control':'no-store','content-type':'image/png'}}),url);
+      const body = JSON.parse(options.body);
+      if(path.endsWith('/importTest')) {
+        imports++;
+        const {subjectId,...draft}=body; assert.equal(subjectId,'physics');
+        for(const question of draft.questions) {
+          question.id=crypto.randomUUID();
+          for(const option of question.options) {
+            const canonical=crypto.randomUUID();
+            if(option.id===question.correct_option_id) question.correct_option_id=canonical;
+            option.id=canonical;
+          }
+        }
+        record={id,revision:2,draft};
+        return located(success(summary()),url);
+      }
+      if(path.endsWith('/readDraft')) {
+        assert.deepEqual(body,{testId:id});
+        if(++reads===1) throw Error('Fixture connection interrupted after committed import');
+        return located(success(record),url);
+      }
+      assert(path.endsWith('/updateDraft'));
+      assert.deepEqual(Object.keys(body).sort(),['draft','expectedRevision','testId']);
+      assert.equal(body.testId,id); assert.equal(body.expectedRevision,record.revision);
+      assert.deepEqual(body.draft.questions.map(q=>[q.id,q.correct_option_id]),record.draft.questions.map(q=>[q.id,q.correct_option_id]));
+      if(++updates===2) return located(Response.json({error:{code:'RESOURCE_REVISION_CONFLICT'}},
+        {status:409,headers:{'cache-control':'no-store'}}),url);
+      record={id,revision:3,draft:body.draft};
+      return located(success(summary()),url);
+    }
+  });
+  await until(()=>el('identity-name')?.textContent==='Ustoz');
+  type(el('editor-title'),'Masofalar');
+  function fill(prompt,correct) {
+    type(controls('Savol mazmuni').querySelector('textarea'),prompt);
+    for(let i=1;i<=4;i++) type(controls(i+'-javob').querySelector('textarea'),prompt+' '+i);
+    controls(correct+'-javob').querySelector('input[type=radio]').click();
+  }
+  fill('Birinchi',3);
+  const fields = controls('Savol mazmuni');
+  [...fields.querySelectorAll('button')].find(b=>b.textContent==='Formula qo‘shish').click();
+  type(controls('Savol mazmuni').querySelector('[data-formula-input]'),'x^2');
+  [...controls('Yechim (ixtiyoriy)').querySelectorAll('button')].find(b=>b.textContent==='Matn qo‘shish').click();
+  type(controls('Yechim (ixtiyoriy)').querySelector('textarea'),'Birinchi yechim');
+  const file = controls('3-javob').querySelector('input[type=file]');
+  Object.defineProperty(file,'files',{value:[new File(['PNG'],'diagram.png',{type:'image/png'})]});
+  file.dispatchEvent(new window.Event('change'));
+  await until(()=>mediaStarted);
+  const first = el('editor-question').value;
+  el('add-question').click();
+  const second = el('editor-question').value;
+  assert.notEqual(first,second);
+  assert.equal(el('question-fields').querySelector('input:checked, img, [data-formula-input]'),null);
+  assert([...el('question-fields').querySelectorAll('textarea')].every(input=>input.value===''));
+  assert.equal(controls('Yechim (ixtiyoriy)').querySelector('textarea'),null);
+  const secondPrompt = controls('Savol mazmuni').querySelector('textarea');
+  fill('Ikkinchi',2);
+  media.resolve(); await pause(20);
+  assert.equal(secondPrompt,controls('Savol mazmuni').querySelector('textarea'));
+  assert.equal(secondPrompt.value,'Ikkinchi');
+  assert(controls('2-javob').querySelector('input:checked'));
+  assert.equal(el('question-fields').querySelector('img, [data-formula-input]'),null);
+  el('editor-question').value=first; ask('editor-question');
+  assert.equal(controls('Savol mazmuni').querySelector('[data-formula-input]').value,'x^2');
+  assert(controls('3-javob').querySelector('input:checked'));
+  assert.equal(controls('Yechim (ixtiyoriy)').querySelector('textarea').value,'Birinchi yechim');
+  type(controls('3-javob').querySelector('.block-row input:not([type])'),'Xususiy rasm');
+  submit();
+  await until(()=>el('save-editor').textContent.includes('qayta ochish') && !el('save-editor').disabled);
+  assert.equal(imports,1); assert(el('editor-controls').disabled);
+  submit();
+  await until(()=>el('save-editor').textContent==='O‘zgarishlarni saqlash' && !el('editor-controls').disabled);
+  assert.equal(imports,1);
+  assert.equal(controls('3-javob').querySelector('input:checked').value,record.draft.questions[0].correct_option_id);
+  assert.equal(controls('3-javob').querySelector('.block-row input:not([type])').value,'Xususiy rasm');
+  type(el('editor-title'),'Masofa testi'); submit();
+  await until(()=>updates===1 && !el('editor-controls').disabled);
+  type(el('editor-title'),'Saqlanmagan tahrir'); submit();
+  await until(()=>el('problem').textContent.includes('boshqa oynada'));
+  assert.equal(el('editor-title').value,'Saqlanmagan tahrir');
+  assert.equal(record.draft.title,'Masofa testi');
+  assert.equal(imports,1); assert.equal(reads,2);
 });
 
 test('token lookup races never dispatch or render for the replacement identity',async t=>{

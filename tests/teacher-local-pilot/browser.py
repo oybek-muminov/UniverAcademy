@@ -82,10 +82,10 @@ def add_rich_test(teacher):
     prompt.locator('[data-formula-input]').fill(r'\frac{s}{t}')
     prompt.locator('input[type=file]').set_input_files({'name':'harakat.svg','mimeType':'image/svg+xml','buffer':SVG})
     prompt.get_by_label('Rasm tavsifi').fill('Masofaning vaqtga bog‘lanishi')
-    for letter, label in zip('ABCD', ['Bir metr/soniya', 'Besh metr/soniya', 'O‘n metr/soniya', 'Yigirma metr/soniya']):
-        option = teacher.get_by_role('group', name=letter + ' varianti', exact=True)
+    for index, label in enumerate(['Bir metr/soniya', 'Besh metr/soniya', 'O‘n metr/soniya', 'Yigirma metr/soniya'], start=1):
+        option = teacher.get_by_role('group', name=f'{index}-javob', exact=True)
         option.get_by_label('Matn', exact=True).fill(label)
-        if letter == 'B':
+        if index == 2:
             option.get_by_role('button', name='Formula qo‘shish').click()
             option.locator('[data-formula-input]').fill(r'\frac{20}{4}')
             option.locator('input[type=file]').set_input_files({'name':'grafik.png','mimeType':'image/png','buffer':png_diagram()})

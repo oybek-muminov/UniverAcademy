@@ -91,7 +91,7 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   el('edit-file').click();
   assert(el('editor-title').value);
   const prompt = () => group('Savol mazmuni');
-  const option = () => group('A varianti');
+  const option = () => group('1-javob');
   [...prompt().querySelectorAll('button')].find(control => control.textContent === 'Formula qo‘shish').click();
   const source = () => prompt().querySelector('[data-formula-input]');
   input(source(), String.raw`\UniverUnknownCommand`);
@@ -117,7 +117,27 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   assert.equal(image.alt, 'Tajriba chizmasi');
   assert.equal((await browserFetch(image.src)).headers.get('content-type'), 'image/png');
   submit(el('editor-form'), el('save-editor'));
-  await until(() => el('test-meta').textContent.includes('Qoralama'), 'save draft');
+  await until(() => el('save-editor').textContent === 'O‘zgarishlarni saqlash' && !el('editor-controls').disabled, 'import and load canonical draft');
+  const savedId = el('saved-test').value;
+  const before = await post('teacher/commands/readDraft', {testId:savedId});
+  el('new-editor').click();
+  assert.equal(el('editor-title').value, '');
+  el('edit-saved').click();
+  await until(() => !el('editor-controls').disabled && el('editor-title').value === before.draft.title, 'resume from the saved list');
+  assert.equal(option().querySelector('input[type=radio]').value, before.draft.questions[0].options[0].id);
+  assert(option().querySelector('img[alt="Tajriba chizmasi"]'));
+  input(prompt().querySelector('textarea'), 'Yangilangan savol');
+  submit(el('editor-form'), el('save-editor'));
+  await until(() => el('save-editor').disabled && !el('editor-controls').disabled, 'save same draft');
+  const after = await post('teacher/commands/readDraft', {testId:savedId});
+  assert(after.revision > before.revision);
+  assert.equal(after.draft.questions[0].id, before.draft.questions[0].id);
+  assert.equal(after.draft.questions[0].correct_option_id, before.draft.questions[0].correct_option_id);
+  assert.deepEqual(after.draft.questions[0].options, before.draft.questions[0].options);
+  assert.equal(after.draft.questions[0].prompt_blocks[0].markdown, 'Yangilangan savol');
+  assert.deepEqual(after.draft.instructions_blocks,before.draft.instructions_blocks);
+  assert.deepEqual(after.draft.grading_config,before.draft.grading_config);
+  assert.equal(el('saved-test').options.length,1);
   el('view-saved').click();
   await until(() => el('saved-preview').querySelector('.katex'), 'reopen saved draft');
   assert(el('saved-preview').querySelector('img[alt="Tajriba chizmasi"]'));
@@ -169,12 +189,32 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   assert.equal(Number(score.percentage), 100);
 
   const options = ['A','B','C','D'].map(markdown => ({id: crypto.randomUUID(), blocks: [{type:'text', markdown}]}));
-  const canonical = {title:'Fayldan',questions:[{id:crypto.randomUUID(), position:1, expected_revision:0,
-    prompt_blocks:[{type:'formula',latex:'a^2',display:'inline'}], options, correct_option_id:options[1].id, explanation_blocks:[]}]};
+  const canonical = {title:'Fayldan',grading_config:{individual_enabled:true},questions:[{id:crypto.randomUUID(), position:1, expected_revision:0,
+    individual_points:'3.500', prompt_blocks:[{type:'formula',latex:'a^2',display:'inline'}], options, correct_option_id:options[1].id, explanation_blocks:[]}]};
   selectFile(el('test-file'), new File([JSON.stringify(canonical)], 'source.json', {type:'application/json'}));
   await until(() => !el('edit-file').disabled && el('preview').textContent.includes('Fayldan'), 'canonical JSON preview');
   el('edit-file').click();
   assert.equal(source().value, 'a^2');
   assert.equal(prompt().querySelector('.formula-editor select').value, 'inline');
-  assert(group('B varianti').querySelector('input[type=radio]').checked);
+  assert(group('2-javob').querySelector('input[type=radio]').checked);
+  assert.equal(el('question-points').value, '3.500');
+  submit(el('editor-form'), el('save-editor'));
+  await until(() => el('save-editor').textContent === 'O‘zgarishlarni saqlash' && !el('editor-controls').disabled, 'open saved weighted draft');
+  const weightedId = el('saved-test').value;
+  el('add-question').click();
+  assert.equal(el('question-points').value,'');
+  input(prompt().querySelector('textarea'),'Yangi savol');
+  for(let i=1;i<=4;i++) input(group(i+'-javob').querySelector('textarea'),'Javob '+i);
+  group('4-javob').querySelector('input[type=radio]').click();
+  for(const invalid of ['', '0', '0.000', '01', '1.2345', '30.001','1e1','1,0','1.0 ']) {
+    input(el('question-points'),invalid); submit(el('editor-form'),el('save-editor'));
+    assert.match(el('problem').textContent,/2-savol.*Savol balini/);
+  }
+  for(const points of ['0.001','30.000']) {
+    input(el('question-points'),points); submit(el('editor-form'),el('save-editor'));
+    await until(() => !el('editor-controls').disabled && el('save-editor').disabled, 'weighted edit accepted');
+    const stored = await post('teacher/commands/readDraft',{testId:weightedId});
+    assert.deepEqual(stored.draft.questions.map(q=>q.individual_points), ['3.500',points]);
+    assert(stored.draft.grading_config.individual_enabled);
+  }
 });

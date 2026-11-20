@@ -2,15 +2,13 @@ Nomi: Kinematika — qisqa sinov
 Vaqt (soniya): 300
 
 1. Jism 4 soniyada 20 metr yo‘l bosdi. O‘rtacha tezlik qancha?
-A) 4 m/s
-B) 5 m/s
-C) 16 m/s
-D) 80 m/s
-Javob: B
+- 4 m/s
+* 5 m/s
+- 16 m/s
+- 80 m/s
 
 2. Tekis to‘g‘ri chiziqli harakatda qaysi kattalik o‘zgarmaydi?
-A) Vaqt
-B) Bosib o‘tilgan yo‘l
-C) Tezlik
-D) Koordinata
-Javob: C
+- Vaqt
+- Bosib o‘tilgan yo‘l
+* Tezlik
+- Koordinata

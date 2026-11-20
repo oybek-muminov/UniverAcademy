@@ -1,11 +1,11 @@
 import { studentDirectoryPageSize } from './teacher-student-directory.mjs';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
-import {cleanText} from './teacher-pilot-import.mjs';
-import {query,need,needId,groupView,createDraft,publish,assign,preview,ownedTest} from './teacher-staging-content.mjs';
+import {cleanText,editableDraft,requireEditable} from './teacher-pilot-import.mjs';
+import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest} from './teacher-staging-content.mjs';
 import {dashboard} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
-const actions={teacher:new Set(['dashboard','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','previewTest','publishTest','assignTest','readMedia','putMedia']),
+const actions={teacher:new Set(['dashboard','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia']),
  student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
@@ -162,6 +162,12 @@ async function authorizeResource(tx,actor,action,input){
     if(action==='assignTest')await ownedTest(tx,actor,input.testId);
     return g;
   }
+  if(action==='updateDraft'){
+    if(Object.keys(input).some(k=>!['testId','expectedRevision','draft'].includes(k)))fail('VALIDATION_ERROR',422);
+    const loaded=await ownedTest(tx,actor,input.testId,true);
+    requireEditable(loaded.t);
+    return loaded;
+  }
   if(action==='publishTest')await ownedTest(tx,actor,input.testId);
   return null;
 }
@@ -186,6 +192,7 @@ async function effect(tx,actor,action,input,subjectId,g){
     case 'createInvite':return invite(tx,actor,g,null,false);
     case 'sendInvite':return invite(tx,actor,g,await byCabinet(tx,input.univeracademy_id),true);
     case 'importTest':{const {subjectId:_,...file}=input;return createDraft(tx,actor,file,subjectId);}
+    case 'updateDraft':return saveDraft(tx,actor,g,input);
     case 'publishTest':return publish(tx,actor,input.testId);
     case 'assignTest':return assign(tx,actor,g,input.testId);
     default:fail('FORBIDDEN',403);
@@ -202,6 +209,10 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   }
   if(action==='availableStudents')return availableStudents(tx,actor,input);
   if(action==='readMedia'||action==='putMedia')return media(tx,actor,action,input);
+  if(action==='readDraft'){
+    const {s,t}=await ownedTest(tx,actor,input.testId,true);
+    return editableDraft(s,t);
+  }
   if(action==='previewTest')return preview(tx,actor,input.testId);
   if(attemptActions.has(action)){
     const {runStagingAttempt}=await import('./teacher-staging-attempts.mjs');
@@ -222,7 +233,7 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   const subject=action==='createGroup'?subjectFor(actor,input.subjectId):importSubject;
   const response=await effect(tx,actor,action,input,subject,g);
   await query(tx,'INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4)',[actor.personId,receiptKey,payload,response]);
-  await query(tx,'INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,0,$5)',
-    [receiptKey,actor.personId,action,response.id??response.groupId,tx.now]);
+  await query(tx,'INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,$5,$6)',
+    [receiptKey,actor.personId,action,response.id??response.groupId,action==='updateDraft'?response.revision:0,tx.now]);
   return response;
 }

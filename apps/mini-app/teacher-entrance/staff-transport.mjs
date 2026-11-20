@@ -1,10 +1,13 @@
 // One mounted staff session. Token lookup happens inside every request, including private image reads.
 const limits = { json: 1024 * 1024, media: 2 * 1024 * 1024 };
 const permitted = {
-  teacher: new Set(['createGroup','addMember','createInvite','sendInvite','importTest','previewTest','publishTest','assignTest']),
+  teacher: new Set(['createGroup','addMember','createInvite','sendInvite','importTest','previewTest','readDraft','updateDraft','publishTest','assignTest']),
   admin: new Set(),
 };
 const messages = {
+  RESOURCE_REVISION_CONFLICT: 'Qoralama boshqa oynada o‘zgargan. So‘nggi nusxani «Qoralamani tahrirlash» orqali qayta oching.',
+  DEMO_TITLE_SHARED: 'Bu nom testning boshqa versiyasida ham ishlatiladi. Savollarni tahrirlab saqlash uchun avvalgi nomni qoldiring.',
+  VERSION_FROZEN: 'Bu test nashr qilingan. Testlar ro‘yxatini yangilang.',
   GROUP_PENDING: 'Guruh hozircha faol emas. Guruhlar ro‘yxatini yangilang.',
   GROUP_MEMBERSHIP_CONFLICT: 'O‘quvchining boshqa faol guruhi bor. Guruhini almashtirish uchun Adminga murojaat qiling.',
   ADMIN_TRANSFER_REQUIRED: 'Guruhni almashtirish uchun Adminga murojaat qiling.',

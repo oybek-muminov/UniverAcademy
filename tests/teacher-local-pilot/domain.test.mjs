@@ -91,7 +91,7 @@ test('invalid LaTeX in a later answer or instructions reports its source and lea
     correct_option_id:options[0].id,explanation_blocks:[]};
   const issue=location=>e=>e.code==='INVALID_FORMULA' && e.status===422 && e.detail.startsWith(location);
   await assert.rejects(pilot.command('teacher','importTest',{title:'Test',questions:[simple,q]},'test-key'),
-    issue('2-savol, C javobi, 2-blok'));
+    issue('2-savol, 3-javob, 2-blok'));
   await assert.rejects(pilot.command('teacher','importTest',{title:'Test',instructions_blocks:[bad],questions:[simple]},'test-key'),
     issue('Test yo‘riqnomasi, 1-blok'));
   assert.deepEqual((await pilot.read('teacher')).tests,[]);

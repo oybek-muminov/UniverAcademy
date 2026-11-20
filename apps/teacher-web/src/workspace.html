@@ -72,7 +72,7 @@
           <div class="card-head"><h2>Test faylini yuklash</h2><span class="pilot-links"><a href="./sample.txt" download="univeracademy-test-namunasi.txt">TXT namunasi</a><a href="./sample.json" download="univeracademy-test-namunasi.json">JSON namunasi</a></span></div>
           <form id="test-form">
             <label>Test fayli (TXT yoki JSON)<input id="test-file" type="file" accept=".txt,.json,text/plain,application/json" required aria-describedby="test-format"></label>
-            <p id="test-format" class="hint">TXT namunasini matn muharririda ochib, savollar va javoblarni almashtiring. Har bir savolda 4 ta variant bo‘lishi kerak. TXT faylni UTF-8 kodlashda saqlang.</p>
+            <p id="test-format" class="hint">Har bir savol uchun to‘rtta javob yozing. TXT faylida to‘g‘ri javob qatorini <code>*</code>, qolgan uchta javobni <code>-</code> bilan boshlang. Faylni UTF-8 kodlashda saqlang.</p>
             <div id="preview" hidden></div>
             <div class="actions"><button type="button" id="edit-file" disabled>Faylni muharrirda ochish</button><button type="submit" id="save-draft" disabled>Fayldan qoralama saqlash</button></div>
           </form>
@@ -83,6 +83,7 @@
           <div id="test-content" hidden>
             <label>Test<select id="saved-test"></select></label>
             <p id="test-meta" class="hint"></p>
+            <button id="edit-saved" type="button" hidden>Qoralamani tahrirlash</button>
             <button id="view-saved" type="button">Saqlangan savollarni ko‘rish</button>
             <section id="saved-preview" hidden aria-label="Saqlangan test ko‘rinishi"></section>
             <button id="publish-button" type="button">Testni nashr qilish</button>

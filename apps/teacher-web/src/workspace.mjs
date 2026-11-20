@@ -85,6 +85,7 @@ export function mountTeacherWorkspace(root, {
   let dashboard;
   let preview;
   let fileVersion = 0;
+  let editingId = null, savedSelection = 0;
   let readVersion = 0;
   let writing = false;
   const retries = new Map();
@@ -117,7 +118,7 @@ export function mountTeacherWorkspace(root, {
     if (next.subjects) {
       for (const id of ['group-subject', 'test-subject']) {
         selectRows(id, next.subjects, undefined, subject => subject.title);
-        el(id).disabled = !next.subjects.length;
+        el(id).disabled = !next.subjects.length || (id === 'test-subject' && Boolean(editingId));
         el(id + '-label').hidden = false;
       }
     }
@@ -160,6 +161,7 @@ export function mountTeacherWorkspace(root, {
       el('main').removeAttribute('aria-busy');
       return;
     }
+    if (disposed) return;
     retries.delete(fingerprint);
     try {
       const selection = complete?.(data) ?? {};
@@ -171,7 +173,7 @@ export function mountTeacherWorkspace(root, {
       writing = false;
       el('main').removeAttribute('aria-busy');
     }
-    return true;
+    return data;
   }
 
   function renderGroup() {
@@ -212,6 +214,7 @@ export function mountTeacherWorkspace(root, {
     const state = published ? 'Nashr qilingan' : 'Qoralama';
     el('test-meta').textContent = [state, test.questionCount + ' ta savol', test.duration_seconds + ' soniya'].join(' · ');
     el('publish-button').hidden = published;
+    el('edit-saved').hidden = test.status !== 'draft';
     const assigned = dashboard.assignments.filter(row => row.testId === test.id);
     const groups = dashboard.groups.filter(group => group.status === 'active' && (!test.subjectId || group.subjectId === test.subjectId));
     const available = groups.filter(group => !assigned.some(row => row.groupId === group.id));
@@ -328,8 +331,7 @@ export function mountTeacherWorkspace(root, {
       if (question.prompt_blocks) renderBlocks(summary, question.prompt_blocks);
       else summary.append(question.text);
       details.append(summary);
-      const options = document.createElement('ol');
-      options.type = 'A';
+      const options = document.createElement('ul');
       for (const [index, value] of question.options.entries()) {
         const option = node('li', '');
         if (question.prompt_blocks) renderBlocks(option, value.blocks);
@@ -387,14 +389,16 @@ export function mountTeacherWorkspace(root, {
     });
   };
   el('publish-button').onclick = () => {
-    command('publishTest', { testId: el('saved-test').value }, 'Test nashr qilindi.');
+    const testId = el('saved-test').value;
+    if (!editor.readyToPublish(testId)) return notice('', 'Nashr qilishdan oldin qoralamadagi o‘zgarishlarni saqlang.');
+    command('publishTest', { testId }, 'Test nashr qilindi.', () => { editor.published(testId); });
   };
   el('assign-form').onsubmit = event => {
     event.preventDefault();
     command('assignTest', { testId: el('saved-test').value, groupId: el('assignment-group').value }, 'Test guruhga tayinlandi.');
   };
   el('member-group').onchange = renderGroup;
-  el('saved-test').onchange = () => renderTest();
+  el('saved-test').onchange = () => { savedSelection++; renderTest(); };
   el('result-group').onchange = renderResults;
   el('refresh-groups').onclick = () => { picker.refresh(); void refresh(); };
   el('refresh-results').onclick = refresh;
@@ -432,12 +436,40 @@ export function mountTeacherWorkspace(root, {
 
   const editor = mountTeacherEditor(el('question-editor'), {
     renderBlocks, mountVisualFormula, uploadImage: upload, notify: notice,
-    saveDraft: draft => command('importTest', draft, 'Test qoralamasi saqlandi.', data => ({ test: data.id })),
+    async readDraft(testId) {
+      const result = await request('commands/readDraft', {testId}, crypto.randomUUID());
+      if (result?.id !== testId || !Number.isSafeInteger(result.revision) || result.revision < 0) throw Error('Qoralamani ochib bo‘lmadi.');
+      filePreview(result.draft);
+      return result;
+    },
+    saveDraft(draft, target) {
+      const action = target ? 'updateDraft' : 'importTest';
+      const input = target ? {testId: target.id, expectedRevision: target.revision, draft} : draft;
+      return command(action, input, 'Test qoralamasi saqlandi.', data => {
+        el('saved-preview').hidden = true;
+        el('saved-preview').replaceChildren();
+        return { test: data.id };
+      });
+    },
+    onTargetChange(id) {
+      editingId = id;
+      if (!dashboard?.subjects) return;
+      const subject = dashboard.tests.find(test => test.id === id)?.subjectId;
+      if (subject) el('test-subject').value = subject;
+      el('test-subject').disabled = Boolean(id) || !dashboard.subjects.length;
+    },
   });
+  el('edit-saved').onclick = () => {
+    const id = el('saved-test').value;
+    const selection = savedSelection;
+    const selectedDraft = () => !disposed && savedSelection === selection && el('saved-test').value === id && dashboard.tests.some(test => test.id === id && test.status === 'draft');
+    if (selectedDraft()) void editor.openSaved(id, selectedDraft);
+  };
   el('edit-file').onclick = () => { if (preview) editor.openFile(preview); };
 
   return () => {
     disposed = true;
+    editor.dispose();
     picker.show(null);
     fileVersion++; readVersion++;
     window.removeEventListener('focus', focus);

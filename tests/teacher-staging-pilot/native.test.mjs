@@ -199,7 +199,7 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     assert.equal(invalid.status,422);
     const fault=(await invalid.json()).error;
     assert.equal(fault.code,'INVALID_FORMULA');
-    assert.match(fault.message,/1-savol, B javobi, 2-blok/);
+    assert.match(fault.message,/1-savol, 2-javob, 2-blok/);
     assert.deepEqual((await good(teacher.dashboard())).tests,before);
     assert.equal(await scalar('SELECT count(*) n FROM ua_private.test_versions'),1);
     const preview=await good(teacher.command('previewTest',{testId:draft.id}));
@@ -237,6 +237,7 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     await rejected(invitee.command('saveAnswer',{...answer,optionId:q.options.find(o=>o.id!==answerId).id}),409);
     const resumed=await afterRestart({database,auth:clerk.publicConfiguration(),token:byInvite.token,attempt:attempt.id});
     assert.equal(resumed.id,attempt.id);
+    assert.deepEqual(resumed.questions,attempt.questions);
     assert.equal(resumed.answers.find(a=>a.questionId===q.id).optionId,answerId);
   });
 

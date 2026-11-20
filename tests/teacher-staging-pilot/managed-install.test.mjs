@@ -53,6 +53,20 @@ test('managed PG17 operator installs, withdraws and restores with its original o
     pg_has_role('cabinet_api_probe','ua_cabinet_stage','SET') stage,pg_has_role('cabinet_api_probe','ua_cabinet_stage','USAGE') inherited,
     pg_has_role('cabinet_bot_probe','ua_cabinet_stage','MEMBER') bot_has_api`),
     {auth:true,stage:true,inherited:false,bot_has_api:false});
+  const edit=async direction=>db.query(await readFile(new URL('../../supabase/migrations/teacher-staging/draft-edit/001_'+direction+'.sql',import.meta.url),'utf8'));
+  const editAccess=()=>first(`SELECT has_table_privilege('ua_cabinet_stage','ua_private.draft_questions','DELETE') questions,
+    has_column_privilege('ua_cabinet_stage','ua_private.demos','title','UPDATE') title,
+    has_column_privilege('ua_cabinet_stage','ua_private.demos','subject_id','UPDATE') subject,
+    has_table_privilege('ua_cabinet_delivery','ua_private.draft_questions','DELETE') bot,
+    has_column_privilege('authenticated','ua_private.demos','title','UPDATE') client`);
+  const closed={questions:false,title:false,subject:false,bot:false,client:false};
+  assert.deepEqual(await editAccess(),closed);
+  await edit('up');
+  assert.deepEqual(await editAccess(),{...closed,questions:true,title:true});
+  assert.deepEqual(await originalGrants(),before);
+  await edit('down');
+  assert.deepEqual(await editAccess(),closed);
+  assert.deepEqual(await originalGrants(),before);
   await db.query('RESET SESSION AUTHORIZATION');
   await db.query('INSERT INTO ua_cabinet.private_starts(telegram_id) VALUES(1000017)');
   await db.query('SET SESSION AUTHORIZATION managed_operator');
@@ -62,4 +76,7 @@ test('managed PG17 operator installs, withdraws and restores with its original o
   await db.query(await renderManagedCabinet('restore'));
   assert.deepEqual(await originalGrants(),before);
   assert.equal((await first('SELECT count(*) AS n FROM ua_cabinet.private_starts')).n,'1');
+  await edit('up');
+  assert.deepEqual(await editAccess(),{...closed,questions:true,title:true});
+  assert.deepEqual(await originalGrants(),before);
 });

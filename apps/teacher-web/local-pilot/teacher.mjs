@@ -6,6 +6,9 @@ import { mountTeacherWorkspace } from '/teacher/workspace.mjs';
 const prefix = '/local-pilot/teacher/';
 const maxBytes = 512 * 1024;
 const messages = {
+  RESOURCE_REVISION_CONFLICT: 'Qoralama boshqa oynada o‘zgargan. So‘nggi nusxani «Qoralamani tahrirlash» orqali qayta oching.',
+  DEMO_TITLE_SHARED: 'Bu nom testning boshqa versiyasida ham ishlatiladi. Savollarni tahrirlab saqlash uchun avvalgi nomni qoldiring.',
+  VERSION_FROZEN: 'Bu test nashr qilingan. Testlar ro‘yxatini yangilang.',
   FILE_TOO_LARGE: 'Fayl juda katta. Bitta yuklama uchun hajm chegarasi 512 KiB.',
   GROUP_MEMBERSHIP_CONFLICT: 'O‘quvchi boshqa faol guruhda. Guruhini almashtirish uchun Adminga murojaat qiling.',
   LOCAL_CHAT_UNAVAILABLE: 'O‘quvchi mahalliy botni hali ochmagan. Guruh taklif havolasini nusxalab ulashing.',
