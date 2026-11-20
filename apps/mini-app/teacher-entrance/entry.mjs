@@ -5,6 +5,7 @@ import { ClerkProvider, ClerkFailed, ClerkLoaded, ClerkLoading, useClerk, useSes
 
 import { mountTeacherReadOnlyCabinet } from '../../teacher-web/src/read-only-entry.mjs';
 import '../../teacher-web/src/style.css';
+import { requestTeacherEmailCode } from './email-code.mjs';
 
 const origin = 'https://ustoz.univeracademy.uz';
 const unavailable = 'Kirish hozircha mavjud emas.';
@@ -68,7 +69,7 @@ function EmailCodeEntrance() {
   if (isSignedIn) return heading(message(session?.status === 'active' && !session.currentTask
     ? 'Clerk hisobingizga kirdingiz. Kabinetga ruxsatni tekshirish va kabinet ma’lumotlari hozircha ulanmagan.'
     : 'Kirishni yakunlash uchun hisobingizda qo‘shimcha tasdiqlash kerak.'));
-  if (!signIn || typeof signIn.create !== 'function' || typeof signIn.emailCode?.sendCode !== 'function' ||
+  if (!signIn || typeof signIn.emailCode?.sendCode !== 'function' ||
       typeof signIn.emailCode?.verifyCode !== 'function' || typeof signIn.finalize !== 'function')
     return heading(message(unavailable));
 
@@ -98,7 +99,7 @@ function EmailCodeEntrance() {
     const fields = new FormData(event.currentTarget);
     const email = fields.get('email'), code = fields.get('code');
     const field = event.currentTarget.elements.namedItem(challenge ? 'code' : 'email');
-    if (field instanceof HTMLInputElement) field.value = '';
+    if (challenge && field instanceof HTMLInputElement) field.value = '';
     fields.delete('email'); fields.delete('code');
     if (challenge ? (typeof code !== 'string' || !code.trim()) :
         (typeof email !== 'string' || !email.trim() || email.trim().length > 254)) return;
@@ -108,13 +109,8 @@ function EmailCodeEntrance() {
     try {
       if (!challenge) {
         attemptId.current = null;
-        const { error } = await signIn.create({ identifier: email.trim(), signUpIfMissing: false, transfer: false });
-        const started = signIn.id;
-        if (!error && typeof started === 'string' && !!started && signIn.isTransferable !== true &&
-            signIn.status === 'needs_first_factor' && signIn.supportedFirstFactors?.some(factor => factor.strategy === 'email_code')) {
-          const { error: sendError } = await signIn.emailCode.sendCode();
-          if (!sendError && signIn.id === started) attemptId.current = started;
-        }
+        attemptId.current = await requestTeacherEmailCode(signIn, email.trim());
+        if (field instanceof HTMLInputElement) field.value = '';
         setChallenge('primary');
         setNotice('Agar bu elektron pochta mavjud hisobga bog‘langan bo‘lsa, tasdiqlash kodi yuboriladi.');
         return;
@@ -131,8 +127,7 @@ function EmailCodeEntrance() {
       await finish();
     } catch {
       if (!challenge) {
-        setChallenge('primary');
-        setNotice('Agar bu elektron pochta mavjud hisobga bog‘langan bo‘lsa, tasdiqlash kodi yuboriladi.');
+        setNotice('Kod so‘rovini bajarib bo‘lmadi. Birozdan so‘ng yana urinib ko‘ring.');
       } else setNotice('Kirishni yakunlab bo‘lmadi.');
     } finally { running.current = false; setBusy(false); }
   }
