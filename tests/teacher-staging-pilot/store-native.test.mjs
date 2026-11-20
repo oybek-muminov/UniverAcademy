@@ -19,7 +19,7 @@ test('native migration can be withdrawn and restored without losing canonical sc
     }
     return {personId,role};
   }
-  const teacher=await staff('teacher',null),admin=await staff('admin',null),student=await staff('student','0100000017');
+  const teacher=await staff('teacher',null),student=await staff('student','0100000017');
   async function call(actor,action,input={},key=randomUUID()){
     await db.query('BEGIN');
     try{
@@ -30,7 +30,7 @@ test('native migration can be withdrawn and restored without losing canonical sc
     }catch(e){await db.query('ROLLBACK');throw e;}
   }
   const g=await call(teacher,'createGroup',{name:'Fizika'});
-  await call(admin,'approveGroup',{groupId:g.id});
+  assert.equal(g.status,'active');
   const invite=await call(teacher,'createInvite',{groupId:g.id});
   await call(student,'acceptInvite',{token:invite.token});
   const test=await call(teacher,'importTest',{title:'Hisob',questions:[{text:'3+4',options:['5','6','7','8'],correctIndex:2}]});

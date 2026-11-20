@@ -1,3 +1,4 @@
+import { cabinetQueryAllowed } from './teacher-student-directory.mjs';
 import { ApiFault } from '../supabase/functions/univeracademy-api/fault.ts';
 import { createClerkWorkerAdapter } from './clerk-worker-bindings.mjs';
 import { ownBody,untilAborted } from './cloudflare-api.mjs';
@@ -85,7 +86,7 @@ export function createWorkerCabinetHandler({createApi,loadClient=async()=>(await
       const studentOrigin=publicHttpsOrigin(value(env,'UA_CABINET_STUDENT_ORIGIN'));
       const apiOrigin=publicHttpsOrigin(value(env,'UA_API_ORIGIN'));
       const url=new URL(request.url),role=/^\/api\/v1\/(teacher|admin|student)\/pilot\//.exec(url.pathname)?.[1];
-      if(!role||url.search||url.hash||url.username||url.password||
+      if(!role||!cabinetQueryAllowed(url,request.method)||url.hash||url.username||url.password||
         (role==='student'?url.origin!==studentOrigin&&url.origin!==apiOrigin:url.origin!==teacherOrigin))return failure('NOT_FOUND',404);
       const expected=role==='student'?studentOrigin:teacherOrigin;
       if(request.headers.has('origin')&&request.headers.get('origin')!==expected)return failure('FORBIDDEN',403);

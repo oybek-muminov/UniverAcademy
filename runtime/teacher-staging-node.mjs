@@ -1,3 +1,4 @@
+import { cabinetQueryAllowed } from './teacher-student-directory.mjs';
 // Node-only stage host. No browser code, real credentials or database connection exists at import time.
 import { createHash,timingSafeEqual } from 'node:crypto';
 import { teacherStagingPath } from './teacher-staging-proxy.mjs';
@@ -34,14 +35,14 @@ export function createTeacherStageNode(readEnv,createApi=createFromEnvironment) 
     if(env.UA_CABINET_STAGING_ENABLED!=='true'||!teacherStagingPath(url.pathname))return deny('NOT_FOUND',404);
     if(!validOrigin(env.UA_CABINET_STAGING_NODE_ORIGIN)||url.origin!==env.UA_CABINET_STAGING_NODE_ORIGIN||
       !sameSecret(env.UA_CABINET_STAGING_PROXY_SECRET,request.headers.get('x-univeracademy-pilot-proxy'))) return deny('FORBIDDEN',403);
-    if(url.search||url.hash)return deny('NOT_FOUND',404);
+    if(!cabinetQueryAllowed(url,request.method)||url.hash)return deny('NOT_FOUND',404);
     const publicOrigin=url.pathname.startsWith('/api/v1/student/')?env.UA_API_ORIGIN:env.UA_CABINET_TEACHER_ORIGIN;
     if(!validOrigin(publicOrigin))return deny('SERVICE_UNAVAILABLE',503);
     try {
       warm??=createApi(env).catch(error=>{warm=undefined;throw error;});
       const service=await warm,headers=new Headers(request.headers);
       headers.delete('x-univeracademy-pilot-proxy');for (const name of ['host','cookie','forwarded','x-forwarded-host','x-forwarded-proto'])headers.delete(name);
-      return await service.fetch(new Request(publicOrigin+url.pathname,{method:request.method,headers,signal:request.signal,
+      return await service.fetch(new Request(publicOrigin+url.pathname+url.search,{method:request.method,headers,signal:request.signal,
         ...(request.body?{body:request.body,duplex:'half'}:{})}));
     }catch{return deny('SERVICE_UNAVAILABLE',503);}
   }};

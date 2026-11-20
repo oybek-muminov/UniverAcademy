@@ -36,6 +36,7 @@ async function pilot(t) {
     assert.ok(cookie, 'local session cookie');
     return {
       dashboard: async () => success(await request('GET', root + '/dashboard', undefined, cookie)),
+      available: (groupId, query='') => request('GET',root+'/groups/'+groupId+'/available-students'+query,undefined,cookie),
       upload: async (bytes, contentType) => {
         const response = await fetch(origin + root + '/media', {
           method: 'POST', headers: { Cookie: cookie, 'Content-Type': contentType }, body: bytes
@@ -86,21 +87,34 @@ function noAnswerKey(value) {
   }
 }
 
-async function approvedGroup(teacher, admin, name) {
-  const pending = success(await teacher.command('createGroup', { name }));
-  assert.equal(pending.status, 'pending');
-  assert.ok((await admin.dashboard()).groups.some(group => group.id === pending.id));
-  success(await admin.command('approveGroup', { groupId: pending.id }));
-  const active = (await teacher.dashboard()).groups.find(group => group.id === pending.id);
-  assert.equal(active?.status, 'active');
-  return pending.id;
+async function createGroup(teacher, name) {
+  const group = success(await teacher.command('createGroup', { name }));
+  assert.equal(group.status, 'active');
+  return group.id;
 }
 
+test('the owner lists eligible students and a joined learner disappears from both teachers’ choices',async t=>{
+  const f=await pilot(t), first=await f.actor('teacher'), second=await f.actor('teacher2');
+  const firstGroup=await createGroup(first,'Fizika'), secondGroup=await createGroup(second,'Optika');
+  const aziza={name:'Aziza Karimova',univeracademy_id:'0100000001'};
+  const bekzod={name:'Bekzod Aliyev',univeracademy_id:'0100000002'};
+  assert.deepEqual(success(await first.available(firstGroup)),{students:[aziza,bekzod],nextCursor:null});
+  assert.deepEqual(success(await first.available(firstGroup,'?after=0100000001')),{students:[bekzod],nextCursor:null});
+  denied(await first.available(firstGroup,'?after=1'));
+  denied(await first.available(firstGroup,'?after=0100000001&after=0100000002'));
+  denied(await second.available(firstGroup));
+  denied(await (await f.actor('student1')).available(firstGroup));
+  success(await first.command('addMember',{groupId:firstGroup,univeracademy_id:aziza.univeracademy_id}));
+  assert.deepEqual(success(await second.available(secondGroup)),{students:[bekzod],nextCursor:null});
+  denied(await second.command('addMember',{groupId:secondGroup,univeracademy_id:aziza.univeracademy_id}));
+  success(await second.command('addMember',{groupId:secondGroup,univeracademy_id:bekzod.univeracademy_id}));
+  assert.deepEqual(success(await first.available(firstGroup)),{students:[],nextCursor:null});
+});
 test('two students join through different entrances, take the uploaded test and get different scores', async t => {
   const f = await pilot(t);
-  const teacher = await f.actor('teacher'), admin = await f.actor('admin');
+  const teacher = await f.actor('teacher');
   const byId = await f.actor('student1'), byInvite = await f.actor('student2');
-  const groupId = await approvedGroup(teacher, admin, 'Fizika 01');
+  const groupId = await createGroup(teacher, 'Fizika 01');
   const directId = (await byId.dashboard()).univeracademy_id;
   assert.equal(directId, '0100000001');
   success(await teacher.command('addMember', { groupId, univeracademy_id: directId }));
@@ -156,16 +170,13 @@ test('two students join through different entrances, take the uploaded test and 
   assert.deepEqual(scores.map(row => row.attemptId).sort(), completed.sort());
 });
 
-test('pending approvals and each participant’s visible group, tests and attempts are respected', async t => {
+test('a teacher creates and uses their own group immediately while other accounts remain scoped', async t => {
   const f = await pilot(t);
   const teacher = await f.actor('teacher'), otherTeacher = await f.actor('teacher2');
-  const admin = await f.actor('admin'), learner = await f.actor('student1'), otherLearner = await f.actor('student2');
-  const pending = success(await teacher.command('createGroup', { name: 'Optika guruhi' }));
-  const groupId = pending.id;
-  denied(await teacher.command('createInvite', { groupId }));
-  denied(await teacher.command('addMember', { groupId, univeracademy_id:'0100000001' }));
+  const learner = await f.actor('student1'), otherLearner = await f.actor('student2');
+  const groupId = await createGroup(teacher, 'Optika guruhi');
+  denied(await learner.command('createGroup', {name:'Begona guruh'}));
   assert.ok(!(await otherTeacher.dashboard()).groups.some(g => g.id === groupId));
-  success(await admin.command('approveGroup', { groupId }));
   const draft = success(await teacher.command('importTest', source));
   denied(await otherTeacher.command('publishTest', { testId: draft.id }));
   denied(await otherTeacher.command('createInvite', { groupId }));
@@ -185,9 +196,9 @@ test('pending approvals and each participant’s visible group, tests and attemp
 
 test('group invitation expires at its boundary and existing members are never transferred implicitly', async t => {
   const f = await pilot(t);
-  const teacher = await f.actor('teacher'), admin = await f.actor('admin'), learner = await f.actor('student1');
-  const first = await approvedGroup(teacher, admin, 'Mexanika');
-  const second = await approvedGroup(teacher, admin, 'Optika');
+  const teacher = await f.actor('teacher'), learner = await f.actor('student1');
+  const first = await createGroup(teacher, 'Mexanika');
+  const second = await createGroup(teacher, 'Optika');
   const invite = success(await teacher.command('createInvite', { groupId:first }));
   const other = success(await teacher.command('createInvite', { groupId:second }));
   assert.equal((await learner.command('acceptInvite', { token:'grp_' + 'X'.repeat(43) })).response.status,404);
@@ -234,9 +245,9 @@ test('TXT preview reports the source line to its teacher and only a valid previe
 
 test('teacher delivery appears once in the intended student inbox and only that student can accept', async t => {
   const f = await pilot(t);
-  const teacher = await f.actor('teacher'), admin = await f.actor('admin');
+  const teacher = await f.actor('teacher');
   const first = await f.actor('student1'), intended = await f.actor('student2');
-  const groupId = await approvedGroup(teacher,admin,'Astronomiya');
+  const groupId = await createGroup(teacher,'Astronomiya');
   const unavailable = await teacher.command('sendInvite',{groupId,univeracademy_id:'0100000001'});
   assert.equal(unavailable.response.status,409);
   assert.equal(unavailable.payload.error.code,'LOCAL_CHAT_UNAVAILABLE');
@@ -274,11 +285,11 @@ async function renderedPng(actor, asset, width, height) {
 
 test('typed formula and private SVG/PNG survive preview, publish and an authorized student attempt',async t=>{
   const f=await pilot(t);
-  const teacher=await f.actor('teacher'), other=await f.actor('teacher2'), admin=await f.actor('admin');
+  const teacher=await f.actor('teacher'), other=await f.actor('teacher2');
   const learner=await f.actor('student1'), outsider=await f.actor('student2');
   const illustration=success(await teacher.upload(svg,'image/svg+xml'));
   const answerImage=success(await teacher.upload(png,'image/png'));
-  const groupId=await approvedGroup(teacher,admin,'Dinamika');
+  const groupId=await createGroup(teacher,'Dinamika');
   await renderedPng(teacher,illustration,120,60);
   assert.equal((await other.image(illustration.id)).status,404);
   assert.equal((await learner.image(illustration.id)).status,404);
@@ -326,8 +337,8 @@ test('typed formula and private SVG/PNG survive preview, publish and an authoriz
 
 test('the timed attempt closes at its server deadline and its score cannot change through late writes',async t=>{
   const f=await pilot(t);
-  const teacher=await f.actor('teacher'),admin=await f.actor('admin'),student=await f.actor('student1');
-  const groupId=await approvedGroup(teacher,admin,'Qisqa nazorat');
+  const teacher=await f.actor('teacher'),student=await f.actor('student1');
+  const groupId=await createGroup(teacher,'Qisqa nazorat');
   success(await teacher.command('addMember',{groupId,univeracademy_id:'0100000001'}));
   const draft=success(await teacher.command('importTest',{...source,duration_seconds:60}));
   success(await teacher.command('publishTest',{testId:draft.id}));

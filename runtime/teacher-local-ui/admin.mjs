@@ -16,23 +16,13 @@ async function refresh() {
       dashboard = await request('dashboard');
     }
     list.replaceChildren();
-    const pending = dashboard.groups.filter(group => group.status === 'pending');
-    status.textContent = pending.length ? 'Tasdiq kutayotgan guruhlar: ' + pending.length : 'Tasdiq kutayotgan guruh yo‘q.';
-    for (const group of pending) {
+    status.textContent = dashboard.groups.length ? '' : 'Hozircha guruh yo‘q.';
+    for (const group of dashboard.groups) {
       const article = document.createElement('article'), title = document.createElement('h2');
+      const teacher = document.createElement('p');
       title.textContent = group.name;
-      const button = document.createElement('button');
-      button.textContent = 'Guruhni tasdiqlash';
-      const idempotencyKey = crypto.randomUUID();
-      button.addEventListener('click', async () => {
-        button.disabled = true;
-        try {
-          await request('commands/approveGroup', { method:'POST', headers:{ ...headers, 'Idempotency-Key':idempotencyKey }, body:JSON.stringify({ groupId:group.id }) });
-          await refresh();
-          status.textContent = group.name + ' guruhi tasdiqlandi.';
-        } catch (error) { button.disabled = false; status.textContent = 'Tasdiqlash bajarilmadi: ' + error.message; }
-      });
-      article.append(title, button);
+      teacher.textContent = group.teacherName;
+      article.append(title, teacher);
       list.append(article);
     }
   } catch (error) { status.textContent = 'Guruhlarni olishda xato: ' + error.message; }

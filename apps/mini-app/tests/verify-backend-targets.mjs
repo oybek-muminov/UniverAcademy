@@ -726,6 +726,7 @@ const PROFILE_RELEASE_OVERLAY_SHA256 = '8b875d66e42c0705192d6836c9e52570bf27143f
 const LIVE_OVERLAY_SHA256 = '876c8c64421b09ad35f0ffefbc79bbca24184029fd499a922836997e5783e514';
 const WORKER_CABINET_OVERLAY_SHA256 = '93a1026783863c936bbead931882058c0bf38bce6eead570169e777c38fa3721';
 const TEACHER_ENTRY_OVERLAY_SHA256 = '0b09b9dd830c42e2e367565c9b4056b726719af54c879e1ccb91917c61fb36bc';
+const TEACHER_GROUP_CREATION_SHA256 = '0bf8010354596c2a3dd9417c5c467ee00dd028f8fee8dcf1f12e178dcb6ff736';
 function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
   const raw = readTarget('apps/mini-app/tests/fixtures/' + filename);
   assert.equal(sha256(raw), expectedHash, diagnostic + '_OVERLAY_MISMATCH');
@@ -747,6 +748,7 @@ applySourceTransition('profile-release-order-overlay.json', PROFILE_RELEASE_OVER
 applySourceTransition('teacher-live-overlay.json', LIVE_OVERLAY_SHA256, 'aecead4fda3c4e518a5e3eb47b0536d8f4619a52', 'LIVE');
 applySourceTransition('teacher-worker-overlay.json', WORKER_CABINET_OVERLAY_SHA256, '210033f666e19ef20d7bd7a174777e3427ce765f', 'WORKER_CABINET');
 applySourceTransition('teacher-default-cabinet-overlay.json', TEACHER_ENTRY_OVERLAY_SHA256, 'b65335ed34f6db1ad4b302323e167d2b2c081544', 'TEACHER_ENTRY');
+applySourceTransition('teacher-group-creation-overlay.json', TEACHER_GROUP_CREATION_SHA256, 'fe424a68a222fc27a30053087813a38af309d218', 'TEACHER_GROUP_CREATION');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

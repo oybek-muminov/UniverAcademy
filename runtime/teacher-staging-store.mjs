@@ -1,10 +1,11 @@
+import { studentDirectoryPageSize } from './teacher-student-directory.mjs';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
 import {cleanText} from './teacher-pilot-import.mjs';
 import {query,need,needId,groupView,createDraft,publish,assign,preview,ownedTest} from './teacher-staging-content.mjs';
 import {dashboard} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
-const actions={teacher:new Set(['dashboard','createGroup','addMember','createInvite','sendInvite','importTest','previewTest','publishTest','assignTest','readMedia','putMedia']),
+const actions={teacher:new Set(['dashboard','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','previewTest','publishTest','assignTest','readMedia','putMedia']),
  student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
@@ -33,31 +34,75 @@ function subjectFor(actor,id){
   const subject=id??actor.approvedSubjectIds[0];
   if(!actor.approvedSubjectIds.includes(subject))fail('FORBIDDEN',403);return subject;
 }
-async function group(tx,id,actor,active=true){
-  const g=need(await query(tx,`SELECT r.*,COALESCE(g.status,'pending') status FROM ua_cabinet.group_requests r
-    LEFT JOIN ua_private.groups g ON g.id=r.active_group_id WHERE r.id=$1 FOR UPDATE OF r`,[needId(id)]));
-  if(actor.role==='teacher'&&(g.teacher_id!==actor.personId||!actor.approvedSubjectIds.includes(g.subject_id)||
-    g.active_group_id&&!actor.scope.group_ids.includes(id)))fail('NOT_FOUND',404);
+// A request and its canonical group share one ID. Only legacy rows can remain pending
+// across transactions. Never recreate a scope or change the status of an existing group.
+async function activatePending(tx,teacherId,subjectIds,activatedBy,groupId=null){
+  return query(tx,`WITH pending AS MATERIALIZED (
+      SELECT id,teacher_id FROM ua_cabinet.group_requests
+      WHERE teacher_id=$1 AND subject_id=ANY($2::text[]) AND active_group_id IS NULL
+        AND ($3::uuid IS NULL OR id=$3) ORDER BY id FOR UPDATE
+    ), created AS (
+      INSERT INTO ua_private.groups(id,revision,status) SELECT id,1,'active' FROM pending RETURNING id
+    ), scoped AS (
+      INSERT INTO ua_private.staff_group_scope(person_id,group_id,revoked_at_ms)
+      SELECT p.teacher_id,c.id,NULL FROM created c JOIN pending p ON p.id=c.id RETURNING group_id
+    )
+    UPDATE ua_cabinet.group_requests r SET active_group_id=r.id,approved_by=$4
+    FROM scoped s WHERE r.id=s.group_id RETURNING r.*,'active' AS status`,
+    [teacherId,subjectIds,groupId,activatedBy]);
+}
+async function group(tx,id,actor,{requireActive=true,recoverPending=false}={}){
+  const g=need(await query(tx,'SELECT * FROM ua_cabinet.group_requests WHERE id=$1 FOR UPDATE',[needId(id)]));
+  if(actor.role==='teacher'&&(g.teacher_id!==actor.personId||!actor.approvedSubjectIds.includes(g.subject_id)))fail('NOT_FOUND',404);
   if(actor.role==='admin'&&!actor.scope.all_groups&&!actor.scope.subject_ids.includes(g.subject_id))fail('NOT_FOUND',404);
-  if(active && g.status!=='active')fail(g.status==='pending'?'GROUP_PENDING':'GROUP_ARCHIVED',409);
-  if(g.active_group_id){
-    const canonical=need(await query(tx,'SELECT status FROM ua_private.groups WHERE id=$1 FOR UPDATE',[id]));
-    if(active&&canonical.status!=='active')fail('GROUP_ARCHIVED',409);
+  if(!g.active_group_id){
+    if(recoverPending&&actor.role==='teacher'){
+      const activated=need(await activatePending(tx,actor.personId,[g.subject_id],actor.personId,g.id));
+      actor.scope.group_ids.push(g.id);
+      return activated;
+    }
+    if(requireActive)fail('GROUP_PENDING',409);
+    return {...g,status:'pending'};
   }
-  return g;
+  if(actor.role==='teacher'&&!actor.scope.group_ids.includes(g.id)){
+    // An older client may have activated the same request while the owner was signing in.
+    need(await query(tx,`SELECT 1 FROM ua_private.staff_group_scope
+      WHERE person_id=$1 AND group_id=$2 AND revoked_at_ms IS NULL FOR SHARE`,[actor.personId,g.id]));
+    actor.scope.group_ids.push(g.id);
+  }
+  const {status}=need(await query(tx,'SELECT status FROM ua_private.groups WHERE id=$1 FOR UPDATE',[g.id]));
+  if(requireActive&&status!=='active')fail('GROUP_ARCHIVED',409);
+  return {...g,status};
+}
+const registeredStudent="p.enabled AND p.roles=ARRAY['student']::text[] AND p.profile->'registration_complete'='true'::jsonb";
+async function availableStudents(tx,actor,{groupId,after}){
+  await group(tx,groupId,actor);
+  if(after!=null&&(typeof after!=='string'||!/^[0-9]{10}$/.test(after)))fail('VALIDATION_ERROR',422);
+  const rows=await query(tx,`SELECT concat_ws(' ',nullif(p.profile->>'first_name',''),nullif(p.profile->>'last_name','')) AS name,
+      p.univeracademy_id
+    FROM ua_private.people_registration p JOIN ua_private.memberships m ON m.person_id=p.id
+    WHERE p.univeracademy_id>$1 AND ${registeredStudent} AND p.profile->>'active_group_id' IS NULL
+      AND NOT m.active AND m.affinity_group_id IS NULL
+    ORDER BY p.univeracademy_id LIMIT $2`,[after??'',studentDirectoryPageSize+1]);
+  const students=rows.slice(0,studentDirectoryPageSize);
+  return {students,nextCursor:rows.length>students.length?students.at(-1).univeracademy_id:null};
 }
 async function byCabinet(tx,id){
   if(typeof id!=='string'||!/^\d{10}$/.test(id))fail('VALIDATION_ERROR',422);
-  return (await query(tx,`SELECT id,telegram_id FROM ua_private.people_registration WHERE univeracademy_id=$1 AND enabled AND 'student'=ANY(roles)
-    AND profile->>'registration_complete'='true'`,[id]))[0];
+  return (await query(tx,`SELECT p.id,p.telegram_id FROM ua_private.people_registration p WHERE p.univeracademy_id=$1 AND ${registeredStudent}`,[id]))[0];
 }
 async function enroll(tx,g,studentId){
-  const rows=await query(tx,`SELECT m.*,p.enabled,p.roles,p.profile FROM ua_private.memberships m JOIN ua_private.people p ON p.id=m.person_id
-    WHERE m.person_id=$1 ORDER BY m.person_id FOR UPDATE OF m,p NOWAIT`,[studentId]);
+  let rows;
+  try {
+    rows=await query(tx,`SELECT m.*,p.profile->>'active_group_id' AS profile_group FROM ua_private.memberships m JOIN ua_private.people p ON p.id=m.person_id
+      WHERE m.person_id=$1 AND ${registeredStudent} FOR UPDATE OF m,p NOWAIT`,[studentId]);
+  }catch(error){
+    if(error.code==='55P03')fail('MEMBERSHIP_BUSY',409);
+    throw error;
+  }
   const m=need(rows);
-  if(!m.enabled||!m.roles.includes('student')||!m.profile.registration_complete)fail('NOT_FOUND',404);
   if(m.active&&m.affinity_group_id===g.id)return groupView(g);
-  if(m.affinity_group_id||m.profile.active_group_id)fail('GROUP_MEMBERSHIP_CONFLICT',409);
+  if(m.active||m.affinity_group_id!==null||m.profile_group!==null)fail('GROUP_MEMBERSHIP_CONFLICT',409);
   need(await query(tx,'UPDATE ua_private.memberships SET active=true,affinity_group_id=$2,revision=revision+1,epoch=epoch+1 WHERE person_id=$1 AND revision=$3 AND NOT active AND affinity_group_id IS NULL RETURNING person_id',[studentId,g.id,m.revision]));
   await query(tx,"UPDATE ua_private.people SET profile=jsonb_set(profile,'{active_group_id}',to_jsonb($2::text)) WHERE id=$1",[studentId,g.id]);
   await query(tx,'UPDATE ua_private.groups SET revision=revision+1 WHERE id=$1',[g.id]);
@@ -113,7 +158,7 @@ async function media(tx,actor,action,input){
 }
 async function authorizeResource(tx,actor,action,input){
   if(['approveGroup','addMember','createInvite','sendInvite','assignTest'].includes(action)){
-    const g=await group(tx,input.groupId,actor,action!=='approveGroup');
+    const g=await group(tx,input.groupId,actor,{requireActive:action!=='approveGroup',recoverPending:actor.role==='teacher'});
     if(action==='assignTest')await ownedTest(tx,actor,input.testId);
     return g;
   }
@@ -123,17 +168,16 @@ async function authorizeResource(tx,actor,action,input){
 async function effect(tx,actor,action,input,subjectId,g){
   switch(action){
     case 'createGroup':{
-      const r=need(await query(tx,`INSERT INTO ua_cabinet.group_requests(id,teacher_id,subject_id,name) VALUES($1,$2,$3,$4) RETURNING *, 'pending' status`,
-        [randomUUID(),actor.personId,subjectId,cleanText(input.name,100)]));return groupView(r);
+      const id=randomUUID();
+      await query(tx,'INSERT INTO ua_cabinet.group_requests(id,teacher_id,subject_id,name) VALUES($1,$2,$3,$4)',
+        [id,actor.personId,subjectId,cleanText(input.name,100)]);
+      return groupView(need(await activatePending(tx,actor.personId,[subjectId],actor.personId,id)));
     }
     case 'approveGroup':{
-      if(!g.active_group_id){
-        await actorFor(tx,{role:'teacher',personId:g.teacher_id}).then(t=>subjectFor(t,g.subject_id));
-        await query(tx,"INSERT INTO ua_private.groups(id,revision,status) VALUES($1,1,'active')",[g.id]);
-        await query(tx,'INSERT INTO ua_private.staff_group_scope(person_id,group_id,revoked_at_ms) VALUES($1,$2,NULL)',[g.teacher_id,g.id]);
-        await query(tx,'UPDATE ua_cabinet.group_requests SET active_group_id=id,approved_by=$2 WHERE id=$1 AND active_group_id IS NULL',[g.id,actor.personId]);
-      }
-      return groupView({...g,status:g.active_group_id?g.status:'active'});
+      if(g.active_group_id)return groupView(g);
+      const owner=await actorFor(tx,{role:'teacher',personId:g.teacher_id});
+      subjectFor(owner,g.subject_id);
+      return groupView(need(await activatePending(tx,g.teacher_id,[g.subject_id],actor.personId,g.id)));
     }
     case 'addMember':{
       const student=await byCabinet(tx,input.univeracademy_id);if(!student)fail('NOT_FOUND',404);
@@ -152,7 +196,11 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   if(!input||typeof input!=='object'||Array.isArray(input))fail('VALIDATION_ERROR',422);
   const actor=await actorFor(tx,identity);
   if(!actions[actor.role].has(action))fail('FORBIDDEN',403);
-  if(action==='dashboard')return dashboard(tx,actor);
+  if(action==='dashboard'){
+    if(actor.role==='teacher')await activatePending(tx,actor.personId,actor.approvedSubjectIds,actor.personId);
+    return dashboard(tx,actor);
+  }
+  if(action==='availableStudents')return availableStudents(tx,actor,input);
   if(action==='readMedia'||action==='putMedia')return media(tx,actor,action,input);
   if(action==='previewTest')return preview(tx,actor,input.testId);
   if(attemptActions.has(action)){
@@ -161,16 +209,17 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   }
   if(typeof key!=='string'||key.length>128||!key.length)fail('IDEMPOTENCY_KEY_REQUIRED',400);
   if(action==='acceptInvite')return accept(tx,actor,input,key);
-  const subject=['createGroup','importTest'].includes(action)?subjectFor(actor,input.subjectId):null;
+  const importSubject=action==='importTest'?subjectFor(actor,input.subjectId):null;
   const g=await authorizeResource(tx,actor,action,input);
   const receiptKey=actor.personId+'/staging/'+action+'/'+hash(key),payload=hash(canonical(input));
   const prior=(await query(tx,'SELECT payload,response FROM ua_private.staff_receipts WHERE actor_id=$1 AND key=$2',[actor.personId,receiptKey]))[0];
   if(prior){
     if(prior.payload!==payload)fail('IDEMPOTENCY_CONFLICT',409);
-    if(action==='createGroup')return groupView(await group(tx,prior.response.id,actor,false));
+    if(action==='createGroup')return groupView(await group(tx,prior.response.id,actor,{requireActive:false,recoverPending:true}));
     if(action==='importTest')await ownedTest(tx,actor,prior.response.id);
     return prior.response;
   }
+  const subject=action==='createGroup'?subjectFor(actor,input.subjectId):importSubject;
   const response=await effect(tx,actor,action,input,subject,g);
   await query(tx,'INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4)',[actor.personId,receiptKey,payload,response]);
   await query(tx,'INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,0,$5)',

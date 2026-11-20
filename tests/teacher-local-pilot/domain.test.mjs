@@ -9,7 +9,7 @@ const image=(id,alt)=>({type:'image',asset_id:id,alt});
 const code=value=>error=>error.code===value;
 async function activeGroup(pilot){
   const group=await pilot.command('teacher','createGroup',{name:'Matematika'});
-  await pilot.command('admin','approveGroup',{groupId:group.id});
+  assert.equal(group.status,'active');
   return group;
 }
 function richFile(publicImage,privateKeyImage){

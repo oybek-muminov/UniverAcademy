@@ -1,3 +1,4 @@
+import { cabinetQueryAllowed } from './teacher-student-directory.mjs';
 // Pages sends staff requests to a named Worker service or the configured legacy Node upstream.
 const noStore={'cache-control':'no-store','cdn-cache-control':'no-store','x-content-type-options':'nosniff'};
 const error=(code,status)=>Response.json({error:{code,message:code}},{status,headers:noStore});
@@ -10,7 +11,7 @@ export async function forwardTeacherStaging(request,env,{surface,transport=fetch
   const url=new URL(request.url);
   const role=/^\/api\/v1\/(teacher|admin|student)\/pilot\//.exec(url.pathname)?.[1];
   if (env?.UA_CABINET_STAGING_ENABLED!=='true'||!role||
-      (surface==='teacher'?!['teacher','admin'].includes(role):surface!=='student'||role!=='student')||url.search||url.hash) return error('NOT_FOUND',404);
+      (surface==='teacher'?!['teacher','admin'].includes(role):surface!=='student'||role!=='student')||!cabinetQueryAllowed(url,request.method)||url.hash) return error('NOT_FOUND',404);
   const external=origin(surface==='teacher'?env.UA_CABINET_TEACHER_ORIGIN:env.UA_API_ORIGIN);
   if (!external) return error('SERVICE_UNAVAILABLE',503);
   if (url.origin!==external || !['GET','POST','OPTIONS'].includes(request.method))return error('NOT_FOUND',404);
@@ -37,7 +38,7 @@ export async function forwardTeacherStaging(request,env,{surface,transport=fetch
       const value=request.headers.get(k);if(value!==null)headers.set(k,value);
     }
     if (secret!==undefined) headers.set('x-univeracademy-pilot-proxy',secret);
-    const r=await send(new Request(destination+url.pathname,{method:request.method,headers,
+    const r=await send(new Request(destination+url.pathname+url.search,{method:request.method,headers,
       ...(request.body?{body:request.body,duplex:'half'}:{}),signal:request.signal,redirect:'manual'}));
     if (r.status>=300&&r.status<400)return error('SERVICE_UNAVAILABLE',503);
     const output=new Headers(noStore);

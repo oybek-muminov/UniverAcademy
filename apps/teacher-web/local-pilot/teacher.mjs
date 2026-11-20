@@ -10,7 +10,7 @@ const messages = {
   GROUP_MEMBERSHIP_CONFLICT: 'O‘quvchi boshqa faol guruhda. Guruhini almashtirish uchun Adminga murojaat qiling.',
   LOCAL_CHAT_UNAVAILABLE: 'O‘quvchi mahalliy botni hali ochmagan. Guruh taklif havolasini nusxalab ulashing.',
   EMPTY_GROUP: 'Avval guruhga kamida bitta o‘quvchi qo‘shing.',
-  GROUP_PENDING: 'Guruh uchun Admin tasdig‘i kerak.',
+  GROUP_PENDING: 'Guruh hozircha faol emas. Guruhlar ro‘yxatini yangilang.',
   TEST_NOT_PUBLISHED: 'Avval testni nashr qiling.',
   NOT_FOUND: 'Yozuv topilmadi. Tanlangan guruh, test yoki UniverAcademy ID raqamini tekshiring.',
   FORBIDDEN: 'Bu amal uchun ruxsat yo‘q.',
@@ -18,8 +18,8 @@ const messages = {
   IDEMPOTENCY_CONFLICT: 'Amal tasdiqlanmadi. Kabinetni yangilang va tanlovni tekshiring.',
   DEMO_SESSION_REQUIRED: 'Mahalliy sessiya tugagan. Kabinetni yangilang.',
 };
-async function request(path, body, key) {
-  const options = { credentials: 'same-origin', cache: 'no-store' };
+async function request(path, body, key, signal) {
+  const options = { signal, credentials: 'same-origin', cache: 'no-store' };
   if (body !== undefined) {
     options.method = 'POST';
     options.body = JSON.stringify(body);
@@ -63,6 +63,10 @@ document.getElementById('workspace-actions').textContent = 'Mahalliy sinov';
 document.getElementById('workspace-links').append(link('Mahalliy Admin sahifasi', '/admin/'), link('Mahalliy o‘quvchi kabineti', '/student/'));
 mountTeacherWorkspace(document, {
   mountTeacherEditor, showStudentView, mountVisualFormula, renderBlocks, upload, request, hashNavigation: true,
+  readAvailableStudents(groupId, after, signal) {
+    const path = 'groups/' + encodeURIComponent(groupId) + '/available-students' + (after === null ? '' : '?after=' + encodeURIComponent(after));
+    return request(path, undefined, undefined, signal);
+  },
   async readDashboard() {
     try { return await request('dashboard'); } catch (error) {
       if (error.status !== 401) throw error;

@@ -2,10 +2,10 @@
 const limits = { json: 1024 * 1024, media: 2 * 1024 * 1024 };
 const permitted = {
   teacher: new Set(['createGroup','addMember','createInvite','sendInvite','importTest','previewTest','publishTest','assignTest']),
-  admin: new Set(['approveGroup']),
+  admin: new Set(),
 };
 const messages = {
-  GROUP_PENDING: 'Guruh uchun Admin tasdig‘i kerak.',
+  GROUP_PENDING: 'Guruh hozircha faol emas. Guruhlar ro‘yxatini yangilang.',
   GROUP_MEMBERSHIP_CONFLICT: 'O‘quvchining boshqa faol guruhi bor. Guruhini almashtirish uchun Adminga murojaat qiling.',
   ADMIN_TRANSFER_REQUIRED: 'Guruhni almashtirish uchun Adminga murojaat qiling.',
   CHAT_UNAVAILABLE: 'O‘quvchi bot bilan hali suhbat boshlamagan. Guruh taklif havolasini ulashing.',
@@ -43,7 +43,7 @@ export function createStaffTransport({origin, role, expected, identity, getCurre
   if (!permitted[role] || typeof getCurrentClerkToken !== 'function' || !expected?.generation || !expected.userId ||
       new URL(origin).protocol !== 'https:' || new URL(origin).origin !== origin || location.origin !== origin) throw fail();
   async function perform(path, options, binary) {
-    const bound = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
+    const bound = AbortSignal.any([signal, AbortSignal.timeout(15000), ...(options.signal ? [options.signal] : [])]);
     const check = () => {
       bound.throwIfAborted();
       const current = identity.current();
@@ -101,6 +101,11 @@ export function createStaffTransport({origin, role, expected, identity, getCurre
       const headers = {'Content-Type':'application/json'};
       if (key) headers['Idempotency-Key'] = key;
       return perform(path, {method:'POST', headers, body}, false);
+    },
+    availableStudents(groupId, after, requestSignal) {
+      if (role !== 'teacher' || !uuid(groupId) || after !== null && (typeof after !== 'string' || !/^[0-9]{10}$/.test(after))) throw fail();
+      const path = 'groups/' + groupId + '/available-students' + (after === null ? '' : '?after=' + after);
+      return perform(path, {method:'GET',signal:requestSignal}, false);
     },
     async upload(file) {
       if (role !== 'teacher') throw fail();

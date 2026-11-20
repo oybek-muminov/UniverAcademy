@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { parseTeacherTestText } from './teacher-pilot-text-import.mjs';
 import { imageLimits, privatePng } from './teacher-local-ui/private-image.mjs';
+import { validStudentDirectorySearch } from './teacher-student-directory.mjs';
 import { createTeacherPilot } from './teacher-pilot-domain.mjs';
 import { teacherPilotBotLinks, teacherPilotBotStart } from '../apps/telegram-bot/src/teacher-pilot-invite.mjs';
 
@@ -140,9 +141,9 @@ export function createTeacherPilotServer(options = {}) {
         }
         throw fault(404,'NOT_FOUND');
       }
-      const match = /^\/local-pilot\/(teacher|student|admin)\/(dashboard|session|import-preview|commands\/([a-zA-Z]+))$/.exec(url.pathname);
+      const match = /^\/local-pilot\/(teacher|student|admin)\/(dashboard|session|import-preview|commands\/([a-zA-Z]+)|groups\/([a-f0-9-]{36})\/available-students)$/.exec(url.pathname);
       if (!match) throw fault(404, 'NOT_FOUND');
-      const [, role, operation, action] = match;
+      const [, role, operation, action, directoryGroupId] = match;
       const token = cookieValue(req, role);
       if (req.method === 'POST' && operation === 'session') {
         const { actor } = await jsonBody(req);
@@ -155,6 +156,13 @@ export function createTeacherPilotServer(options = {}) {
       }
       const session = sessions.get(token);
       if (!session || session.role !== role) throw fault(401, 'DEMO_SESSION_REQUIRED');
+      if (directoryGroupId) {
+        if (role !== 'teacher') throw fault(404, 'NOT_FOUND');
+        if (req.method !== 'GET') throw fault(405, 'METHOD_NOT_ALLOWED');
+        if (!validStudentDirectorySearch(url.search)) throw fault(400, 'INVALID_QUERY');
+        const data = await pilot.availableStudents(session.actor, directoryGroupId, url.searchParams.get('after'));
+        return json(res, 200, {data});
+      }
       if (req.method === 'POST' && operation === 'import-preview') {
         if (role !== 'teacher') throw fault(403, 'FORBIDDEN');
         return json(res, 200, { data: parseTeacherTestText((await jsonBody(req)).text) });

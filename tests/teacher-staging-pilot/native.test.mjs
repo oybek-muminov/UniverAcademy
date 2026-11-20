@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import { forwardTeacherStaging } from '../../runtime/teacher-staging-proxy.mjs';
 import { createTeacherStageNode } from '../../runtime/teacher-staging-node.mjs';
 import { createTeacherStagingApi } from '../../runtime/teacher-staging-api.mjs';
 import { createStagingInviteDeliveryStore } from '../../runtime/teacher-staging-delivery.mjs';
-import { createCluster, createServiceLogin } from './cluster.mjs';
+import { addProfile, createCluster, createServiceLogin } from './cluster.mjs';
 import { proofHash } from '../../supabase/functions/univeracademy-api/student-state.ts';
 import { issuer,party,testClerk,provisionStaff,provisionStudent } from './credentials.mjs';
 import { apiOrigin,routes,studentOrigin,good,rejected,graphSvg,richDocument } from './requests.mjs';
@@ -114,18 +114,21 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
   });
 
   const groupKey=randomUUID();
-  await t.test('repeated group request and Admin approval create one group; leading-zero ID is authoritative',async()=>{
+  await t.test('a verified teacher immediately creates one usable group across concurrent retries and enrolls by leading-zero ID',async()=>{
     const data={name:'Mexanika 01',subjectId:'physics'};
     const repeated=await Promise.all([1,2].map(()=>good(teacher.command('createGroup',data,groupKey))));
     assert.equal(repeated[0].id,repeated[1].id);
     group=repeated[0];
-    assert.equal(group.status,'pending');
+    assert.equal(group.status,'active');
+    assert.deepEqual(repeated[1],group);
+    assert.equal((await good(teacher.dashboard())).groups.find(row=>row.id===group.id).status,'active');
     await rejected(teacher.command('createGroup',{...data,name:'Boshqa guruh'},groupKey),409);
-    await rejected(teacher.command('addMember',{groupId:group.id,univeracademy_id:byId.cabinetId}));
-    const pending=(await good(admin.dashboard())).groups.find(row=>row.id===group.id);
-    assert.equal(pending.status,'pending');
-    await good(admin.command('approveGroup',{groupId:group.id}));
-    await rejected(other.command('createInvite',{groupId:group.id}));
+    await rejected(teacher.command('createGroup',{name:'Unapproved',subjectId:'chemistry'}),403);
+    await rejected(other.command('createInvite',{groupId:group.id}),404);
+    assert.deepEqual((await db.query(`SELECT r.approved_by,s.person_id,g.status FROM ua_cabinet.group_requests r
+      JOIN ua_private.groups g ON g.id=r.active_group_id JOIN ua_private.staff_group_scope s ON s.group_id=g.id
+      WHERE r.id=$1`,[group.id])).rows,[{approved_by:teacherRow.id,person_id:teacherRow.id,status:'active'}]);
+    assert.equal(await scalar("SELECT count(*) n FROM ua_private.staff_audit WHERE target_id=$1 AND action='createGroup'",[group.id]),1);
     const add={groupId:group.id,univeracademy_id:byId.cabinetId};
     const key=randomUUID();
     await Promise.all([good(teacher.command('addMember',add,key)),good(teacher.command('addMember',add,key))]);
@@ -304,6 +307,142 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     assert.equal((await good(teacher.dashboard())).groups.find(row=>row.id===group.id).members.length,1);
     assert.equal((await good(student.dashboard())).univeracademy_id,byId.cabinetId);
     assert.equal((await good(teacher.dashboard())).tests.find(row=>row.id===draft.id).status,'published');
+  });
+
+  await t.test('the teacher directory pages through eligible students and enrollment rechecks the choice under lock',async()=>{
+    const ownerGroup=await good(teacher.command('createGroup',{name:'Ro‘yxat',subjectId:'physics'}));
+    const otherGroup=await good(other.command('createGroup',{name:'Boshqa sinf',subjectId:'physics'}));
+    const path=id=>'groups/'+id+'/available-students';
+    const directory=path(ownerGroup.id);
+    const expected=[],people=[];
+    for(let i=0;i<32;i++){
+      const cabinetId='09'+String(i).padStart(8,'0'),name='Talaba '+i;
+      people.push(await addProfile(db,{name,role:'student',cabinetId}));
+      expected.push({name:name+' Sinov',univeracademy_id:cabinetId});
+    }
+    const staff=people[28],disabled=people[29],incomplete=people[30],historic=people[31];
+    await db.query("UPDATE ua_private.people SET roles=ARRAY['student','teacher'],profile=jsonb_set(profile,'{roles}',to_jsonb(ARRAY['student','teacher'])) WHERE id=$1",[staff]);
+    await db.query('UPDATE ua_private.people SET enabled=false WHERE id=$1',[disabled]);
+    await db.query("UPDATE ua_private.people SET profile=jsonb_set(profile,'{registration_complete}','false'::jsonb) WHERE id=$1",[incomplete]);
+    await db.query('UPDATE ua_private.memberships SET affinity_group_id=$1 WHERE person_id=$2',[otherGroup.id,historic]);
+    const eligible=expected.slice(0,28);
+    const first=await good(teacher.call(directory+'?after=0800000000'));
+    assert.deepEqual(first,{students:eligible.slice(0,25),nextCursor:eligible[24].univeracademy_id});
+    assert.deepEqual(await good(teacher.call(directory+'?after='+first.nextCursor)),{students:eligible.slice(25),nextCursor:null});
+    assert.deepEqual(await good(teacher.call(directory+'?after='+eligible[2].univeracademy_id)),{students:eligible.slice(3),nextCursor:null});
+    assert.deepEqual(await good(teacher.call(directory+'?after=9999999999')),{students:[],nextCursor:null});
+    const unfiltered=await teacher.call(directory);
+    assert.equal(unfiltered.headers.get('cache-control'),'no-store');
+    assert.equal((await good(unfiltered)).students.length,25);
+    for(const suffix of ['?after=no','?after=','?after=12345','?after=0000000001&extra=x','?after=0000000001&after=0000000002','?limit=500'])
+      await rejected(teacher.call(directory+suffix),404);
+    await rejected(teacher.call(directory,'POST'),404);
+    await rejected(other.call(directory),404);
+    await rejected(admin.call(directory),404);
+    await rejected(routes(router,'teacher',byId.token).call(directory));
+    await rejected(student.call(directory),404);
+    await rejected(teacher.call(path(randomUUID())),404);
+    for(const i of [28,29,30])await rejected(teacher.command('addMember',{groupId:ownerGroup.id,univeracademy_id:expected[i].univeracademy_id}),404);
+    await rejected(teacher.command('addMember',{groupId:ownerGroup.id,univeracademy_id:expected[31].univeracademy_id}),409);
+
+    const selected=eligible[0].univeracademy_id;
+    const enrollment={groupId:ownerGroup.id,univeracademy_id:selected};
+    await db.query('BEGIN');
+    try{
+      await db.query('SELECT 1 FROM ua_private.memberships WHERE person_id=$1 FOR UPDATE',[people[0]]);
+      const busy=await teacher.command('addMember',enrollment);
+      assert.equal(busy.status,409);
+      assert.equal((await busy.json()).error.code,'MEMBERSHIP_BUSY');
+    }finally{await db.query('ROLLBACK');}
+    await good(other.command('addMember',{...enrollment,groupId:otherGroup.id}));
+    const stale=await teacher.command('addMember',enrollment);
+    assert.equal(stale.status,409);
+    assert.equal((await stale.json()).error.code,'GROUP_MEMBERSHIP_CONFLICT');
+    assert.equal((await good(teacher.call(directory+'?after=0800000000'))).students.some(row=>row.univeracademy_id===selected),false);
+    assert.equal((await db.query('SELECT affinity_group_id FROM ua_private.memberships WHERE person_id=$1',[people[0]])).rows[0].affinity_group_id,otherGroup.id);
+    await db.query('UPDATE ua_private.teacher_subject_approvals SET revoked_at_ms=1 WHERE person_id=$1',[teacherRow.id]);
+    await rejected(teacher.call(directory),403);
+    await db.query('UPDATE ua_private.teacher_subject_approvals SET revoked_at_ms=NULL WHERE person_id=$1',[teacherRow.id]);
+    await db.query("UPDATE ua_private.groups SET status='archived' WHERE id=$1",[ownerGroup.id]);
+    await rejected(teacher.call(directory),409);
+    await db.query('UPDATE ua_private.staff_group_scope SET revoked_at_ms=1 WHERE person_id=$1 AND group_id=$2',[teacherRow.id,ownerGroup.id]);
+    await rejected(teacher.call(directory),404);
+  });
+
+  await t.test('a late audit write failure rolls back group, scope, request and receipt; the same command can retry',async()=>{
+    const input={name:'Atomar guruh',subjectId:'physics'},key=randomUUID();
+    const counts=async()=>(await db.query(`SELECT
+      (SELECT count(*) FROM ua_cabinet.group_requests) AS requests,
+      (SELECT count(*) FROM ua_private.groups) AS groups,
+      (SELECT count(*) FROM ua_private.staff_group_scope) AS scopes,
+      (SELECT count(*) FROM ua_private.staff_receipts) AS receipts`)).rows[0];
+    const before=await counts();
+    await db.query("ALTER TABLE ua_private.staff_audit ADD CONSTRAINT qa_reject_group CHECK(action<>'createGroup') NOT VALID");
+    try { await rejected(other.command('createGroup',input,key),500); }
+    finally { await db.query('ALTER TABLE ua_private.staff_audit DROP CONSTRAINT qa_reject_group'); }
+    assert.deepEqual(await counts(),before);
+    const created=await good(other.command('createGroup',input,key));
+    assert.equal(created.status,'active');
+    assert.deepEqual(await good(other.command('createGroup',input,key)),created);
+  });
+
+  await t.test('legacy pending requests activate on owner sign-in, first use or receipt replay, within current subject and scope',async()=>{
+    async function pending(name,subject='physics'){
+      const id=randomUUID();
+      await db.query('INSERT INTO ua_cabinet.group_requests(id,teacher_id,subject_id,name) VALUES($1,$2,$3,$4)',
+        [id,otherRow.id,subject,name]);
+      return id;
+    }
+    const byDashboard=await pending('Eski guruh'),unapproved=await pending('Kimyo','chemistry');
+    const isPending=async id=>await scalar('SELECT count(*) n FROM ua_cabinet.group_requests WHERE id=$1 AND active_group_id IS NULL',[id])===1;
+    await good(teacher.dashboard());
+    await good(admin.dashboard());
+    await rejected(teacher.command('createInvite',{groupId:byDashboard}),404);
+    assert.equal(await isPending(byDashboard),true);
+    const deny=async sql=>{
+      await db.query(sql,[otherRow.id]);
+      await rejected(other.dashboard(),403);
+      assert.equal(await isPending(byDashboard),true);
+    };
+    await deny('UPDATE ua_private.staff_access SET approved=false WHERE person_id=$1');
+    await db.query('UPDATE ua_private.staff_access SET approved=true WHERE person_id=$1',[otherRow.id]);
+    await deny('UPDATE ua_private.teacher_subject_approvals SET revoked_at_ms=123 WHERE person_id=$1');
+    await db.query('UPDATE ua_private.teacher_subject_approvals SET revoked_at_ms=NULL WHERE person_id=$1',[otherRow.id]);
+    const [first,again]=await Promise.all([good(other.dashboard()),good(other.dashboard())]);
+    for(const result of [first,again]){
+      assert.equal(result.groups.find(row=>row.id===byDashboard).status,'active');
+      assert.equal(result.groups.some(row=>row.id===unapproved),false);
+    }
+    assert.equal(await isPending(unapproved),true);
+    const byCommand=await pending('Yangi taklif');
+    assert.equal((await good(other.command('createInvite',{groupId:byCommand}))).groupId,byCommand);
+    const byReceipt=await pending('Eski kvitansiya'),key=randomUUID(),input={name:'Eski kvitansiya'};
+    const digest=value=>createHash('sha256').update(value).digest('hex');
+    const receipt=otherRow.id+'/staging/createGroup/'+digest(key);
+    const old={id:byReceipt,name:input.name,status:'pending',subjectId:'physics'};
+    await db.query('BEGIN');
+    await db.query('INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,0,$5)',
+      [receipt,otherRow.id,'createGroup',byReceipt,Date.now()]);
+    await db.query('INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4)',
+      [otherRow.id,receipt,digest(JSON.stringify(input)),old]);
+    await db.query('COMMIT');
+    await db.query("INSERT INTO ua_private.teacher_subject_approvals VALUES($1,'history',true,NULL)",[otherRow.id]);
+    await rejected(other.command('createGroup',{name:'Boshqa'},key),409);
+    assert.equal(await isPending(byReceipt),true);
+    assert.deepEqual(await good(other.command('createGroup',input,key)),{...old,status:'active'});
+    await rejected(other.command('createGroup',{name:'Fan kerak'}),422);
+    await db.query("UPDATE ua_private.groups SET status='archived' WHERE id=$1",[byReceipt]);
+    assert.equal((await good(other.command('createGroup',input,key))).status,'archived');
+    await rejected(other.command('createInvite',{groupId:byReceipt}),409);
+    await db.query('UPDATE ua_private.staff_group_scope SET revoked_at_ms=123 WHERE person_id=$1 AND group_id=$2',[otherRow.id,byReceipt]);
+    await db.query('INSERT INTO ua_private.staff_group_scope(person_id,group_id) VALUES($1,$2)',[teacherRow.id,byReceipt]);
+    assert.equal((await good(other.dashboard())).groups.some(row=>row.id===byReceipt),false);
+    await rejected(other.command('createGroup',input,key),404);
+    await rejected(teacher.command('createInvite',{groupId:byReceipt}),404);
+    const byOldClient=await pending('Old client');
+    assert.equal((await good(admin.command('approveGroup',{groupId:byOldClient}))).status,'active');
+    await good(other.dashboard());
+    assert.equal((await db.query('SELECT approved_by FROM ua_cabinet.group_requests WHERE id=$1',[byOldClient])).rows[0].approved_by,adminRow.id);
   });
 
   await t.test('revoking a staff mapping or an opaque family closes even a previously successful replay',async()=>{

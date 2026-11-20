@@ -94,9 +94,16 @@ try {
   const direct=await mf.dispatchFetch(apiOrigin+'/api/v1/teacher/pilot/dashboard',{headers:{origin:studentOrigin,authorization:'Bearer '+teacherJwt,'x-univeracademy-pilot-proxy':'untrusted'}});
   assert.equal(direct.status,404);
   const g=await good(teacherUI.command('createGroup',{subjectId:'physics',name:'Mexanika'}));
-  assert.equal(g.status,'pending');
-  await good(adminUI.command('approveGroup',{groupId:g.id}));
-  await good(teacherUI.command('addMember',{groupId:g.id,univeracademy_id:account.cabinetId}));
+  assert.equal(g.status,'active');
+  const available='groups/'+g.id+'/available-students';
+  const candidates=await good(teacherUI.call(available));
+  assert.deepEqual(candidates,{students:[{name:'O‘quvchi Sinov',univeracademy_id:account.cabinetId},
+    {name:'Taklifli Sinov',univeracademy_id:invitee.cabinetId}],nextCursor:null});
+  assert.deepEqual(await good(teacherUI.call(available+'?after='+account.cabinetId)),{students:[candidates.students[1]],nextCursor:null});
+  await rejected(student.call(available),404);
+  await rejected(teacherUI.call(available+'?after=bad'),404);
+  await good(teacherUI.command('addMember',{groupId:g.id,univeracademy_id:candidates.students[0].univeracademy_id}));
+  assert.deepEqual(await good(teacherUI.call(available)),{students:[candidates.students[1]],nextCursor:null});
   const invitation=await good(teacherUI.command('createInvite',{groupId:g.id}));
   const webhook=await mf.dispatchFetch(botOrigin+'/telegram/webhook',{method:'POST',
     headers:{'content-type':'application/json','X-Telegram-Bot-Api-Secret-Token':webhookSecret},
@@ -131,7 +138,7 @@ try {
   assert.equal((await good(teacherUI.dashboard())).results.find(r=>r.attemptId===attempt.id).percentage,score.percentage);
   assert.equal((await db.query('SELECT count(*)::int n FROM ua_private.ordinary_results WHERE attempt_id=$1',[attempt.id])).rows[0].n,1);
   assert.ok(clerkCalls.includes('/.well-known/jwks.json'));
-  console.log('PASS workerd. Bundled Ustoz Pages and API verified signed staff JWTs and the student session, approved a group, imported/published a rich test, rendered a private PNG, enrolled a second learner via the compiled Telegram bot and both directory bindings, stored answers and returned the persisted grade.');
+  console.log('PASS workerd. Bundled Ustoz Pages and API verified signed staff JWTs and the student session, created a teacher-owned active group, selected an eligible student from its paged directory, imported/published a rich test, rendered a private PNG, enrolled a second learner via the compiled Telegram bot and both directory bindings, stored answers and returned the persisted grade.');
 } finally {
   try { await mf?.dispose(); } finally { try {await cluster?.close();} finally {await rm(bundle,{recursive:true,force:true});} }
 }

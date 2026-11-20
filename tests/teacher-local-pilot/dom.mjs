@@ -124,20 +124,24 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   el('publish-button').click();
   await until(() => el('test-meta').textContent.includes('Nashr qilingan'), 'publish');
 
+  window.location.hash = 'guruhlar';
+  await until(() => !el('guruhlar').hidden, 'group workspace');
   input(el('group-name'), 'Fizika <b>8A</b>');
   submit(el('group-form'), el('group-form').querySelector('button'));
-  await until(() => el('group-status').textContent.includes('Admin'), 'pending group');
-  assert(el('member-form').hidden);
-  await post('admin/session', { actor: 'admin' });
-  await post('admin/commands/approveGroup', { groupId: el('member-group').value });
-  el('refresh-groups').click();
-  await until(() => !el('member-form').hidden, 'approved group');
+  await until(() => el('member-group').value && !el('member-form').hidden, 'new group ready for enrollment');
   const form = el('member-form');
   input(el('student-number'), '0100000001');
   submit(form, form.querySelector('[value=send]'));
   await until(() => el('problem').textContent.includes('botni hali ochmagan'), 'unknown bot chat');
-  submit(form, form.querySelector('button'));
-  await until(() => el('members').textContent.includes('0100000001'), 'add member');
+  const available = el('available-list');
+  await until(() => [...available.options].some(row => row.value === '0100000001'), 'ungrouped student listed');
+  available.value = '0100000001';
+  available.dispatchEvent(new window.Event('change'));
+  assert(!el('members').textContent.includes('0100000001'));
+  submit(el('available-form'), el('available-add'));
+  await until(() => el('members').textContent.includes('0100000001') &&
+    [...available.options].some(row => row.value === '0100000002') &&
+    ![...available.options].some(row => row.value === '0100000001'), 'enrolled student moves from picker to members');
   input(el('student-number'), '0100000002');
   submit(form, form.querySelector('[value=send]'));
   await until(() => el('notice').textContent.includes('bot xabarlariga yuborildi'), 'deliver local invite');

@@ -1,7 +1,81 @@
+export function groupStatusLabel(status) {
+  if (status === 'active') return 'Faol guruh';
+  if (status === 'archived') return 'Arxivlangan guruh';
+  return 'Guruh faol emas';
+}
+
+function mountStudentPicker(el, readAvailableStudents, addMember) {
+  const list = el('available-list'), add = el('available-add');
+  const previous = el('available-previous'), next = el('available-next'), retry = el('available-retry');
+  const status = el('available-status');
+  let group = null, pages = [null], nextCursor = null, controller;
+
+  function clear() {
+    controller?.abort();
+    el('available-form').removeAttribute('aria-busy');
+    nextCursor = null;
+    list.replaceChildren();
+    el('available-label').hidden = add.hidden = true;
+    add.disabled = true;
+    previous.hidden = next.hidden = retry.hidden = true;
+    status.textContent = '';
+  }
+  async function readPage() {
+    clear();
+    if (!group) return;
+    const signal = (controller = new AbortController()).signal;
+    const after = pages.at(-1);
+    status.textContent = 'O‘quvchilar yuklanmoqda…';
+    el('available-form').setAttribute('aria-busy', 'true');
+    try {
+      const data = await readAvailableStudents(group, after, signal);
+      if (signal.aborted) return;
+      if (!Array.isArray(data?.students) || data.students.some(row =>
+        typeof row?.name !== 'string' || typeof row.univeracademy_id !== 'string' || !/^[0-9]{10}$/.test(row.univeracademy_id)) ||
+        data.nextCursor !== null && (typeof data.nextCursor !== 'string' || !/^[0-9]{10}$/.test(data.nextCursor) || data.nextCursor <= (after ?? ''))) {
+        throw Error('O‘quvchilar ro‘yxatini o‘qib bo‘lmadi.');
+      }
+      const options = data.students.map(row => new Option(row.name + ' · ' + row.univeracademy_id, row.univeracademy_id));
+      list.replaceChildren(...options);
+      list.selectedIndex = -1;
+      el('available-label').hidden = add.hidden = !options.length;
+      nextCursor = data.nextCursor;
+      next.hidden = nextCursor === null;
+      status.textContent = options.length ? 'Bu sahifada ' + options.length + ' ta o‘quvchi.' :
+        after ? 'Bu sahifada o‘quvchi qolmagan.' : 'Hozircha guruhga kirmagan o‘quvchi yo‘q.';
+    } catch (error) {
+      if (signal.aborted) return;
+      status.textContent = error.message || 'O‘quvchilar ro‘yxatini yuklab bo‘lmadi.';
+      retry.hidden = false;
+    } finally {
+      if (!signal.aborted) {
+        previous.hidden = pages.length === 1;
+        el('available-form').removeAttribute('aria-busy');
+      }
+    }
+  }
+  function show(groupId, refresh = false) {
+    if (groupId === group && !refresh) return;
+    group = groupId;
+    pages = [null];
+    el('available-students').hidden = !group;
+    void readPage();
+  }
+  previous.onclick = () => { if (pages.length > 1) { pages.pop(); void readPage(); } };
+  next.onclick = () => { if (nextCursor) { pages.push(nextCursor); void readPage(); } };
+  retry.onclick = readPage;
+  list.onchange = () => { add.disabled = !list.value; };
+  el('available-form').onsubmit = event => {
+    event.preventDefault();
+    if (group && !add.disabled && list.value) void addMember(group, list.value);
+  };
+  return { show, refresh() { if (group) show(group, true); } };
+}
+
 // Mounted by both the standalone local rehearsal and the authenticated staff entrance.
 // Sessions, authorization, media transport and invitation destinations belong to each host.
 export function mountTeacherWorkspace(root, {
-  readDashboard, request, upload, renderBlocks, mountTeacherEditor, showStudentView,
+  readDashboard, readAvailableStudents, request, upload, renderBlocks, mountTeacherEditor, showStudentView,
   mountVisualFormula, inviteLink, sentMessage, hashNavigation = false,
 }) {
   const controls = new Map([...root.querySelectorAll('[id]')].map(item => [item.id, item]));
@@ -15,6 +89,7 @@ export function mountTeacherWorkspace(root, {
   let writing = false;
   const retries = new Map();
   const invites = new Map();
+  const picker = mountStudentPicker(el, readAvailableStudents, addStudent);
 
   function node(tag, text) {
     const item = document.createElement(tag);
@@ -50,7 +125,7 @@ export function mountTeacherWorkspace(root, {
     selectRows('saved-test', next.tests, selection.test, test => test.title);
     selectRows('result-group', next.groups, undefined, group => group.name);
     renderGroup();
-    renderTest();
+    renderTest(selection.group);
     renderResults();
   }
   async function refresh() {
@@ -101,11 +176,12 @@ export function mountTeacherWorkspace(root, {
 
   function renderGroup() {
     const group = dashboard.groups.find(row => row.id === el('member-group').value);
+    picker.show(currentPage === 'guruhlar' && group?.status === 'active' ? group.id : null);
     el('group-content').hidden = !group;
     el('group-empty').hidden = Boolean(group);
     if (!group) return;
     const active = group.status === 'active';
-    el('group-status').textContent = active ? 'Faol guruh' : 'Guruh Admin tasdig‘ini kutmoqda.';
+    el('group-status').textContent = groupStatusLabel(group.status);
     el('member-form').hidden = !active;
     el('invite-section').hidden = !active;
     const rows = group.members.map(member => {
@@ -123,7 +199,7 @@ export function mountTeacherWorkspace(root, {
     el('open-invite').textContent = invite.label;
     el('invite-note').textContent = invite.note;
   }
-  function renderTest() {
+  function renderTest(preferredGroup) {
     const test = dashboard.tests.find(row => row.id === el('saved-test').value);
     if (el('saved-preview').dataset.test !== test?.id) {
       el('saved-preview').hidden = true;
@@ -139,11 +215,12 @@ export function mountTeacherWorkspace(root, {
     const assigned = dashboard.assignments.filter(row => row.testId === test.id);
     const groups = dashboard.groups.filter(group => group.status === 'active' && (!test.subjectId || group.subjectId === test.subjectId));
     const available = groups.filter(group => !assigned.some(row => row.groupId === group.id));
-    selectRows('assignment-group', available, undefined, group => group.name);
+    const selected = available.some(group => group.id === preferredGroup) ? preferredGroup : undefined;
+    selectRows('assignment-group', available, selected, group => group.name);
     el('assign-form').hidden = !published || !available.length;
     const assignedNames = groups.filter(group => assigned.some(row => row.groupId === group.id)).map(group => group.name);
     let message = assignedNames.length ? 'Tayinlangan guruhlar: ' + assignedNames.join(', ') : '';
-    if (published && !groups.length) message = 'Testni tayinlash uchun Admin tasdiqlagan guruh kerak.';
+    if (published && !groups.length) message = 'Testni tayinlash uchun shu fandan faol guruh yarating.';
     el('assignment-info').textContent = message;
   }
   function renderResults() {
@@ -165,7 +242,7 @@ export function mountTeacherWorkspace(root, {
     event.preventDefault();
     const name = el('group-name').value.trim();
     if (!name) return notice('', 'Guruh nomini kiriting.');
-    command('createGroup', { name }, 'Guruh yaratish so‘rovi yuborildi. Admin tasdig‘idan keyin o‘quvchi qo‘sha olasiz.', data => {
+    command('createGroup', { name }, 'Guruh yaratildi.', data => {
       el('group-name').value = '';
       return { group: data.id };
     });
@@ -179,10 +256,15 @@ export function mountTeacherWorkspace(root, {
       command('sendInvite', { groupId, univeracademy_id: id }, sentMessage);
       return;
     }
-    command('addMember', { groupId, univeracademy_id: id }, 'O‘quvchi guruhga qo‘shildi.', () => {
-      el('student-number').value = '';
-    });
+    void addStudent(groupId, id);
   };
+  async function addStudent(groupId, id) {
+    if (disposed || writing || groupId !== el('member-group').value) return;
+    await command('addMember', { groupId, univeracademy_id: id }, 'O‘quvchi guruhga qo‘shildi.', () => {
+      if (el('member-group').value === groupId) el('student-number').value = '';
+    });
+    if (!disposed && el('member-group').value === groupId) picker.refresh();
+  }
   el('invite-button').onclick = () => {
     const groupId = el('member-group').value;
     command('createInvite', { groupId }, 'Guruh uchun yangi taklif havolasi yaratildi.', data => {
@@ -312,14 +394,15 @@ export function mountTeacherWorkspace(root, {
     command('assignTest', { testId: el('saved-test').value, groupId: el('assignment-group').value }, 'Test guruhga tayinlandi.');
   };
   el('member-group').onchange = renderGroup;
-  el('saved-test').onchange = renderTest;
+  el('saved-test').onchange = () => renderTest();
   el('result-group').onchange = renderResults;
-  el('refresh-groups').onclick = refresh;
+  el('refresh-groups').onclick = () => { picker.refresh(); void refresh(); };
   el('refresh-results').onclick = refresh;
 
   let currentPage = 'guruhlar';
   function showPage(page) {
     if (['guruhlar', 'testlar', 'natijalar'].includes(page)) currentPage = page;
+    if (dashboard) renderGroup();
     for (const section of root.querySelectorAll('.page')) section.hidden = section.id !== currentPage;
     for (const link of root.querySelectorAll('nav a')) {
       if (link.hash === '#' + currentPage) link.setAttribute('aria-current', 'page');
@@ -355,6 +438,7 @@ export function mountTeacherWorkspace(root, {
 
   return () => {
     disposed = true;
+    picker.show(null);
     fileVersion++; readVersion++;
     window.removeEventListener('focus', focus);
     if (hashNavigation) window.removeEventListener('hashchange', navigate);

@@ -10,6 +10,7 @@ import {blocksWire,scoreWire} from '../supabase/functions/univeracademy-api/stud
 import {materializeElapsedAttempts} from '../supabase/functions/univeracademy-api/membership-activity.ts';
 import {StaffFixture,validate} from '../tests/backend/staff-fixture.ts';
 import {testNumbers} from '../tests/backend/http-fixture.ts';
+import {studentDirectoryPageSize} from './teacher-student-directory.mjs';
 import {ungroupedSchedule} from './ungrouped-fixture.mjs';
 import {cleanText,importDraft,verifyTeacherImage} from './teacher-pilot-import.mjs';
 
@@ -185,11 +186,11 @@ function previewTest(state,actor,testId,time) {
 function teacherCommand(state,actor,action,input,key,time) {
   const staff=state.staff[actor.alias];
   if (action==='createGroup') {
-    const id=unique(),group={id,name:cleanText(input.name,100),revision:0,status:'pending',subjectId:subject,
+    const id=unique(),group={id,name:cleanText(input.name,100),revision:1,status:'active',subjectId:subject,
       teacherAlias:actor.alias,teacherPersonId:actor.personId};
     state.groups[id]=group;
     staff.scope.group_ids.push(id);
-    state.audit.push({actorId:actor.personId,action:'group_request',targetId:id,revision:0,at:time});
+    state.audit.push({actorId:actor.personId,action:'createGroup',targetId:id,revision:group.revision,at:time});
     return groupView(group);
   }
   if (action==='importTest') return testView(state,importDraft(state,staff,input,time));
@@ -302,6 +303,26 @@ export function createTeacherPilot({now=Date.now}={}) {
         if (actor.role==='teacher') return asset.teacherPersonId===actor.personId;
         return actor.role==='student' && Object.values(state.student.attempts)
           .some(attempt=>attemptCanReadImage(state,actor,attempt,id,time));
+      });
+    },
+    availableStudents(alias,groupId,after) {
+      return store.transaction(({state,now:clock})=>{
+        const actor=authorized(state,alias,clock());
+        if (actor.role!=='teacher') fail('FORBIDDEN',403);
+        groupFor(state,actor,safeId(groupId));
+        const students=[];
+        for (const id of Object.keys(state.pilot.studentsById).sort()) {
+          if (after && id<=after) continue;
+          const personId=state.pilot.studentsById[id], person=state.student.people[personId];
+          const m=state.memberships[personId], profile=person?.profile;
+          if (!person?.enabled || !profile?.registration_complete || profile.roles.length!==1 || profile.roles[0]!=='student' ||
+              !m || m.active || m.affinityGroupId!==null || profile.active_group_id!==null) continue;
+          if (students.length===studentDirectoryPageSize) {
+            return {students,nextCursor:students.at(-1).univeracademy_id};
+          }
+          students.push({name:fullName(profile),univeracademy_id:id});
+        }
+        return {students,nextCursor:null};
       });
     },
     read(alias) {

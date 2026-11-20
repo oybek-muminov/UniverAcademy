@@ -1,6 +1,6 @@
 # UniverAcademy
 
-[O‘qituvchi kabinetini mahalliy sinash](docs/teacher-local-pilot.md) — savol muharriri, Admin tasdiqlaydigan guruh, bot taklifi, imtihon va natija.
+[O‘qituvchi kabinetini mahalliy sinash](docs/teacher-local-pilot.md) — savol muharriri, o‘qituvchi ochadigan guruh, bot taklifi, imtihon va natija.
 
 Ko‘p fanli mustaqil ta’lim platformasi: veb-sahifa, o‘quvchi Mini App, Telegram bot va yagona API.
 

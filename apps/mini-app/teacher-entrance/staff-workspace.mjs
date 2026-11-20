@@ -1,7 +1,7 @@
 import template from '../../teacher-web/src/workspace.html?raw';
 import sampleText from '../../teacher-web/local-pilot/sample.txt?url&no-inline';
 import sampleJson from '../../teacher-web/local-pilot/sample.json?url&no-inline';
-import { mountTeacherWorkspace } from '../../teacher-web/src/workspace.mjs';
+import { groupStatusLabel, mountTeacherWorkspace } from '../../teacher-web/src/workspace.mjs';
 import { mountTeacherEditor, showStudentView } from '../../teacher-web/local-pilot/rich-editor.mjs';
 import { mountVisualFormula } from '../../teacher-web/local-pilot/visual-formula.mjs';
 import { renderBlocks } from '../src/rich-blocks.mjs';
@@ -52,51 +52,37 @@ function teacherView(host, port, first, lifecycle) {
       if (first) { const value = first; first = null; return value; }
       return lifecycle.dashboard();
     },
-    request:port.request, upload:port.upload, renderBlocks:privateBlocks, mountTeacherEditor, showStudentView, mountVisualFormula,
+    readAvailableStudents:port.availableStudents, request:port.request, upload:port.upload, renderBlocks:privateBlocks, mountTeacherEditor, showStudentView, mountVisualFormula,
     sentMessage:'Taklif Telegram orqali yetkazish navbatiga qo‘yildi.', inviteLink:checkedInvite,
   });
   return unmount;
 }
 
-function adminView(host, port, initial, lifecycle) {
+function adminView(host, initial, lifecycle) {
   const doc = host.ownerDocument;
   const main = doc.createElement('section');
   main.className = 'card';
-  const title = doc.createElement('h1'); title.textContent = 'Guruh so‘rovlari';
-  const rows = doc.createElement('div');
+  const title = doc.createElement('h1'); title.textContent = 'Guruhlar';
+  const rows = doc.createElement('ul');
   const notice = doc.createElement('p'); notice.setAttribute('role','status');
-  const retries = new Map();
-  let busy = false;
   function paint(dashboard) {
-    const pending = dashboard.groups.filter(group => group.status === 'pending');
-    rows.replaceChildren();
-    if (!pending.length) rows.textContent = 'Tasdiq kutayotgan guruh yo‘q.';
-    for (const group of pending) {
-      const row = doc.createElement('p');
-      const label = doc.createElement('span'); label.textContent = [group.name, group.teacherName].filter(Boolean).join(' · ');
-      const approve = button(doc, 'Tasdiqlash', async () => {
-        if (busy) return;
-        busy = true;
-        const key = retries.get(group.id) ?? crypto.randomUUID();
-        retries.set(group.id, key);
-        try {
-          await port.request('commands/approveGroup',{groupId:group.id},key);
-          retries.delete(group.id);
-          notice.textContent = 'Guruh tasdiqlandi.';
-          await reload();
-        } catch (error) { notice.textContent = error.message; }
-        finally { busy = false; }
-      });
-      row.append(label, ' ', approve); rows.append(row);
-    }
+    rows.replaceChildren(...dashboard.groups.map(group => {
+      const row = doc.createElement('li');
+      row.textContent = [group.name, group.teacherName, groupStatusLabel(group.status)].filter(Boolean).join(' · ');
+      return row;
+    }));
+    notice.textContent = dashboard.groups.length ? '' : 'Guruhlar yo‘q.';
   }
-  async function reload() {
+  const refresh = button(doc, 'Yangilash', async () => {
+    refresh.disabled = true;
     try {
       const data = await lifecycle.dashboard();
       if (!lifecycle.signal.aborted) paint(data);
-    } catch (error) { notice.textContent = error.message; }
-  }
-  main.append(title, button(doc,'Yangilash',reload), rows, notice, button(doc,'O‘qituvchi kabineti',lifecycle.teacher),
+    } catch (error) {
+      if (!lifecycle.signal.aborted) notice.textContent = error.message;
+    } finally { refresh.disabled = false; }
+  });
+  main.append(title, refresh, rows, notice, button(doc,'O‘qituvchi kabineti',lifecycle.teacher),
     button(doc,'Chiqish',lifecycle.signout));
   host.replaceChildren(main);
   paint(initial);
@@ -155,7 +141,7 @@ export function mountAuthenticatedWorkspace(host, options) {
       const data = await dashboard();
       if (signal.aborted || !sameIdentity()) return;
       const lifecycle = {signal, dashboard, signout, teacher:() => open('teacher'), admin:() => open('admin')};
-      cleanup = nextRole === 'teacher' ? teacherView(host, port, data, lifecycle) : adminView(host, port, data, lifecycle);
+      cleanup = nextRole === 'teacher' ? teacherView(host, port, data, lifecycle) : adminView(host, data, lifecycle);
     } catch {
       if (!signal.aborted) { clear(); panel('Kabinetni yuklab bo‘lmadi.', [button(doc, 'Qayta urinish', () => open(nextRole))]); }
     }

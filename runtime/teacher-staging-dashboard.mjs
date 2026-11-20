@@ -30,8 +30,10 @@ export async function dashboard(tx,actor){
     return {...base,groups:gs.map(g=>({...groupView(g),teacherName:displayName(g.profile)}))};
   }
   const teacher=actor.role==='teacher',person=actor.personId;
-  const groups=teacher?await query(tx,`SELECT r.*,COALESCE(g.status,'pending') status FROM ua_cabinet.group_requests r LEFT JOIN ua_private.groups g ON g.id=r.active_group_id
-    WHERE r.teacher_id=$1 AND r.subject_id=ANY($2::text[]) AND (r.active_group_id IS NULL OR r.id=ANY($3::uuid[])) ORDER BY r.created_at,r.id`,[person,actor.approvedSubjectIds,actor.scope.group_ids]):
+  const groups=teacher?await query(tx,`SELECT r.*,g.status FROM ua_cabinet.group_requests r
+    JOIN ua_private.groups g ON g.id=r.active_group_id
+    JOIN ua_private.staff_group_scope s ON s.group_id=g.id AND s.person_id=r.teacher_id AND s.revoked_at_ms IS NULL
+    WHERE r.teacher_id=$1 AND r.subject_id=ANY($2::text[]) ORDER BY r.created_at,r.id`,[person,actor.approvedSubjectIds]):
     await query(tx,`SELECT r.*,g.status FROM ua_private.memberships m JOIN ua_private.groups g ON g.id=m.affinity_group_id
     JOIN ua_cabinet.group_requests r ON r.active_group_id=g.id WHERE m.person_id=$1 AND m.active`,[person]);
   const ids=groups.map(g=>g.id);

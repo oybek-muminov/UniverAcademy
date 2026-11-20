@@ -56,7 +56,8 @@ test('Worker request adapter verifies signed staff, live bound student and least
     const t=routes(api(),'teacher',token), s=routes(api(),'student',student.token);
     assert.equal((await good(t.dashboard())).person_id,teacher.id);
     const group=await good(t.command('createGroup',{name:'Worker physics',subjectId:'physics'}));
-    assert.equal(group.status,'pending');
+    assert.equal(group.status,'active');
+    assert.equal((await good(t.command('createInvite',{groupId:group.id}))).groupId,group.id);
     assert.equal((await good(s.dashboard())).person_id,student.id);
     await rejected(routes(api(),'teacher',otherParty).dashboard(),401);
     await rejected(routes(api(),'admin',token).dashboard());
