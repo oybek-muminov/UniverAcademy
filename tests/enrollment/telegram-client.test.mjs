@@ -7,7 +7,9 @@ import {createProductionStudentClient as ownerClient,STUDENT_CONTRACT_SHA256 as 
 
 const jwt='eyJ0ZXN0Ijp0cnVlfQ.eyJzdWIiOiJ1c2VyX09mZmxpbmUifQ.c3ludGhldGlj';
 const proof='query_id=opaque%2Flaunch&user=%7B%22id%22%3A42%7D&hash=synthetic';
-const ack={data:{ok:true}},session={data:{access_token:'opaque-access',refresh_token:'opaque-refresh',expires_at:'2030-01-01T00:00:00.000Z',refresh_expires_at:'2030-01-02T00:00:00.000Z',token_type:'Bearer',profile:{}}};
+const ack={data:{ok:true}},session={data:{access_token:'opaque-access',refresh_token:'opaque-refresh',expires_at:'2030-01-01T00:00:00.000Z',refresh_expires_at:'2030-01-02T00:00:00.000Z',token_type:'Bearer',
+ profile:{person_id:'00000000-0000-4000-8000-000000000001',first_name:'',last_name:'',roles:['student'],
+  registration_complete:false,active_group_id:null,univeracademy_id:'0100000001'}}};
 const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});
 const options=transport=>({mode:'production',baseUrl:'https://api.univeracademy.uz/api/v1',contractSha256:STUDENT_CONTRACT_SHA256,transport});
 const hash=value=>createHash('sha256').update(value).digest('hex');

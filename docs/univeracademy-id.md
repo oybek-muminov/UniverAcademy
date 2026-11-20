@@ -13,12 +13,12 @@ Yangi mijozlar jadvaldagi aniq `Accept` qiymatini yuboradi. Har javobda bitta ID
 
 ## Chiqarish ketma-ketligi
 
-1. Yangi registration API versiyasini chiqarish mumkin. U dastlabki PostgreSQL sxemasida ham yangi o‘quvchi yaratadi va profil ismini yangilaydi. API chiqarilishi Supabase ustunining nomini o‘zgartirmaydi. Yangi frontendni chiqarishdan oldin jadvaldagi ikkala so‘rov o‘sha IDni qaytarishini tekshiring.
-2. Yangi Mini App va boshqa yangilangan mijozlarni tarqating. Avvalroq ochilgan ilovalar eski javob shaklini olishda davom etadi.
+1. Yangi registration API versiyasini chiqarish mumkin. U dastlabki PostgreSQL sxemasida ham yangi o‘quvchi yaratadi va profil ismini yangilaydi. API chiqarilishi Supabase ustunining nomini o‘zgartirmaydi. Yangilangan API orqali jadvaldagi ikkala so‘rov aynan o‘sha IDni qaytarishini tekshiring.
+2. Mini App va API alohida chiqarilishi mumkin. Mini App birinchi yangilansa, oldingi API yuborgan oddiy JSON profilini qabul qilib, ichkarida amaldagi ID maydoniga o‘giradi. API birinchi yangilansa, avval ochilgan ilova eski javob shaklini oladi. Login, Telegram bog‘lanishi va refresh bir so‘rov bilan bajariladi. Yangi Mini App buildi faqat joriy yoki bevosita oldingi tasdiqlangan talaba kontrakti SHA-256 qiymatini qabul qiladi. Ilova ichidagi mijoz joriy kontrakt bilan yaratiladi.
 3. Baza egasi jismoniy nomni almashtirishga ruxsat bergach, [ID migratsiyasidagi](../supabase/migrations/cabinet-id/README.md) tiklash nuqtasi va katalog tekshiruvlarini bajaring. `expand` yangi ko‘rinishni ochadi. U allaqachon bajarilgan bo‘lsa ham API shu sxemani taniydi. O‘qituvchi kabinetining PostgreSQL migratsiyasi shu ko‘rinishga tayanadi.
 4. Eski server nusxalari xizmatdan chiqib, ularning tranzaksiyalari tugagach, `forward` orqali ustun nomini almashtiring. So‘ng `backfill` eski profil JSONlarini yangilaydi. Oraliqda har ikkala ko‘rinish o‘qiladi. Ro‘yxatga olish, ismni yangilash va boshidagi nollar `node --test tests/telegram-entry/native-registration-phases.test.mjs` orqali uchala bosqichda sinaladi.
 
-Frontendni qaytarishda API ikkala ko‘rinishga ham xizmat qiladi. Serverning eski versiyasiga qaytish uchun avval eski frontendni tarqating va yangi `Accept` bilan ochiq qolgan mijozlar uchun mos API versiyasini saqlang. Baza yakunlovchi bosqichdan o‘tgan bo‘lsa, eski server trafik olishidan oldin bazada `rollback`, keyin `backfill` bosqichlarini bajaring.
+Mini App versiyasini qaytarish API chiqarishidan mustaqil. Har ikkala mijoz eski va yangi Worker bilan tekshirilgan. Baza yakunlovchi bosqichdan o‘tgan bo‘lsa, eski server yana trafik olishidan oldin `rollback` va `backfill`ni bajarib, eski jismoniy ustun hamda profil shaklini tasdiqlang.
 
 ## Tarixiy manbalar
 

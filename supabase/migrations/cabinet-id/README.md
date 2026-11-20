@@ -9,9 +9,15 @@ O‘quvchining 10 raqamli ID’si, boshidagi nollar, ichki `person_id`, a’zoli
 3. Eski **server** nusxalarining so‘rovlari tugagach `node supabase/migrations/cabinet-id/migrate.mjs forward`. Qisqa tranzaksiya ustunni `univeracademy_id` deb qayta nomlaydi va unique/check nomlari, JSON shakli hamda ikkita RLS yozish shartini moslashtiradi. UNIQUE indeksi qayta qurilmaydi. Eski Mini App bilan ishlash yangilangan serverning javob formatini tanlashiga tayanadi. Qator yangilansa, trigger JSON kalitini ham yangilaydi.
 4. `node supabase/migrations/cabinet-id/migrate.mjs backfill`. Har tranzaksiya birlamchi kalit bo‘yicha ko‘pi bilan 500 qatorni ko‘radi. Faqat eski kalitli profillar yoziladi. Oxirida skript CHECKni butun jadvalda tasdiqlaydi va eski kalit qolmaganini tekshiradi. Jarayon uzilsa, qayta ishga tushirish mumkin. Bloklangan yoki hisob o‘chirilayotgan qator migratsiyani to‘xtatsa, uning odatiy tranzaksiyasi yakunlangach takrorlang. Muayyan bazada ishlash tezligi va migratsiya vaqti alohida o‘lchanadi.
 
+## Supabase operatori
+
+UniverAcademy Supabase muhitida xizmat ko‘rsatuvchi `postgres` operatoriga `BYPASSRLS` va o‘qish huquqi berilgan. Uning `ua_owner` a’zoligida `ADMIN TRUE, INHERIT FALSE, SET FALSE` qayd etilgan. Qo‘llangan `expand` SQLini Supabase migration history orqali topish mumkin.
+
+Keyingi DDL uchun operator o‘z tranzaksiyasida vaqtincha `SET` huquqini oladi, `SET LOCAL ROLE ua_owner` bilan katalogni o‘zgartiradi, asl roliga qaytadi va vaqtinchalik a’zolik grantini commitdan oldin qaytaradi. Backfill har bir 500 qatorli tranzaksiya uchun kerak bo‘lsa `UPDATE(profile)`ni vaqtincha beradi va aynan qo‘shilgan huquqni commitdan oldin olib tashlaydi. Har bosqich oxirida boshlang‘ich a’zolik va ustun ACL qiymatlari tiklanganini tekshiring.
+
 ## Ortga qaytish
 
-`forward`gacha avvalgi serverga bevosita qaytish mumkin. `forward`dan keyin yangi serverlar so‘rovlarga xizmat qilib turganida `node supabase/migrations/cabinet-id/migrate.mjs rollback`, keyin `node supabase/migrations/cabinet-id/migrate.mjs backfill` bajariladi. Shu tekshiruv tugagach eski server yana aniq eski profil shaklini o‘qiy oladi. Eski serverga qaytilsa, unga mos Mini App versiyasi ham kerak. Bu tartib yangi versiyada ro‘yxatdan o‘tgan o‘quvchilarning ID’larini ham saqlaydi.
+`forward`gacha avvalgi serverga bevosita qaytish mumkin. `forward`dan keyin yangi serverlar so‘rovlarga xizmat qilib turganida `node supabase/migrations/cabinet-id/migrate.mjs rollback`, keyin `node supabase/migrations/cabinet-id/migrate.mjs backfill` bajariladi. Shu tekshiruv tugagach eski server yana aniq eski profil shaklini o‘qiy oladi. Eski API bilan yangi Mini App ham tarixiy profil shaklini o‘qiy oladi. Bu tartib yangi versiyada ro‘yxatdan o‘tgan o‘quvchilarning ID’larini ham saqlaydi.
 
 ## Mahalliy tekshiruv
 

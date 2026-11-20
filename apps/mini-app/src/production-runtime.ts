@@ -1,5 +1,5 @@
 import { createTelegramBootstrap, readTelegramBridge } from './telegram-bootstrap.ts';
-import { createProductionStudentClient, STUDENT_CONTRACT_SHA256 } from './owner-client/student-client.ts';
+import { createProductionStudentClient, PREVIOUS_STUDENT_CONTRACT_SHA256, STUDENT_CONTRACT_SHA256 } from './owner-client/student-client.ts';
 import { StudentFailure } from './transport.ts';
 
 type Environment = Readonly<Record<string, unknown>>;
@@ -20,7 +20,7 @@ export function readProductionConfig(env: Environment, pageOrigin: string): Prod
   const appOrigin = httpsOrigin(env.VITE_MINI_APP_ORIGIN);
   const apiOrigin = httpsOrigin(env.VITE_API_ORIGIN);
   if (httpsOrigin(pageOrigin) !== appOrigin) throw new StudentFailure('protocol', 'APP_ORIGIN_MISMATCH');
-  if (env.VITE_STUDENT_CONTRACT_SHA256 !== STUDENT_CONTRACT_SHA256)
+  if (env.VITE_STUDENT_CONTRACT_SHA256 !== STUDENT_CONTRACT_SHA256 && env.VITE_STUDENT_CONTRACT_SHA256 !== PREVIOUS_STUDENT_CONTRACT_SHA256)
     throw new StudentFailure('protocol', 'CONTRACT_HASH_MISMATCH');
   // Validate the Backend's production origin/mode policy before touching SDK data.
   try {

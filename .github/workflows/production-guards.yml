@@ -13,6 +13,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.15.0'
@@ -29,6 +30,9 @@ jobs:
       - run: node --test apps/mini-app/tests/path-containment.test.mjs
       - run: npm ci --prefix tests/account-deletion/tooling --no-audit --no-fund
       - run: npm ci --ignore-scripts --prefix apps/mini-app --no-audit --no-fund
+      - run: node --test tests/enrollment/profile-release-order.test.mjs
+        env:
+          UA_REQUIRE_PROFILE_RELEASE_HISTORY: '1'
       - run: node --test tests/account-deletion/*.test.mjs tests/telegram-entry/*.test.mjs apps/mini-app/tests/account-deletion-*.test.mjs apps/mini-app/tests/telegram-atomic-*.test.mjs
       - run: node --test tests/teacher-cabinet/*.test.mjs
       - run: node tests/account-deletion/run-native.mjs

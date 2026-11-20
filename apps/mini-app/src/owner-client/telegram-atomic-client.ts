@@ -1,4 +1,4 @@
-import {StudentApiError,StudentClientProtocolError,STUDENT_PROFILE_ACCEPT} from './student-client.ts';
+import {StudentApiError,StudentClientProtocolError,STUDENT_PROFILE_ACCEPT,decodeStudentSession} from './student-client.ts';
 import type {StudentSchema} from './student-client.ts';
 export const TELEGRAM_ATOMIC_CONTRACT_SHA256='2d575800ef4548634867a1dbae622539d537d9f45dd900aa039f8ce15614b13a';
 export const TELEGRAM_ATOMIC_CONTRACT_VERSION='0.1.1-univeracademy-id.1';
@@ -7,15 +7,19 @@ export type TelegramAtomicClientOptions={mode:'production';contractSha256:string
 function bad(code='CLIENT_INVALID_RESPONSE'):never{throw new StudentClientProtocolError(code);}
 function plain(value:unknown):value is Record<string,unknown>{return !!value&&typeof value==='object'&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value));}
 const uuid=(v:unknown):v is string=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-const token=(v:unknown):v is string=>typeof v==='string'&&v.length>0&&v.length<=4096&&!/[\s\x00-\x1f\x7f]/.test(v);
-const date=(v:unknown):v is string=>typeof v==='string'&&v.length<=40&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(Date.parse(v)).toISOString().slice(0,19)===v.slice(0,19);
-function validateSession(value:unknown):StudentSchema['SuccessSession']{
- if(!plain(value)||Object.keys(value).join(',')!=='data'||!plain(value.data))bad();
- const d=value.data;
- if(Object.keys(d).sort().join(',')!=='access_token,expires_at,profile,refresh_expires_at,refresh_token,token_type'||d.token_type!=='Bearer'||!token(d.access_token)||!token(d.refresh_token)||d.access_token===d.refresh_token||!date(d.expires_at)||!date(d.refresh_expires_at)||Date.parse(d.expires_at)>Date.parse(d.refresh_expires_at)||!plain(d.profile))bad();
- const p=d.profile;
- if(Object.keys(p).sort().join(',')!=='active_group_id,first_name,last_name,person_id,registration_complete,roles,univeracademy_id'||!uuid(p.person_id)||typeof p.first_name!=='string'||typeof p.last_name!=='string'||[p.first_name,p.last_name].some(s=>Array.from(s).length>100||/[\x00-\x1f\x7f]/.test(s))||typeof p.registration_complete!=='boolean'||!Array.isArray(p.roles)||p.roles.some(r=>typeof r!=='string'||!['student','teacher','admin','owner'].includes(r))||!(p.active_group_id===null||uuid(p.active_group_id))||!(p.roles.includes('student')?(typeof p.univeracademy_id==='string'&&/^\d{10}$/.test(p.univeracademy_id)):p.univeracademy_id===null))bad();
- return value as unknown as StudentSchema['SuccessSession'];
+// Keep the atomic entry's stricter protocol checks after common ID normalization.
+function validateAtomicSession(value: unknown, contentType: string | null): StudentSchema['SuccessSession'] {
+  const result = decodeStudentSession(value, contentType);
+  const session = result.data, profile = session.profile;
+  const validToken = (v: string) => v.length <= 4096 && !/[\s\x00-\x1f\x7f]/.test(v);
+  const validDate = (v: string) => /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v) &&
+    new Date(Date.parse(v)).toISOString().slice(0,19) === v.slice(0,19);
+  if (!validToken(session.access_token) || !validToken(session.refresh_token) ||
+      !validDate(session.expires_at) || !validDate(session.refresh_expires_at) ||
+      Date.parse(session.expires_at) > Date.parse(session.refresh_expires_at) || !uuid(profile.person_id) ||
+      (profile.active_group_id !== null && !uuid(profile.active_group_id)) ||
+      [profile.first_name,profile.last_name].some(name => Array.from(name).length > 100 || /[\x00-\x1f\x7f]/.test(name))) bad();
+  return result;
 }
 /** Backend-owned additive client. No token storage, identity fields, retry,
  * native fetch fallback, or changes to the legacy student-client contract. */
@@ -49,7 +53,7 @@ export function createProductionTelegramAtomicClient(options:TelegramAtomicClien
     if(!plain(value)||!plain(value.error)||typeof value.error.code!=='string'||!/^[A-Z][A-Z0-9_]{0,63}$/.test(value.error.code))bad();
     throw new StudentApiError(response.status,value.error.code,uuid(value.error.request_id)?value.error.request_id:'');
    }
-   if(response.status!==200)bad();return validateSession(value);
+   if(response.status!==200)bad();return validateAtomicSession(value,response.headers.get('content-type'));
   };
   try{return await Promise.race([work(),cancelled]);}
   catch(error){if(error instanceof StudentApiError||error instanceof StudentClientProtocolError)throw error;bad('CLIENT_REQUEST_UNCONFIRMED');}

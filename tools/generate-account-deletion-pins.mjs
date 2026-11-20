@@ -38,6 +38,7 @@ const transitions = [
   readPinned(manifests+'univeracademy-id-overlay.json', /const BRAND_OVERLAY_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'teacher-staging-overlay.json', /const STAGING_OVERLAY_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'registration-storage-overlay.json', /const REGISTRATION_OVERLAY_SHA256 = '([a-f0-9]{64})';/),
+  readPinned(manifests+'profile-release-order-overlay.json', /const PROFILE_RELEASE_OVERLAY_SHA256 = '([a-f0-9]{64})';/),
 ].map(release => new Map(release.files.map(file => [file.path,file])));
 const previousFiles = new Map(previous.files.map(file => [file.path, file]));
 const rows = [];

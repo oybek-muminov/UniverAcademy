@@ -19,6 +19,13 @@ for (const origin of [undefined, '', ' https://api.example.test', 'http://localh
     assert.throws(() => readProductionConfig({ ...env, VITE_API_ORIGIN: origin }, env.VITE_MINI_APP_ORIGIN), code('ORIGIN_CONFIG_INVALID'));
   });
 }
+test('cached production build accepts only the exact previous student contract', () => {
+  const previous = '2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c';
+  assert.deepEqual(readProductionConfig({ ...env, VITE_STUDENT_CONTRACT_SHA256: previous }, env.VITE_MINI_APP_ORIGIN), config());
+  for (const invalid of [undefined, '', previous.toUpperCase(), previous.slice(0,-1)+'d']) {
+    assert.throws(() => readProductionConfig({ ...env, VITE_STUDENT_CONTRACT_SHA256: invalid }, env.VITE_MINI_APP_ORIGIN), code('CONTRACT_HASH_MISMATCH'));
+  }
+});
 test('page origin mismatch and stale contract pin fail before SDK identity is read', () => {
   assert.throws(() => readProductionConfig(env, 'https://different.invalid'), code('APP_ORIGIN_MISMATCH'));
   assert.throws(() => readProductionConfig({ ...env, VITE_STUDENT_CONTRACT_SHA256: 'old' }, env.VITE_MINI_APP_ORIGIN), code('CONTRACT_HASH_MISMATCH'));

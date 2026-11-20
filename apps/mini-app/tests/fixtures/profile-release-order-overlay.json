@@ -1,0 +1,72 @@
+{
+  "format_version": 1,
+  "base_commit": "d19fe4f9483586fe29f1ab54b34a9377f743ce7a",
+  "files": [
+    {
+      "path": "apps/mini-app/src/owner-client/telegram-atomic-client.ts",
+      "previous_sha256": "d6cd1080d5f5b2895fbb75ee3dbdefe340ad11cb3f1e0c5f72decd3351203e22",
+      "bytes": 6565,
+      "sha256": "2408765bcb87935c70ecfc143cfc9abbdf0a695c1e95a257f3b1b93fe8c9c857"
+    },
+    {
+      "path": "apps/mini-app/src/production-runtime.ts",
+      "previous_sha256": null,
+      "bytes": 3686,
+      "sha256": "5b79ae6fb4e7e0190034a9d48e4820de3666b6de6df84508b8f1def6ac0b101d"
+    },
+    {
+      "path": "apps/mini-app/tests/production-entry.fixture.mjs",
+      "previous_sha256": null,
+      "bytes": 4908,
+      "sha256": "842502f9a82b798601082c59f30de8f6dfb3a8b71d32ac96a9ce6140d319e510"
+    },
+    {
+      "path": "apps/mini-app/tests/production-owner-port.test.mjs",
+      "previous_sha256": null,
+      "bytes": 4705,
+      "sha256": "7dee952bb98f8d9aba8aeca66634bedb932f61ba858f39603ef681eda3554c5f"
+    },
+    {
+      "path": "apps/mini-app/tests/production-runtime.test.mjs",
+      "previous_sha256": null,
+      "bytes": 6448,
+      "sha256": "b80135139cc9914eb67efc8847f629f625e67348c3194c09c60d0cd66295a680"
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-bootstrap.test.mjs",
+      "previous_sha256": null,
+      "bytes": 18750,
+      "sha256": "aca3007554fc9bf9b0df36ce3839442ae64a85fadb8d6cd0c7338b9794c334de"
+    },
+    {
+      "path": "packages/api-client/student-client.ts",
+      "previous_sha256": "4b57647dfc9f2f68c02e8a9d37033c9c5c8d8dc5b63b917a9665a1ae48542abc",
+      "bytes": 15135,
+      "sha256": "85d696b81c8ea28ec4aa971063f4087dd2c23b7c9e0a73f898770cb494498fa6"
+    },
+    {
+      "path": "packages/api-client/telegram-atomic-client.ts",
+      "previous_sha256": "d6cd1080d5f5b2895fbb75ee3dbdefe340ad11cb3f1e0c5f72decd3351203e22",
+      "bytes": 6565,
+      "sha256": "2408765bcb87935c70ecfc143cfc9abbdf0a695c1e95a257f3b1b93fe8c9c857"
+    },
+    {
+      "path": "tests/enrollment/production-client.test.mjs",
+      "previous_sha256": "bbf17d16954401b179cda8134942363414abe2d5a041577410d11ba31de7821f",
+      "bytes": 5955,
+      "sha256": "0e569fd7e6cdfa3ed15be4d0892055cf6d3f2c4d4a7818ae63a1fc0a99d652d5"
+    },
+    {
+      "path": "tests/enrollment/profile-release-order.test.mjs",
+      "previous_sha256": null,
+      "bytes": 14583,
+      "sha256": "4ee1f56d55afbab215d4cc8383612586d55e0c0039420af649f79190dc58eeb5"
+    },
+    {
+      "path": "tests/enrollment/telegram-client.test.mjs",
+      "previous_sha256": "d6f5fcc175a1f0c874c94fc8560f21d1251bd4fa82fc0b6fcb283bdbc20e5aab",
+      "bytes": 9485,
+      "sha256": "351c224db791a0af384e62f3a0fc8a7812f9ef8af65a09e266d0b33ca62e00d9"
+    }
+  ]
+}

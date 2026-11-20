@@ -21,7 +21,7 @@ if (scenario !== 'missing_sdk') window.Telegram = { WebApp: bridge };
 window.syntheticReadyCount = () => readyCount;
 const env = { VITE_MINI_APP_ORIGIN: 'https://app.invalid', VITE_API_ORIGIN: 'https://api.example.test',
   VITE_STUDENT_CONTRACT_SHA256: STUDENT_CONTRACT_SHA256 };
-const ok = value => new Response(JSON.stringify({ data: value }), { status: 200 });
+const ok = value => Response.json({ data: value });
 const fail = (status, code) => new Response(JSON.stringify({ error: { code, message: 'synthetic-SECRET-error',
   request_id: '00000000-0000-4000-8000-000000000099' } }), { status });
 const stamp = () => new Date().toISOString();

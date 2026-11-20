@@ -20,7 +20,7 @@ function harness(meta = data('examOpen'), asset = 'https://api.example.test/asse
       value = data('in_progress');
       for (const q of value.questions) for (const block of q.prompt_blocks) if (block.type === 'image') block.asset.url = asset;
     } else throw new Error('Unexpected synthetic request');
-    return new Response(JSON.stringify({ data: value }));
+    return Response.json({ data: value });
   });
   return { connection, calls };
 }

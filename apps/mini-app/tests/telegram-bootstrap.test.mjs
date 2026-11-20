@@ -11,7 +11,7 @@ const rawA = 'query_id=synthetic-first&user=%7B%22id%22%3A1%7D&hash=synthetic%2B
 const rawB = 'query_id=synthetic-second&user=%7B%22id%22%3A2%7D&hash=synthetic%2B%3D';
 const profile = (person, registered = true) => ({ person_id: person, first_name: 'Suniy', last_name: 'Bootstrap',
   roles: ['student'], registration_complete: registered, active_group_id: null, univeracademy_id: '0000000001' });
-const ok = data => new Response(JSON.stringify({ data }), { status: 200 });
+const ok = data => Response.json({ data });
 const fail = (status, code) => new Response(JSON.stringify({ error: { code,
   message: 'Synthetic error', request_id: id(900) } }), { status });
 function gate() { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; }
