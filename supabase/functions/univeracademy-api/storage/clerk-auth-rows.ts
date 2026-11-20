@@ -1,3 +1,4 @@
+import { readStoredProfile } from "./stored-profile.ts";
 import {fail} from "../fault.ts";
 import {checkClerkProof,clerkReplayIdentity,requireLiveClerk,clerkIdentityKey,clerkSessionKey} from "../clerk-auth.ts";
 import type {ClerkIdentity,ClerkProof,ClerkLiveness} from "../clerk-auth.ts";
@@ -34,8 +35,8 @@ function checkSnapshot(scope:Scope,s:ClerkAuthSnapshot,revocationOnly=false){
   if(!s.person||s.person.profile.person_id!==scope.personId)fail("FORBIDDEN",403);
   const p=s.person.profile,m=s.membership;
   if(!Array.isArray(p.roles)||!p.roles.every(r=>["student","teacher","admin","owner"].includes(r))||typeof p.first_name!=="string"||typeof p.last_name!=="string"||
-    typeof p.registration_complete!=="boolean"||!(p.active_group_id===null||uuid(p.active_group_id))||typeof p.qadam_id!=="string"||!/^\d{10}$/.test(p.qadam_id)||
-    p.registration_complete&&(!p.first_name.trim()||!p.last_name.trim())||Object.keys(p).some(k=>!["person_id","first_name","last_name","roles","registration_complete","active_group_id","qadam_id"].includes(k)))fail("RESPONSE_INVARIANT_FAILED",500);
+    typeof p.registration_complete!=="boolean"||!(p.active_group_id===null||uuid(p.active_group_id))||typeof p.univeracademy_id!=="string"||!/^\d{10}$/.test(p.univeracademy_id)||
+    p.registration_complete&&(!p.first_name.trim()||!p.last_name.trim())||Object.keys(p).some(k=>!["person_id","first_name","last_name","roles","registration_complete","active_group_id","univeracademy_id"].includes(k)))fail("RESPONSE_INVARIANT_FAILED",500);
   if(!p.roles.includes("student"))fail("FORBIDDEN",403);
   if(!bool(s.person.enabled)&&!revocationOnly)fail("ACCOUNT_DISABLED",403);
   if(!m||typeof m.active!=="boolean"||!Number.isSafeInteger(m.epoch)||m.epoch<0||!Number.isSafeInteger(m.revision)||m.revision<0||
@@ -142,7 +143,7 @@ export class ClerkAuthRows{
     };
     const p=(await read("ua_clerk_person","SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1")).rows;
     if(p.length!==1)fail("CLERK_IDENTITY_REVOKED",401);
-    const profile=p[0].profile as Person["profile"];
+    const profile=readStoredProfile(p[0].profile);
     if(profile.person_id!==s.personId||!same(profile.roles,p[0].roles))fail("RESPONSE_INVARIANT_FAILED",500);
     result.person={telegramId:p[0].telegram_id===null?null:integer(p[0].telegram_id),enabled:bool(p[0].enabled),profile};
     const member=(await read("ua_clerk_membership","SELECT active,epoch::text,revision::text,affinity_group_id::text FROM ua_private.memberships WHERE person_id=$1")).rows;
@@ -219,11 +220,11 @@ export class ClerkAuthRows{
       if(!s.identity)fail("SERVICE_UNAVAILABLE",503);
       if(person.telegramId!==null||!same(person.profile.roles,["student"])||person.profile.registration_complete||person.profile.active_group_id!==null||
         !same(Object.keys(after.identities),[clerkIdentityKey(s.identity)])||!same(after.membership,{active:false,epoch:0,revision:0,affinityGroupId:null}))fail("RESPONSE_INVARIANT_FAILED",500);
-      await write("ua_clerk_person_insert","INSERT INTO ua_private.people(id,telegram_id,qadam_id,enabled,roles,profile) VALUES($1,NULL,$2,$3,$4,$5::jsonb) ON CONFLICT DO NOTHING RETURNING id",[s.personId,person.profile.qadam_id,person.enabled,person.profile.roles,JSON.stringify(person.profile)]);
+      await write("ua_clerk_person_insert","INSERT INTO ua_private.people_registration(id,telegram_id,univeracademy_id,enabled,roles,profile) VALUES($1,NULL,$2,$3,$4,$5::jsonb) ON CONFLICT DO NOTHING RETURNING id",[s.personId,person.profile.univeracademy_id,person.enabled,person.profile.roles,JSON.stringify(person.profile)]);
       await write("ua_clerk_member_insert","INSERT INTO ua_private.memberships(person_id,active,epoch,revision,affinity_group_id) VALUES($1,false,0,0,NULL) RETURNING person_id",[s.personId]);
       await write("ua_clerk_identity_insert","INSERT INTO ua_private.clerk_identities(issuer,subject,person_id,enabled) VALUES($1,$2,$3,true) RETURNING person_id",[s.identity.issuer,s.identity.userId,s.personId]);
     }else{
-      const invariant=(p:Person)=>({telegramId:p.telegramId,enabled:p.enabled,roles:p.profile.roles,qadam:p.profile.qadam_id,group:p.profile.active_group_id});
+      const invariant=(p:Person)=>({telegramId:p.telegramId,enabled:p.enabled,roles:p.profile.roles,cabinetId:p.profile.univeracademy_id,group:p.profile.active_group_id});
       if(!same(invariant(before.person),invariant(person))||!same(before.membership,after.membership)||!same(before.identities,after.identities))fail("RESPONSE_INVARIANT_FAILED",500);
       if(!same(before.person.profile,person.profile))await write("ua_clerk_profile_update","UPDATE ua_private.people SET profile=$1::jsonb WHERE id=$2 RETURNING id",[JSON.stringify(person.profile),s.personId]);
     }

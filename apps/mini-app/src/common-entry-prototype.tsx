@@ -24,7 +24,6 @@ export function CommonEntryPreview({ runtime, httpReview = false }: { runtime: R
       <span>UniverAcademy<small>O‘quvchi kabineti</small></span><span className="demo-badge">Lokal prototip</span></header>
     <p className="sample-notice">Sun’iy sinov: Google ochilmaydi, email yuborilmaydi. Haqiqiy hisob ma’lumotini kiritmang.</p>
     <section className="card entry-card">
-      <p className="eyebrow">Bilim sari bir qadam</p>
       <h1>{state.step === 'browser_required' ? 'Brauzerda davom etish kerak' : choosing ? 'Kabinetga kirish' : state.step === 'code' ? 'Emailni tasdiqlang' : 'Hisob ochilmoqda…'}</h1>
       {state.notice && <p className="notice" role="alert">{state.notice}</p>}
       {choosing && <>
@@ -60,7 +59,7 @@ export function CommonEntryPreview({ runtime, httpReview = false }: { runtime: R
       {['verifying', 'authorizing'].includes(state.step) && <p role="status">{state.step === 'authorizing' ? 'Ilova ruxsati sun’iy javob bilan tekshirilmoqda…' : 'Tasdiq tekshirilmoqda…'}</p>}
       {state.busy && <button className="text-button" onClick={() => void reset()}>Bekor qilish</button>}
     </section>
-    <footer><span>UniverAcademy</span><span>Har bir qadam — oldinga.</span></footer>
+    <footer><span>UniverAcademy</span></footer>
   </main>;
 }
 export function CommonEntryPrototypeApp() {

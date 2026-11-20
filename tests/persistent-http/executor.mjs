@@ -14,8 +14,8 @@ export function httpExecutor(path){
     if(name==="ua_telegram_identity_lock")return result();
     if(name==="ua_identity_person")return result(Object.entries(d.people).filter(([,p])=>p.telegram_id===v[0]).map(([id])=>({id})));
     if(name==="ua_identity_insert"){
-      if(d.people[v[0]]||Object.values(d.people).some(p=>p.telegram_id===v[1]||p.profile?.qadam_id===v[2]))return result();
-      d.people[v[0]]={telegram_id:v[1],qadam_id:v[2],enabled:true,roles:v[3],profile:JSON.parse(v[4])};return result([{id:v[0]}]);
+      if(d.people[v[0]]||Object.values(d.people).some(p=>p.telegram_id===v[1]||p.profile?.univeracademy_id===v[2]))return result();
+      d.people[v[0]]={telegram_id:v[1],univeracademy_id:v[2],enabled:true,roles:v[3],profile:JSON.parse(v[4])};return result([{id:v[0]}]);
     }
     if(name==="ua_identity_membership"){
       if(d.memberships[v[0]])throw Error("SYNTHETIC_MEMBERSHIP_UNIQUE");

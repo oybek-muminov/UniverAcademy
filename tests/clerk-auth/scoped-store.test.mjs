@@ -44,7 +44,7 @@ class Pool{
       else if(name==="ua_clerk_refresh")rows=Object.entries(draft.refresh).filter(([,r])=>draft.families[r.familyId]?.personId===owner).map(([key,r])=>({digest:key,family_id:r.familyId,consumed:r.consumed}));
       if(rows)return result(this.inject?this.inject(name,rows):structuredClone(rows));
       if(name==="ua_clerk_person_insert"){
-        if(draft.people[v[0]]||Object.values(draft.people).some(p=>p.profile.qadam_id===v[1]))return result([]);
+        if(draft.people[v[0]]||Object.values(draft.people).some(p=>p.profile.univeracademy_id===v[1]))return result([]);
         draft.people[v[0]]={telegramId:null,enabled:v[2],profile:JSON.parse(v[4])};
       }else if(name==="ua_clerk_member_insert")draft.members[v[0]]={active:false,epoch:0,revision:0,affinityGroupId:null};
       else if(name==="ua_clerk_identity_insert"){
@@ -71,9 +71,9 @@ function fixture(){
   const store=new ClerkScopedAuthStore({pool,liveness,newPersonId:()=>id(++generated)});
   return{pool,store,generated:()=>generated};
 }
-function login(identity=who,n=1,qadam="0100000001"){
+function login(identity=who,n=1,studentNumber="0100000001"){
   return async({personId,state,now})=>{
-    if(!state.person){state.person={telegramId:null,enabled:true,profile:{person_id:personId,first_name:"",last_name:"",roles:["student"],registration_complete:false,active_group_id:null,qadam_id:qadam}};
+    if(!state.person){state.person={telegramId:null,enabled:true,profile:{person_id:personId,first_name:"",last_name:"",roles:["student"],registration_complete:false,active_group_id:null,univeracademy_id:studentNumber}};
       state.membership={active:false,epoch:0,revision:0,affinityGroupId:null};state.identities[clerkIdentityKey(identity)]={personId,enabled:true};}
     const key=clerkSessionKey(identity);
     for(const [k,v]of Object.entries(state.studentSessions))if(k!==key&&v.retiredAt===null)v.retiredAt=now;
@@ -123,7 +123,7 @@ test("replay collision, scope/role escalation, binding reassignment and retired-
   f.pool.state.replays[collision]={personId:id(999),at};const conflict=structuredClone(f.pool.state);
   await assert.rejects(f.store.run(nextProof,login(next,2)),e=>e.status===409);assert.deepEqual(f.pool.state,conflict);delete f.pool.state.replays[collision];
   for(const change of [s=>{s.person.profile.roles=["owner"];},s=>{s.familyBindings[id(101)]={...who,userId:"user_Foreign"};},s=>{s.person.profile.person_id=id(999);},
-    s=>{s.person.enabled="true";},s=>{s.person.profile.registration_complete="false";},s=>{s.person.profile.qadam_id=null;}]){
+    s=>{s.person.enabled="true";},s=>{s.person.profile.registration_complete="false";},s=>{s.person.profile.univeracademy_id=null;}]){
     await assert.rejects(f.store.run(proof(),async({state})=>change(state)));assert.deepEqual(f.pool.state,before);
   }
   await f.store.run(proof(next),login(next,2));await assert.rejects(f.store.run(proof(),async()=>{}),e=>e.code==="CLERK_SESSION_SUPERSEDED");
@@ -183,11 +183,11 @@ test('new verified-provider names seed only a new UUID student and remain incomp
   const f=namesFixture(),result=await f.exchange({...proof(),first_name:'Forged',last_name:'Claims',roles:['owner'],email:'auto-link@invalid'});
   assert.equal(result.profile.first_name,'Aziz');assert.equal(result.profile.last_name,'Karimov');assert.equal(result.profile.registration_complete,false);
   assert.deepEqual(result.profile.roles,['student']);assert.equal(result.profile.active_group_id,null);assert.equal(result.profile.person_id,id(1));
-  assert.equal(f.pool.state.people[id(1)].telegramId,null);assert.match(result.profile.qadam_id,/^\d{10}$/);
+  assert.equal(f.pool.state.people[id(1)].telegramId,null);assert.match(result.profile.univeracademy_id,/^\d{10}$/);
   assert.deepEqual(f.pool.state.members[id(1)],{active:false,epoch:0,revision:0,affinityGroupId:null});
   assert.equal(f.pool.events.filter(e=>e.name==='ua_clerk_person_insert').length,1);
 });
-test('repeat login preserves edited platform names and all existing identity/role/qadam/group fields',async()=>{
+test('repeat login preserves edited platform names and all existing identity/role/student ID/group fields',async()=>{
   const f=namesFixture();await f.exchange();const person=f.pool.state.people[id(1)];
   Object.assign(person.profile,{first_name:'Edited',last_name:'Platform',registration_complete:true});const before=structuredClone(person);
   f.names={firstName:'Changed provider',lastName:'Must not overwrite'};

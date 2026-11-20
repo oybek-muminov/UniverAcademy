@@ -6,7 +6,7 @@ import type { PublishedTest, Ratio } from "./ordinary.ts";
 export type Profile = {
   person_id: string; first_name: string; last_name: string;
   roles: ("student" | "teacher" | "admin" | "owner")[];
-  registration_complete: boolean; active_group_id: string | null; qadam_id: string | null;
+  registration_complete: boolean; active_group_id: string | null; univeracademy_id: string | null;
 };
 export type Person = { telegramId: number | null; enabled: boolean; profile: Profile };
 export type Family = {
@@ -130,7 +130,7 @@ export async function authenticate(state: StudentState, token: string, now: numb
   return { personId: family.personId, familyId: proof.familyId, person };
 }
 
-export function newQadamId(): string {
+export function newUniverAcademyId(): string {
   let value = "";
   while (value.length < 10) {
     const digit = crypto.getRandomValues(new Uint8Array(1))[0];
@@ -148,12 +148,12 @@ export function studentPerson(state: StudentState, telegramId: number, firstName
     return existing;
   }
   for (let attempt = 0; attempt < policy.identityCollisionAttempts; attempt++) {
-    const qadamId = newQadamId();
-    if (Object.values(state.people).some((p) => p.profile.qadam_id === qadamId)) continue;
+    const univerAcademyId = newUniverAcademyId();
+    if (Object.values(state.people).some((p) => p.profile.univeracademy_id === univerAcademyId)) continue;
     const id = crypto.randomUUID();
     const person: Person = { telegramId, enabled: true, profile: {
       person_id: id, first_name: firstName, last_name: lastName ?? "", roles: ["student"],
-      registration_complete: false, active_group_id: null, qadam_id: qadamId,
+      registration_complete: false, active_group_id: null, univeracademy_id: univerAcademyId,
     } };
     state.people[id] = person;
     return person;

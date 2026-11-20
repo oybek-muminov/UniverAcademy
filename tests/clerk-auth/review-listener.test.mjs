@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { startClerkReviewServer, createClerkReviewLab } from "../../runtime/clerk-review-server.mjs";
 import { createProductionStudentClient, StudentApiError, STUDENT_CONTRACT_SHA256,
   STUDENT_CONTRACT_VERSION, STUDENT_CONTRACT_REVIEW_STATUS } from "../../packages/api-client/student-client.ts";
-import { staffIds, versionBody } from "../backend/staff-fixture.ts";
+import { staffIds, versionBody, validate as validateCurrentWire } from "../backend/staff-fixture.ts";
 
 const load = createRequire(import.meta.url);
 const { buildView } = load("../backend/validator/view-builder.cjs");
@@ -15,8 +15,7 @@ const raw = readFileSync(new URL("../../contracts/clerk-review.openapi.json", im
 const review = JSON.parse(raw);
 const { ajv, validators } = compileView(buildView(raw).view);
 function wire(name, value) {
-  const validate = validators.get(name);
-  assert.equal(validate(value), true, name + ": " + JSON.stringify(validate.errors));
+  assert.equal(validateCurrentWire(name, value), true, name);
   return value;
 }
 

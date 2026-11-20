@@ -1,3 +1,4 @@
+import { readStoredProfile } from "./stored-profile.ts";
 import { fail } from "../fault.ts";
 import { parseStaffJson } from "../staff-json.ts";
 import { canWriteContent, groupScope, owner, requireRosterAuthority } from "../staff-state.ts";
@@ -115,7 +116,7 @@ FROM ua_private.test_versions v JOIN ua_private.demos d ON d.id=v.demo_id WHERE 
     for (const id of new Set(c.students)) {
       const p = (await query(tx, "ua_http_person", "SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1", [id])).rows[0];
       if (!p) fail("NOT_FOUND", 404);
-      const profile = p.profile as Person["profile"];
+      const profile = readStoredProfile(p.profile);
       if (profile.person_id !== id || !same(profile.roles, p.roles)) fail("RESPONSE_INVARIANT_FAILED", 500);
       if(typeof p.enabled!=="boolean")fail("RESPONSE_INVARIANT_FAILED",500);
       s.student.people[id] = { telegramId: p.telegram_id===null?null:integer(p.telegram_id), enabled: p.enabled, profile };

@@ -25,7 +25,7 @@ jobs:
       - run: npm run typecheck
       - run: node --test tests/cloudflare/*.test.mjs tests/clerk-auth/*.test.mjs
       # Directory fsync durability is exercised on Linux, not silently weakened on Windows.
-      - run: node --test tests/storage-auth/*.test.mjs tests/persistent-http/*.test.mjs tests/enrollment/identity-staff.test.mjs tests/first-test/*.test.mjs tests/vercel-node/*.test.mjs
+      - run: node --test tests/storage-auth/*.test.mjs tests/persistent-http/*.test.mjs tests/enrollment/identity-staff.test.mjs tests/enrollment/profile-contract-compat.test.mjs tests/first-test/*.test.mjs tests/vercel-node/*.test.mjs
       - run: node --test apps/mini-app/tests/path-containment.test.mjs
       - run: npm ci --prefix tests/account-deletion/tooling --no-audit --no-fund
       - run: npm ci --ignore-scripts --prefix apps/mini-app --no-audit --no-fund

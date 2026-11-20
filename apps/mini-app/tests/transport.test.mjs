@@ -18,6 +18,7 @@ test('student proof, no-store, omitted cookies and exact key are used without lo
   await transport.login('synthetic launch');
   assert.deepEqual(await transport.request({ method: 'POST', path: '/exams/sample/attempts', key: 'sample-operation-key', body: { confirmed: true } }), { example: true });
   assert.equal(sent.url, 'https://mock.invalid/api/v1/exams/sample/attempts');
+  assert.equal(sent.init.headers.Accept, 'application/json; profile=univeracademy-id-v2');
   assert.equal(sent.init.headers.Authorization, 'Bearer synthetic-access-a');
   assert.equal(sent.init.headers['Idempotency-Key'], 'sample-operation-key');
   assert.equal(sent.init.cache, 'no-store');

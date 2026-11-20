@@ -13,7 +13,7 @@ import { initialState, clock, id, ids, botKey, signedInitData, testNumbers, test
 const load = createRequire(import.meta.url);
 const { buildView } = load("./validator/view-builder.cjs");
 const { compileView } = load("./validator/ajv-config.cjs");
-const full = readFileSync(new URL("../../contracts/review-only.openapi.json", import.meta.url));
+const full = readFileSync(new URL("../../contracts/telegram-return.openapi.json", import.meta.url));
 const schemaValidators: Map<string, (data: unknown) => boolean> = compileView(buildView(full).view).validators;
 export const validate = (name: string, value: unknown) => Boolean(schemaValidators.get(name)?.(value));
 export const staffIds = { targetGroup: id(41), thirdGroup: id(42), draft: id(31), future: id(11),

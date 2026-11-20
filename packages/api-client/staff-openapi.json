@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "UniverAcademy API — ordinary scoring and optional statistical bonus",
-    "version": "0.2.9-admin-assignment-policy-a-candidate.1",
-    "description": "PROVISIONAL, NOT ACCEPTED. New user decision freezes Rasch for a later phase and restores statistical bonus instead of the optional Rasch action. Exactly two active scoring mechanisms: ordinary and optional group statistical bonus. Unanswered counts as incorrect by explicit new user reply. Teacher own-group/subject optional action, Owner existing authority; no Admin activation. Question default45/editable, positive fractional points, initial individual off, ordinary display2, protected Asia/Tashkent admission, current-self-submitted population and frozen one-shot/recovery attribution retained from latest mechanics. API wire and numerical/storage proposals require Backend review; no implementation, migration or deployment performed. Local decision delta: transfer blocked only by a started current active attempt; revoke unstarted recovery eligibility on successful transfer and retain history. User selected policy A: Admin assignment requires existing manage_content and current group/subject scope; manage_roster is independent for roster mutations. No inherited acceptance."
+    "version": "0.3.2-univeracademy-id.1",
+    "description": "PROVISIONAL / NOT ACCEPTED. The schemas in this contract describe the UniverAcademy ID representation. Profile and session clients select it using Accept: application/json; profile=univeracademy-id-v2. An unversioned request keeps the previous response format during rollout."
   },
   "servers": [
     {
@@ -845,7 +845,14 @@
                   "GRADING_POLICY_UNRESOLVED",
                   "INVALID_GRADING_CONFIG",
                   "STATISTICAL_BONUS_NOT_READY",
-                  "BONUS_EMPTY_COHORT"
+                  "BONUS_EMPTY_COHORT",
+                  "CLERK_TOKEN_INVALID",
+                  "CLERK_SESSION_REVOKED",
+                  "CLERK_IDENTITY_REVOKED",
+                  "CLERK_SESSION_SUPERSEDED",
+                  "CLERK_TOKEN_REPLAY",
+                  "IDENTITY_LINK_CONFLICT",
+                  "TELEGRAM_LINK_REQUIRED"
                 ]
               },
               "message": {
@@ -987,7 +994,7 @@
           "expected_revision",
           "expected_membership_revision"
         ],
-        "description": "O-01: group revision AND membership revision CAS. Teacher initial placement, own-group removal, or same-affinity re-add only; different-affinity placement requires privileged transfer. Removal guard is separate; transfer blocks only a started active attempt and revokes unstarted recovery eligibility. UUID selected through authorized directory/candidate; Qadam ID itself grants nothing."
+        "description": "O-01: group revision AND membership revision CAS. Teacher initial placement, own-group removal, or same-affinity re-add only; different-affinity placement requires privileged transfer. Removal guard is separate; transfer blocks only a started active attempt and revokes unstarted recovery eligibility. UUID selected through authorized directory/candidate; UniverAcademy ID itself grants nothing."
       },
       "MembershipMutation": {
         "type": "object",
@@ -1359,6 +1366,6 @@
       }
     }
   },
-  "x-source-sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4",
+  "x-source-sha256": "430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455",
   "x-status": "LOCAL_STAFF_HANDLER_CANDIDATE_NOT_PRODUCTION_ACCEPTANCE"
 }

@@ -23,8 +23,8 @@ const fingerprints=paths.map(path=>{const b=readFileSync(new URL(path,project));
 const pins=[
  [api+"membership-removal.ts","3477846790c594c6baf96ea5a15a0be83bcde6f33328d57feb5c6917139e4ccb"],
  [api+"membership-activity.ts","c4149e06a68778b39bd2e229188605d84fc4dda756dc5fc95016259a9226eb6b"],
- ["contracts/review-only.openapi.json",STAFF_CONTRACT_SHA],
- ["packages/api-client/staff-openapi.json","a1bdcd4e7177388e6eb0cf77bdde00a4a962ca7ac13fb921277f863ea0acacff"]];
+ ["contracts/telegram-return.openapi.json",STAFF_CONTRACT_SHA],
+ ["packages/api-client/staff-openapi.json","a1891beb4d133de052e7c29a629d2b061067143b0ff7a4a865d281e8454674b2"]];
 for(const [path,sha]of pins)assert.equal(digest(readFileSync(new URL(path,project))),sha,path);
 const issuer="https://offline.synthetic.invalid",audience="local-removal-review";
 const keys=await generateKeyPair("RS256",{modulusLength:2048}),otherKeys=await generateKeyPair("RS256",{modulusLength:2048});
@@ -47,7 +47,7 @@ function assignment(j,d,opensAt=C-1000,closesAt=C+5000){return{admission:{assign
 function record(person=P,attempt=A,j=J,d=D){const pub=published(d);return{id:attempt,personId:person,assignmentId:j,groupId:G,generation:1,status:"submitted",startedAt:C,deadlineAt:T,completedAt:C+20,stateRevision:3,seriesStateRevision:3,published:pub,
   questionOrder:pub.questions.map(q=>({questionId:q.id,optionIds:[...q.optionIds]})),answers:[{questionId:id(100),selectedOptionId:id(200),revision:1,savedAt:C+10,seriesStateRevision:2}],ordinary:ordinary()};}
 function fixture(){return{
- student:{people:{[P]:{telegramId:null,enabled:true,registeredAt:C-10000,profile:{person_id:P,first_name:"Literal",last_name:"Student",roles:["student"],registration_complete:true,active_group_id:G,qadam_id:"0100000001"}}},
+ student:{people:{[P]:{telegramId:null,enabled:true,registeredAt:C-10000,profile:{person_id:P,first_name:"Literal",last_name:"Student",roles:["student"],registration_complete:true,active_group_id:G,univeracademy_id:"0100000001"}}},
  families:{keep:{personId:P,expiresAt:T+100000,revokedAt:null,logoutRetainUntil:null}},access:{keep:{familyId:"keep",expiresAt:T+1000,superseded:false}},refresh:{keep:{familyId:"keep",consumed:false}},consumedInitData:{keep:true},
  grants:{[P]:{[J]:{rostered:true,membershipEpoch:7,grantEpoch:7},[U]:{rostered:true,membershipEpoch:7,grantEpoch:7},[F]:{rostered:true,membershipEpoch:7,grantEpoch:7},[OLD]:{rostered:false,membershipEpoch:7,grantEpoch:6}}},
  assignments:{[J]:assignment(J,D),[U]:assignment(U,id(21),C-1000,T+1000),[F]:assignment(F,id(22),T+10000,T+20000),[OLD]:assignment(OLD,id(23))},
@@ -161,7 +161,7 @@ for(const kind of ["active","future-ready","both"])scenario("HTTP-peer-barrier-"
 for(const [name,o,code,status]of [
  ["malformed",{raw:"{"},"MALFORMED_JSON",400],["empty",{raw:""},"MALFORMED_JSON",400],["null",{raw:"null"},"VALIDATION_ERROR",422],["array",{raw:"[]"},"VALIDATION_ERROR",422],
  ["active",{body:{...body(),status:"active"}},"VALIDATION_ERROR",422],["bad-status",{body:{...body(),status:"inactive"}},"VALIDATION_ERROR",422],
- ["student-format",{body:{...body(),student_id:"qadam-0100000001"}},"VALIDATION_ERROR",422],
+ ["student-format",{body:{...body(),student_id:"univeracademy-0100000001"}},"VALIDATION_ERROR",422],
  ["negative-group",{body:{...body(),expected_revision:-1}},"VALIDATION_ERROR",422],
  ["negative-member",{body:{...body(),expected_membership_revision:-1}},"VALIDATION_ERROR",422],
  ["fraction-group",{body:{...body(),expected_revision:4.5}},"VALIDATION_ERROR",422],

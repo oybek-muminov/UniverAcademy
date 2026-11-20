@@ -77,7 +77,7 @@ export function StudentApp({ studentFlow, mode, onEnter, onLogout, demoControls,
       onLogout={onLogout} onDeleteAccount={onDeleteAccount} deletionBusy={deletionBusy} />}
     {!dashboard && <>
     {s.screen === 'welcome' && <section className="card welcome">
-      <div className="orbit" aria-hidden="true">↗</div><h2>Birinchi qadam — bilimni sinash</h2>
+      <div className="orbit" aria-hidden="true">↗</div><h2>Bilimingizni sinab ko‘ring</h2>
       <p>Testni boshlang, savollarga javob bering va natijangizni ko‘ring.</p>
       <button className="primary" disabled={s.busy} onClick={() => void (onEnter ? onEnter() : flow.enter())}>{mode === 'telegram' ? 'Qayta kirish' : mode === 'local_fixture' ? 'Sinovga kirish' : 'Namunani ochish'} <span aria-hidden="true">→</span></button>
       <small>{flow.signInMethod === 'clerk' ? 'Qayta kirishda Google yoki email usulini tanlang.' : 'Haqiqiy kirish nuqtasi: @univeracademybot'}</small>

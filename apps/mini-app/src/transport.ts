@@ -1,3 +1,5 @@
+import { STUDENT_PROFILE_ACCEPT } from './owner-client/student-client.ts';
+
 // No routes, wire DTOs, live fetch or Backend implementation imports live here.
 // Supply the reviewed client's session hooks/fetch after owner acceptance.
 export type FailureKind = 'auth' | 'forbidden' | 'missing' | 'conflict' | 'validation' | 'limited' | 'temporary' | 'offline' | 'protocol';
@@ -170,7 +172,7 @@ export function createStudentTransport(options: {
     try {
       response = await options.fetcher(base.href.replace(/\/$/, '') + spec.path, {
         method: spec.method, cache: 'no-store', credentials: 'omit', redirect: 'error',
-        headers: { Authorization: `Bearer ${sentAccess}`, Accept: 'application/json',
+        headers: { Authorization: `Bearer ${sentAccess}`, Accept: STUDENT_PROFILE_ACCEPT,
           ...(spec.body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(spec.key ? { 'Idempotency-Key': spec.key } : {}) },
         ...(spec.body === undefined ? {} : { body: JSON.stringify(spec.body) }),

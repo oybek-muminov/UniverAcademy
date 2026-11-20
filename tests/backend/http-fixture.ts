@@ -31,11 +31,11 @@ export function initialState(): StudentState {
     people: {
       [ids.person]: { telegramId: 4_000_000_001, enabled: true, profile: {
         person_id: ids.person, first_name: "Sun’iy", last_name: "O‘quvchi", roles: ["student"],
-        registration_complete: true, active_group_id: ids.group, qadam_id: "0100000001",
+        registration_complete: true, active_group_id: ids.group, univeracademy_id: "0100000001",
       } },
       [ids.other]: { telegramId: 4_000_000_002, enabled: true, profile: {
         person_id: ids.other, first_name: "Boshqa", last_name: "Sun’iy", roles: ["student"],
-        registration_complete: true, active_group_id: null, qadam_id: "0100000002",
+        registration_complete: true, active_group_id: null, univeracademy_id: "0100000002",
       } },
     }, families: {}, access: {}, refresh: {}, consumedInitData: {},
     grants: { [ids.person]: { [ids.assignment]: { rostered: true, membershipEpoch: 7, grantEpoch: 7 } } },
@@ -109,7 +109,7 @@ export function fixture(options: Partial<StudentHttpDependencies> = {}) {
     sessionPolicy: testPolicy, numericPresentation: testNumbers, ...options });
   async function call(method: string, path: string,
     config: { token?: string; body?: unknown; raw?: string; key?: string } = {}) {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { accept: "application/json; profile=univeracademy-id-v2" };
     if (config.token) headers.authorization = `Bearer ${config.token}`;
     if (config.key) headers["idempotency-key"] = config.key;
     if (config.body !== undefined) headers["content-type"] = "application/json";

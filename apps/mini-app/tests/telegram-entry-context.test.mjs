@@ -19,7 +19,7 @@ const config = readCommonEntryConfig({
 }, 'https://app.example.test');
 const person = '00000000-0000-4000-8000-000000000001';
 const profile = { person_id: person, first_name: 'Synthetic', last_name: 'Browser',
-  qadam_id: '0000000001', roles: ['student'], active_group_id: null, registration_complete: true };
+  univeracademy_id: '0000000001', roles: ['student'], active_group_id: null, registration_complete: true };
 const json = data => new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } });
 let nativeFetch, outbound = 0;
 before(() => { nativeFetch = globalThis.fetch; globalThis.fetch = () => { outbound++; throw Error('NETWORK_FORBIDDEN'); }; });

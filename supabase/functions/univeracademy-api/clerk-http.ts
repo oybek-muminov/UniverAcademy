@@ -1,4 +1,5 @@
 import {ApiFault,fail} from "./fault.ts";
+import {studentResponse} from "./student-response.ts";
 import {createClerkVerifier,checkClerkProof,clerkReplayIdentity,requireLiveClerk,requireLiveClerkProfile,clerkDisplayNames,clerkIdentityKey,clerkSessionKey} from "./clerk-auth.ts";
 import type {ClerkIdentity,ClerkProof,ClerkVerifierConfiguration,ClerkLiveness,ClerkDisplayNames} from "./clerk-auth.ts";
 import {createStudentHttpHandler} from "./student-http.ts";
@@ -6,7 +7,7 @@ import {createStaffHttpHandler} from "./staff-http.ts";
 import {currentStaff,STAFF_CONTRACT_SHA} from "./staff-state.ts";
 import type {StaffAccessRecord,StaffState,VerifiedStaffProof} from "./staff-state.ts";
 import {reconcileMembershipEffects} from "./membership-effects.ts";
-import {checkSessionPolicy,issueProofs,newQadamId,proofHash,revokeFamily} from "./student-state.ts";
+import {checkSessionPolicy,issueProofs,newUniverAcademyId,proofHash,revokeFamily} from "./student-state.ts";
 import type {SessionPolicy,NumericPresentation,Person} from "./student-state.ts";
 import {telegramRequestBody} from "./telegram-return.ts";
 import type {TelegramReturnPort} from "./telegram-return.ts";
@@ -63,10 +64,10 @@ function ensureClerkStudent(state:ClerkCandidateState,id:ClerkIdentity,policy:Se
   }
   const initialNames=clerkDisplayNames(names);
   for(let n=0;n<policy.identityCollisionAttempts;n++){
-    const personId=newPersonId(),qadam=newQadamId();
-    if(state.domain.student.people[personId]||Object.values(state.domain.student.people).some(p=>p.profile.qadam_id===qadam))continue;
+    const personId=newPersonId(),cabinetId=newUniverAcademyId();
+    if(state.domain.student.people[personId]||Object.values(state.domain.student.people).some(p=>p.profile.univeracademy_id===cabinetId))continue;
     const person:Person={telegramId:null,enabled:true,profile:{person_id:personId,first_name:initialNames.firstName??"",last_name:initialNames.lastName??"",roles:["student"],
-      registration_complete:false,active_group_id:null,qadam_id:qadam}};
+      registration_complete:false,active_group_id:null,univeracademy_id:cabinetId}};
     state.domain.student.people[personId]=person;state.domain.memberships[personId]={affinityGroupId:null,active:false,revision:0,epoch:0};
     state.identities[key]={personId,enabled:true};return person;
   }
@@ -186,19 +187,19 @@ export function createClerkCandidateHandler(configuration:ClerkCandidateDependen
         let parsed;try{parsed=JSON.parse(raw);}catch{fail("MALFORMED_JSON",400);}
         if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)||Object.keys(parsed).length)fail("VALIDATION_ERROR",422);
         const result=await deps.transactions.transaction(tx=>exchangeClerkSession(tx,proof,deps),{kind:"exchange",proof});
-        return new Response(JSON.stringify({data:result}),{status:200,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+        return studentResponse(request,result);
       }
       if(path==="/api/v1/auth/telegram/link"&&request.method==="POST"){
         const raw=await telegramRequestBody(request),proof=await createClerkVerifier(deps.verifier)(bearer(request));
         const operation=deps.transactions.telegramReturn;if(!operation)fail("SERVICE_UNAVAILABLE",503);
         const result=await operation.link(proof,raw);
-        return new Response(JSON.stringify({data:result}),{status:200,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+        return studentResponse(request,result);
       }
       if(path==="/api/v1/auth/telegram/resume"&&request.method==="POST"){
         if(request.headers.has("authorization"))fail("VALIDATION_ERROR",422);
         const raw=await telegramRequestBody(request),operation=deps.transactions.telegramReturn;if(!operation)fail("SERVICE_UNAVAILABLE",503);
         const result=await operation.resume(raw);
-        return new Response(JSON.stringify({data:result}),{status:200,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+        return studentResponse(request,result);
       }
       if(path.startsWith("/api/v1/admin/")){
         const token=bearer(request),proof=await createClerkVerifier(deps.verifier)(token),p=deps.staff;

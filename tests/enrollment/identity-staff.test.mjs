@@ -34,7 +34,7 @@ async function setup(t){
 }
 test("empty storage creates an unprivileged student through HTTP; production constructor reads profile/empty exams after restart",async(t)=>{
   const f=await setup(t);assert.equal(Object.keys(f.pool.read().people).length,0);
-  const session=await f.login(),p=session.profile;assert.match(p.person_id,/^[0-9a-f-]{36}$/);assert.match(p.qadam_id,/^\d{10}$/);
+  const session=await f.login(),p=session.profile;assert.match(p.person_id,/^[0-9a-f-]{36}$/);assert.match(p.univeracademy_id,/^\d{10}$/);
   assert.deepEqual(p.roles,["student"]);assert.equal(p.registration_complete,false);assert.equal(p.active_group_id,null);
   const disk=f.pool.read();assert.equal(Object.keys(disk.people).length,1);assert.equal(disk.memberships[p.person_id].active,false);assert.deepEqual(disk.grants,{});assert.deepEqual(disk.staffIdentities,{});
   assert.ok(f.pool.events.indexOf("ua_telegram_identity_lock")<f.pool.events.indexOf("ua_identity_insert"));
@@ -66,12 +66,12 @@ test("unknown first-login COMMIT is never ACKed or auto-retried; fresh launch re
     assert.equal(Object.values(f.pool.read().families).filter(x=>x.revoked_at_ms===null).length,1);
   }
 });
-test("Qadam uniqueness retries collision without a seeded user or overwrite and exhausts only the configured bound",async(t)=>{
-  const f=await setup(t),first=await f.login();const qadam=first.profile.qadam_id,other=qadam==="1111111111"?"2222222222":"1111111111";
-  const candidates=[qadam,other],rows=new StudentIdentityRows({qadamId:()=>candidates.shift()});const runner=new PostgresTransactions(f.pool);
+test("Student ID uniqueness retries collision without a seeded user or overwrite and exhausts only the configured bound",async(t)=>{
+  const f=await setup(t),first=await f.login();const studentNumber=first.profile.univeracademy_id,other=studentNumber==="1111111111"?"2222222222":"1111111111";
+  const candidates=[studentNumber,other],rows=new StudentIdentityRows({univerAcademyId:()=>candidates.shift()});const runner=new PostgresTransactions(f.pool);
   const raw=f.launch(4000000102);const person=await runner.runIdentity(4000000102,gate=>rows.ensure(gate,raw,{botToken:botKey,sessionPolicy:testPolicy}),async tx=>tx.personIds[0]);
-  assert.notEqual(person,first.profile.person_id);assert.equal(f.pool.read().people[person].profile.qadam_id,other);assert.equal(Object.keys(f.pool.read().people).length,2);
-  const before=readFileSync(f.path,"utf8"),exhaust=new StudentIdentityRows({qadamId:()=>qadam});
+  assert.notEqual(person,first.profile.person_id);assert.equal(f.pool.read().people[person].profile.univeracademy_id,other);assert.equal(Object.keys(f.pool.read().people).length,2);
+  const before=readFileSync(f.path,"utf8"),exhaust=new StudentIdentityRows({univerAcademyId:()=>studentNumber});
   await assert.rejects(runner.runIdentity(4000000103,gate=>exhaust.ensure(gate,f.launch(4000000103),{botToken:botKey,sessionPolicy:testPolicy}),async()=>assert.fail("must not execute")),e=>e.status===503);
   assert.equal(readFileSync(f.path,"utf8"),before);
 });

@@ -5,9 +5,9 @@ import hashlib
 import json
 
 ROOT = Path(__file__).resolve().parents[1]
-raw = (ROOT / 'contracts/review-only.openapi.json').read_bytes()
+raw = (ROOT / 'contracts/telegram-return.openapi.json').read_bytes()
 digest = hashlib.sha256(raw).hexdigest()
-assert digest == '9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4'
+assert digest == '430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455'
 source = json.loads(raw)
 paths = {name: {method: deepcopy(source['paths'][name][method])} for name, method in [
     ('/admin/students/{student_id}/transfer', 'post'), ('/admin/versions/{version_id}', 'patch'),

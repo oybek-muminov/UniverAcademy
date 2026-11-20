@@ -1,6 +1,6 @@
 {
   "status": "SYNTHETIC_REVIEW_ONLY_CANDIDATE_FIXTURES_NOT_OWNER_ACCEPTANCE",
-  "contract_sha256": "280503a6a306c62e60dacea8a067137b37bcde151e6c2101d0beb4cbe09a25eb",
+  "contract_sha256": "430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455",
   "context": {
     "assignmentId": "00000000-0000-4000-8000-000000000001",
     "attemptId": "00000000-0000-4000-8000-000000000002",
@@ -19,7 +19,7 @@
         ],
         "registration_complete": false,
         "active_group_id": null,
-        "qadam_id": "0000000001"
+        "univeracademy_id": "0000000001"
       }
     },
     "profileRegistered": {
@@ -33,7 +33,7 @@
         ],
         "registration_complete": true,
         "active_group_id": "00000000-0000-4000-8000-000000000007",
-        "qadam_id": "0000000001"
+        "univeracademy_id": "0000000001"
       }
     },
     "examOpen": {

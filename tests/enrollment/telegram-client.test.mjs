@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-import {createProductionStudentClient,createLocalStudentClient,STUDENT_CONTRACT_SHA256,StudentApiError,StudentClientProtocolError} from '../../packages/api-client/student-client.ts';
+import {createProductionStudentClient,createLocalStudentClient,STUDENT_CONTRACT_SHA256,STUDENT_PROFILE_ACCEPT,StudentApiError,StudentClientProtocolError} from '../../packages/api-client/student-client.ts';
 import {createProductionStudentClient as ownerClient,STUDENT_CONTRACT_SHA256 as ownerPin} from '../../apps/mini-app/src/owner-client/student-client.ts';
 
 const jwt='eyJ0ZXN0Ijp0cnVlfQ.eyJzdWIiOiJ1c2VyX09mZmxpbmUifQ.c3ludGhldGlj';
@@ -62,11 +62,27 @@ test('schemas bind exact method/security/request/response shapes without changin
  const fullRaw=await readFile(new URL('../../contracts/telegram-return.openapi.json',import.meta.url)),full=JSON.parse(fullRaw),view=JSON.parse(await readFile(new URL('../../packages/api-client/student-openapi.json',import.meta.url)));
  assert.equal(hash(fullRaw),STUDENT_CONTRACT_SHA256);assert.equal(view['x-source'].full_openapi_sha256,STUDENT_CONTRACT_SHA256);
  const frozenRaw=await readFile(new URL('../../contracts/clerk-review.openapi.json',import.meta.url)),frozen=JSON.parse(frozenRaw);assert.equal(hash(frozenRaw),'f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28');
- for(const [path,value]of Object.entries(frozen.paths))assert.deepEqual(full.paths[path],value,path);
+ // Old operations retain their schemas, with the reviewed field rename and media negotiation.
+ const currentNames = value => JSON.parse(JSON.stringify(value)
+   .replaceAll('qadam_id','univeracademy_id').replaceAll('Qadam','UniverAcademy'));
+ for(const [path,value] of Object.entries(frozen.paths)){
+  const expected=currentNames(value);
+  for(const operation of Object.values(expected)){
+   const response=operation.responses?.['200'];
+   const previous=response?.content?.['application/json'];
+   if(['#/components/schemas/SuccessProfile','#/components/schemas/SuccessSession'].includes(previous?.schema?.$ref)){
+    response.content={[STUDENT_PROFILE_ACCEPT]:previous};
+   }
+  }
+  assert.deepEqual(full.paths[path],expected,path);
+ }
+ assert.equal(full['x-id-representation'].accept,'application/json; profile=univeracademy-id-v2');
  assert.deepEqual(full.paths['/auth/telegram/link'].post.security,[{ClerkSessionBearer:[]}]);assert.deepEqual(full.paths['/auth/telegram/resume'].post.security,[]);assert.equal(full.paths['/auth/telegram/resume'].post['x-authorization-header'],'MUST_BE_ABSENT');
  for(const [path,name,result]of [['/auth/telegram/link','TelegramLinkRequest','SuccessAck'],['/auth/telegram/resume','TelegramResumeRequest','SuccessSession']]){
-  const op=full.paths[path].post;assert.deepEqual(view.paths[path],full.paths[path]);assert.equal(op.requestBody.content['application/json'].schema.$ref,'#/components/schemas/'+name);assert.equal(op.responses['200'].content['application/json'].schema.$ref,'#/components/schemas/'+result);
+  const op=full.paths[path].post;assert.deepEqual(view.paths[path],full.paths[path]);assert.equal(op.requestBody.content['application/json'].schema.$ref,'#/components/schemas/'+name);const media=result==='SuccessSession'?STUDENT_PROFILE_ACCEPT:'application/json';
+  assert.deepEqual(Object.keys(op.responses['200'].content),[media]);
+  assert.equal(op.responses['200'].content[media].schema.$ref,'#/components/schemas/'+result);
   assert.deepEqual(full.components.schemas[name],{type:'object',additionalProperties:false,properties:{init_data:{type:'string',minLength:1,maxLength:16384}},required:['init_data']});assert.deepEqual(view.components.schemas[name],full.components.schemas[name]);
  }
- for(const name of ['SuccessAck','SuccessSession','Session','Profile'])assert.deepEqual(full.components.schemas[name],frozen.components.schemas[name]);
+ for(const name of ['SuccessAck','SuccessSession','Session','Profile'])assert.deepEqual(full.components.schemas[name],currentNames(frozen.components.schemas[name]));
 });

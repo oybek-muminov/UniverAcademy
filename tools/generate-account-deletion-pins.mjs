@@ -1,12 +1,13 @@
-// Explicit local review overlay. --check never regenerates approved bytes in CI.
-import {readFileSync,writeFileSync,readdirSync,lstatSync} from 'node:fs';
+// Reproduce the immutable account-deletion release from its reviewed inputs.
+// Later releases can replace files only through an exact, root-pinned transition.
+import {readFileSync,readdirSync,lstatSync} from 'node:fs';
+import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
 const base='3d4afd1a55918775eb3cbd2da7a004e19d37a6b8';
 const manifest='apps/mini-app/tests/fixtures/backend-account-deletion-review-manifest.json';
 const guard='apps/mini-app/tests/verify-backend-targets.mjs';
-const checking=process.argv.includes('--check');
-const prior=checking?JSON.parse(readFileSync(manifest,'utf8')):null;
+const brandManifest='apps/mini-app/tests/fixtures/univeracademy-id-overlay.json';
+const guardSource=readFileSync(guard,'utf8');
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function walk(p){return readdirSync(p,{withFileTypes:true}).flatMap(e=>e.name==='node_modules'?[]:e.isDirectory()?walk(p+'/'+e.name):[p+'/'+e.name]);}
 const paths=[
@@ -24,11 +25,38 @@ const paths=[
 ...walk('apps/mini-app/tests').filter(p=>p.startsWith('apps/mini-app/tests/telegram-atomic-')),
 ...walk('apps/mini-app/src/account-deletion-candidate').filter(p=>!p.endsWith('.md')),
 ...walk('apps/mini-app/tests').filter(p=>p.startsWith('apps/mini-app/tests/account-deletion-'))].sort();
-const rows=paths.map(path=>{if(!lstatSync(path).isFile())throw Error('Regular source required: '+path);const bytes=readFileSync(path);let old=null;if(checking){old=prior.files.find(f=>f.path===path)?.preimage??null;}else try{const b=execFileSync('git',['show',base+':'+path],{stdio:['ignore','pipe','ignore']});old={path,bytes:b.length,sha256:hash(b)};}catch{}return {path,preimage:old,result:{path,bytes:bytes.length,sha256:hash(bytes)}};});
-const text=JSON.stringify({format_version:1,base_commit:base,status:'local-review-only-not-deployed',files:rows},null,2)+'\n';
-const literal="const ACCOUNT_DELETION_OVERLAY_SHA256 = '"+hash(text)+"';";
-const source=readFileSync(guard,'utf8'),pattern=/const ACCOUNT_DELETION_OVERLAY_SHA256 = '[a-f0-9]{64}';/;
-if(!pattern.test(source))throw Error('Guard overlay anchor missing');
-if(checking){
- if(readFileSync(manifest,'utf8')!==text||source.match(pattern)[0]!==literal)throw Error('ACCOUNT_DELETION_PINS_STALE: regenerate locally and review source plus manifest changes');
-}else{writeFileSync(manifest,text);writeFileSync(guard,source.replace(pattern,literal));}
+
+function readPinned(path, pattern) {
+  const raw = readFileSync(path);
+  const match = guardSource.match(pattern);
+  assert(match, 'Missing release pin for ' + path);
+  assert.equal(hash(raw), match[1], 'Unreviewed release manifest: ' + path);
+  return JSON.parse(raw);
+}
+const previous = readPinned(manifest, /const ACCOUNT_DELETION_OVERLAY_SHA256 = '([a-f0-9]{64})';/);
+const brand = readPinned(brandManifest, /const BRAND_OVERLAY_SHA256 = '([a-f0-9]{64})';/);
+const previousFiles = new Map(previous.files.map(file => [file.path, file]));
+const brandFiles = new Map(brand.files.map(file => [file.path, file]));
+const rows = [];
+for (const path of paths) {
+  assert(lstatSync(path).isFile(), 'Regular source required: ' + path);
+  const bytes = readFileSync(path);
+  const current = {path, bytes: bytes.length, sha256: hash(bytes)};
+  const old = previousFiles.get(path);
+  const next = brandFiles.get(path);
+  if (next) {
+    assert.equal(current.bytes, next.bytes, 'ACCOUNT_DELETION_PINS_STALE: ' + path);
+    assert.equal(current.sha256, next.sha256, 'ACCOUNT_DELETION_PINS_STALE: ' + path);
+    assert.equal(next.previous_sha256, old?.result.sha256 ?? null, 'Account deletion predecessor mismatch: ' + path);
+    // Newly selected files in the later release have no historical row.
+    if (old) rows.push(old);
+  } else {
+    assert(old, 'Unreviewed account-deletion input: ' + path);
+    rows.push({path, preimage: old.preimage, result: current});
+  }
+}
+const output = JSON.stringify({format_version:1,base_commit:base,status:'local-review-only-not-deployed',files:rows},null,2)+'\n';
+assert.equal(hash(output), hash(readFileSync(manifest)), 'ACCOUNT_DELETION_PINS_STALE: keep historical pins and review a new overlay');
+// With no arguments this also verifies reproducibility. Generate to stdout on
+// explicit request so reproducing an old release cannot repin any newer source.
+if (process.argv.includes('--print')) process.stdout.write(output);

@@ -270,7 +270,7 @@ function r03Fixture(){
     answers:[{questionId:id(100),selectedOptionId:id(200),revision:1,savedAt:clock,seriesStateRevision:2}],ordinary:null};
   return {student:{
     people:{[ids.person]:{telegramId:4000000001,enabled:true,profile:{person_id:ids.person,roles:["student"],registration_complete:true,
-      active_group_id:ids.group,first_name:"QA",last_name:"Synthetic",qadam_id:"0100000001"}}},
+      active_group_id:ids.group,first_name:"QA",last_name:"Synthetic",univeracademy_id:"0100000001"}}},
     families:{},access:{},refresh:{},consumedInitData:{},grants:{[ids.person]:{[ids.assignment]:{rostered:true,membershipEpoch:7,grantEpoch:7}}},
     assignments:{[ids.assignment]:{admission:{assignmentId:ids.assignment,groupId:ids.group,activeGroupId:ids.group,
       rostered:true,profileComplete:true,membershipEpoch:7,grantEpoch:7,opensAt:clock-1000,closesAt:clock+1000},

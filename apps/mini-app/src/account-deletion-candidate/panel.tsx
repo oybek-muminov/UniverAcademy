@@ -29,11 +29,11 @@ function ConfirmDeletion({controller,cabinetDisplayId}:{controller:DeletionContr
     <h2 id="delete-confirm-title">Hisobni o‘chirishni tasdiqlang</h2>
     <p id="delete-confirm-warning">Hisobingiz va unga bog‘liq shaxsiy natijalar o‘chiriladi. Buni qaytarib bo‘lmaydi. Telegram bog‘lanishi ajratiladi; keyin yangi hisob ochishingiz mumkin.</p>
     {validId ? <>
-      <p>Kabinet ID: <strong>{cabinetDisplayId}</strong></p>
-      <label htmlFor="delete-cabinet-id">Tasdiqlash uchun 10 xonali kabinet ID ni kiriting</label>
+      <p>UniverAcademy ID: <strong>{cabinetDisplayId}</strong></p>
+      <label htmlFor="delete-cabinet-id">Tasdiqlash uchun 10 xonali UniverAcademy ID raqamingizni kiriting</label>
       <input id="delete-cabinet-id" value={entered} onChange={event=>setEntered(event.target.value)} inputMode="numeric" autoComplete="off" pattern="[0-9]{10}" maxLength={10} required aria-describedby="delete-id-help"/>
       <small id="delete-id-help">Bu parol emas. Keyin hisob egasini Clerk orqali qayta tasdiqlaysiz.</small>
-    </> : <p role="alert">Kabinet ID olinmadi. O‘chirishni davom ettirib bo‘lmaydi. Kabinetni qayta oching.</p>}
+    </> : <p role="alert">UniverAcademy ID olinmadi. O‘chirishni davom ettirib bo‘lmaydi. Kabinetni qayta oching.</p>}
     <div className="account-action-row">
       <button type="button" className="secondary" onClick={()=>controller.cancel()}>Bekor qilish</button>
       <button type="submit" className="danger-button" disabled={!matches}>Tasdiqlayman, hisobimni o‘chirish</button>

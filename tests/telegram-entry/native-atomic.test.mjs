@@ -1,5 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import pg from '../account-deletion/tooling/node_modules/pg/lib/index.js';
+import {expand} from '../../supabase/migrations/cabinet-id/migrate.mjs';
 import {TelegramClerkEntryRows} from '../../supabase/functions/univeracademy-api/storage/telegram-clerk-entry-rows.ts';
 import {testPolicy,testNumbers,botKey} from '../backend/http-fixture.ts';
 import {proofHash} from '../../supabase/functions/univeracademy-api/student-state.ts';
@@ -16,6 +17,7 @@ const fresh=(userId='user_Native',sessionId='sess_Native')=>{const now=Date.now(
 test('native atomic Telegram entry with actual catalog RLS/helpers',{skip:!url},async t=>{
  if(!['127.0.0.1','localhost'].includes(new URL(url).hostname))throw Error('Disposable loopback database only');
  const {nativeFixture}=await import('./native-fixture.mjs');const fixture=await nativeFixture({url});const admin=fixture.admin;t.after(()=>fixture.close());
+ await expand(admin);
  const connections=[];
  const pool={connect:async()=>{
   const c=new pg.Client({connectionString:url,application_name:'ua-atomic-runtime'});await c.connect();

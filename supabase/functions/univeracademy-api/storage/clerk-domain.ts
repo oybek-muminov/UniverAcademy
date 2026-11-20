@@ -1,3 +1,4 @@
+import { readStoredProfile } from "./stored-profile.ts";
 import {TelegramReturnRows} from "./telegram-return-rows.ts";
 import {fail} from "../fault.ts";
 import {guardBoundFamily} from "../clerk-http.ts";
@@ -278,7 +279,7 @@ export class ClerkDomainTransactions implements ClerkTransactions{
         const current=await new StaffAccessRows().load(tx,{issuer:intent.proof.issuer,subject:intent.proof.userId},actorId,"clerk");
         Object.assign(domain,await rows.load(tx,current));domain.staff={[intent.proof.userId]:current};
       }
-      domain.student.people[actorId]={telegramId:p.telegram_id===null?null:integer(p.telegram_id),enabled:p.enabled,profile:p.profile as StudentState["people"][string]["profile"]};
+      domain.student.people[actorId]={telegramId:p.telegram_id===null?null:integer(p.telegram_id),enabled:p.enabled,profile:readStoredProfile(p.profile)};
       const state:ClerkCandidateState={domain,identities:{[clerkIdentityKey(intent.proof)]:{personId:actorId,enabled:true}},familyBindings:{},studentSessions:{},consumedTokens:{}};
       const before=structuredClone(domain);await fresh(tx);checkClerkProof(intent.proof,tx.now);
       const value=await work({state,now:()=>tx.now});await fresh(tx);checkClerkProof(intent.proof,tx.now);

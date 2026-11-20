@@ -4,7 +4,7 @@ import { createServer } from 'vite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StudentFlow } from '../src/flow.ts';
-const student = {person:'p1',firstName:'Namuna',lastName:'O‘quvchi',displayId:'1',registrationComplete:true};
+const student = {person:'p1',firstName:'Namuna',lastName:'O‘quvchi',displayId:'0000000001',registrationComplete:true};
 test('cabinet header and dashboard render accessible controls without placeholders',async()=>{
  const server=await createServer({root:new URL('..',import.meta.url).pathname,server:{middlewareMode:true}});
  try {
@@ -15,8 +15,9 @@ test('cabinet header and dashboard render accessible controls without placeholde
   const html=renderToStaticMarkup(createElement(StudentApp,{studentFlow:flow,mode:'telegram'}));
   assert.match(html,/Namuna O‘quvchi/);
   assert.match(html,/>Dashboard<\/button>/);
-  assert.doesNotMatch(html,/Salom,|Tez kunda|Har bir qadam/);
+  assert.doesNotMatch(html,/Salom,|Tez kunda/);
   const panel=renderToStaticMarkup(createElement(AccountDashboard,{student,flow,busy:false,onLogout:async()=>{},onDeleteAccount(){}}));
+  assert.match(panel,/UniverAcademy ID: 0000000001</);
   assert.match(panel,/dashboard-first-name/);
   assert.doesNotMatch(panel,/Kabinetga qaytish/);
   assert.match(panel,/account-action-row/);

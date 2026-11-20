@@ -10,7 +10,7 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const rawA = 'query_id=synthetic-first&user=%7B%22id%22%3A1%7D&hash=synthetic%2B%3D';
 const rawB = 'query_id=synthetic-second&user=%7B%22id%22%3A2%7D&hash=synthetic%2B%3D';
 const profile = (person, registered = true) => ({ person_id: person, first_name: 'Suniy', last_name: 'Bootstrap',
-  roles: ['student'], registration_complete: registered, active_group_id: null, qadam_id: '0000000001' });
+  roles: ['student'], registration_complete: registered, active_group_id: null, univeracademy_id: '0000000001' });
 const ok = data => new Response(JSON.stringify({ data }), { status: 200 });
 const fail = (status, code) => new Response(JSON.stringify({ error: { code,
   message: 'Synthetic error', request_id: id(900) } }), { status });

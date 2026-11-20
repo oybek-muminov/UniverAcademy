@@ -15,7 +15,7 @@ export function Road(){
   const timers:ReturnType<typeof setTimeout>[]=[];let frame=0;
   const cleanup=()=>{timers.forEach(clearTimeout);cancelAnimationFrame(frame);g.replaceChildren();labels.replaceChildren()};
   var L=road.getTotalLength();
-  var N:[number,string,string][]=[[.0,"Birinchi qadamni tashlang","d"],[.25,"Intizom eng muhim konikmadir","d"],[.5,"mashlar sizni yanada kuchli qiladi!","c"],[.75,"bilimlarni tekshirish","l"],[1,"siz eng zoriga loyiqsin","s"]];
+  var N:[number,string,string][]=[[.0,"Fanni tanlang","d"],[.25,"Intizom eng muhim konikmadir","d"],[.5,"mashlar sizni yanada kuchli qiladi!","c"],[.75,"bilimlarni tekshirish","l"],[1,"siz eng zoriga loyiqsin","s"]];
   const ns="http://www.w3.org/2000/svg";
   N.forEach(function(n,i){
     var p=road.getPointAtLength(L*n[0]),el=document.createElementNS(ns,"g");el.setAttribute("class","node node-"+n[2]);
@@ -43,5 +43,5 @@ export function Road(){
   return cleanup;
  },[reduced,mobile]);
  if(mobile)return null;
- return <div className="map" aria-label="Barcha fanlar uchun o‘quv yo‘li namunasi"><svg viewBox="0 0 420 520" role="img" aria-label="Qadamlar yo‘li — tasviriy namuna. Tekshiruvdan o‘tish keyingi mavzuga yo‘l ochishini ko‘rsatuvchi animatsiya; haqiqiy test natijasi emas."><path id="roadb" d={roadD}/><path id="road" ref={path} d={roadD}/><g id="nodes" ref={nodes}/></svg><div className="road-labels" aria-hidden="true"/><div className="chip" style={{left:0,top:'8%'}}>✦ Barcha fanlar</div><div className="chip" style={{right:0,top:'46%'}}>✦ O‘z sur’atingizda</div><div className="chip start-chip" style={{left:'2%',bottom:'12%'}}>Har kim boshlashi mumkin</div></div>;
+ return <div className="map" aria-label="Barcha fanlar uchun o‘quv yo‘li namunasi"><svg viewBox="0 0 420 520" role="img" aria-label="O‘quv yo‘li namunasi. Tekshiruvdan o‘tish keyingi mavzuga yo‘l ochishini ko‘rsatuvchi animatsiya; haqiqiy test natijasi emas."><path id="roadb" d={roadD}/><path id="road" ref={path} d={roadD}/><g id="nodes" ref={nodes}/></svg><div className="road-labels" aria-hidden="true"/><div className="chip" style={{left:0,top:'8%'}}>✦ Barcha fanlar</div><div className="chip" style={{right:0,top:'46%'}}>✦ O‘z sur’atingizda</div><div className="chip start-chip" style={{left:'2%',bottom:'12%'}}>Har kim boshlashi mumkin</div></div>;
 }

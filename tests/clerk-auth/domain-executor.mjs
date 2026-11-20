@@ -77,7 +77,7 @@ export function domainExecutor(path){
     if(name==="ua_clerk_fences")return result(Object.entries(d.clerkFences).filter(([,r])=>r.personId===v[0]).map(([key,r])=>{const [issuer,subject,sid]=JSON.parse(key);return{issuer,subject,sid,person_id:r.personId,retired_at_ms:r.retiredAt===null?null:String(r.retiredAt)};}));
     if(name==="ua_clerk_replays")return result(Object.entries(d.clerkReplays).filter(([,r])=>r.personId===v[0]).map(([digest,r])=>({digest,person_id:r.personId})));
     if(name==="ua_clerk_person_insert"){
-      if(d.people[v[0]]||Object.values(d.people).some(p=>p.profile.qadam_id===v[1]))return result();
+      if(d.people[v[0]]||Object.values(d.people).some(p=>p.profile.univeracademy_id===v[1]))return result();
       d.people[v[0]]={telegram_id:null,enabled:v[2],roles:v[3],profile:JSON.parse(v[4])};return ack();
     }
     if(name==="ua_clerk_member_insert"){if(d.memberships[v[0]])return result();d.memberships[v[0]]={active:false,epoch:0,revision:0,affinity_group_id:null};return ack();}

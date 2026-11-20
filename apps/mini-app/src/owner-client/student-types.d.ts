@@ -444,14 +444,14 @@ export interface components {
             roles: ("student" | "teacher" | "admin" | "owner")[];
             registration_complete: boolean;
             active_group_id: string | null;
-            qadam_id: components["schemas"]["QadamId"] | null;
+            univeracademy_id: components["schemas"]["UniverAcademyId"] | null;
         } & unknown;
         ProfileUpdate: {
             first_name: string;
             last_name: string;
         };
         /** @description Permanent external student identifier; preserve leading zeroes. Not authentication or authorization. Server generated, never client assigned. */
-        QadamId: string;
+        UniverAcademyId: string;
         /** @description Current technical successor START eligibility window. Full duration from pinned version. Closing never truncates a started recovery. No original assignment fallback. */
         Recovery: {
             /** Format: date-time */
@@ -663,7 +663,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessSession"];
+                    "application/json; profile=univeracademy-id-v2": components["schemas"]["SuccessSession"];
                 };
             };
             400: components["responses"]["ErrorResponse"];
@@ -697,7 +697,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessSession"];
+                    "application/json; profile=univeracademy-id-v2": components["schemas"]["SuccessSession"];
                 };
             };
             400: components["responses"]["ErrorResponse"];
@@ -731,7 +731,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessSession"];
+                    "application/json; profile=univeracademy-id-v2": components["schemas"]["SuccessSession"];
                 };
             };
             400: components["responses"]["ErrorResponse"];
@@ -795,7 +795,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessProfile"];
+                    "application/json; profile=univeracademy-id-v2": components["schemas"]["SuccessProfile"];
                 };
             };
             400: components["responses"]["ErrorResponse"];
@@ -829,7 +829,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessProfile"];
+                    "application/json; profile=univeracademy-id-v2": components["schemas"]["SuccessProfile"];
                 };
             };
             400: components["responses"]["ErrorResponse"];
@@ -1166,7 +1166,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessSession"];
+                    "application/json; profile=univeracademy-id-v2": components["schemas"]["SuccessSession"];
                 };
             };
             400: components["responses"]["ErrorResponse"];

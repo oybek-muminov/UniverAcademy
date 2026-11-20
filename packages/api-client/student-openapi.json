@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "UniverAcademy student Clerk exchange review — NOT ACCEPTED",
-    "version": "0.3.1-telegram-return-review.1",
-    "description": "PROVISIONAL / NOT ACCEPTED. Telegram link/resume derived review; prior endpoints retained byte-equivalent as JSON values. No runtime or deployment acceptance."
+    "version": "0.3.2-univeracademy-id.1",
+    "description": "PROVISIONAL / NOT ACCEPTED. The schemas in this contract describe the UniverAcademy ID representation. Profile and session clients select it using Accept: application/json; profile=univeracademy-id-v2. An unversioned request keeps the previous response format during rollout."
   },
   "paths": {
     "/auth/clerk": {
@@ -38,7 +38,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -94,7 +94,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -160,7 +160,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -302,7 +302,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessProfile"
                 }
@@ -360,7 +360,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessProfile"
                 }
@@ -1096,7 +1096,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -2068,10 +2068,10 @@
               }
             ]
           },
-          "qadam_id": {
+          "univeracademy_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QadamId"
+                "$ref": "#/components/schemas/UniverAcademyId"
               },
               {
                 "type": "null"
@@ -2086,7 +2086,7 @@
           "roles",
           "registration_complete",
           "active_group_id",
-          "qadam_id"
+          "univeracademy_id"
         ],
         "allOf": [
           {
@@ -2104,14 +2104,14 @@
             },
             "then": {
               "properties": {
-                "qadam_id": {
-                  "$ref": "#/components/schemas/QadamId"
+                "univeracademy_id": {
+                  "$ref": "#/components/schemas/UniverAcademyId"
                 }
               }
             },
             "else": {
               "properties": {
-                "qadam_id": {
+                "univeracademy_id": {
                   "type": "null"
                 }
               }
@@ -2139,7 +2139,7 @@
           "last_name"
         ]
       },
-      "QadamId": {
+      "UniverAcademyId": {
         "type": "string",
         "pattern": "^[0-9]{10}$",
         "minLength": 10,
@@ -3056,10 +3056,11 @@
     }
   },
   "x-source": {
-    "full_openapi_sha256": "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c",
+    "full_openapi_sha256": "430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455",
     "base_openapi_sha256": "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4",
     "status": "PROVISIONAL / NOT ACCEPTED",
     "full_openapi_path": "contracts/telegram-return.openapi.json",
-    "previous_full_openapi_sha256": "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28"
+    "previous_full_openapi_sha256": "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c",
+    "legacy_full_openapi_url": "https://github.com/oybek-muminov/UniverAcademy/blob/d62adb0f090b3e964450163d6607387c248d56bc/contracts/telegram-return.openapi.json"
   }
 }

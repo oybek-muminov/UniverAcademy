@@ -1,4 +1,4 @@
-/** Decorative stairs from the supplied qadam-animatsiya.html, not real progress. */
+/** Decorative illustration of the learning path. */
 export function MobileStairs(){return <div className="mobile-stairs" aria-hidden="true"><svg viewBox="0 -60 360 230">
  <rect className="st" x="24" y="126" width="56" height="34" rx="10" style={{animationDelay:'.4s'}}/>
  <rect className="st" x="88" y="98" width="56" height="62" rx="10" style={{animationDelay:'.9s'}}/>

@@ -35,7 +35,7 @@ function assignment(j,d,opensAt=C-1000,closesAt=C+5000){return{admission:{assign
 function record(person=P,attempt=A,j=J,d=D){const pub=published(d);return{id:attempt,personId:person,assignmentId:j,groupId:G,generation:1,status:"submitted",startedAt:C,deadlineAt:T,completedAt:C+20,stateRevision:3,seriesStateRevision:3,published:pub,
   questionOrder:pub.questions.map(q=>({questionId:q.id,optionIds:[...q.optionIds]})),answers:[{questionId:id(100),selectedOptionId:id(200),revision:1,savedAt:C+10,seriesStateRevision:2}],ordinary:ordinary()};}
 function fixture(){return{
- student:{people:{[P]:{telegramId:null,enabled:true,registeredAt:C-10000,profile:{person_id:P,first_name:"Literal",last_name:"Student",roles:["student"],registration_complete:true,active_group_id:G,qadam_id:"0100000001"}}},
+ student:{people:{[P]:{telegramId:null,enabled:true,registeredAt:C-10000,profile:{person_id:P,first_name:"Literal",last_name:"Student",roles:["student"],registration_complete:true,active_group_id:G,univeracademy_id:"0100000001"}}},
  families:{keep:{personId:P,expiresAt:T+100000,revokedAt:null,logoutRetainUntil:null}},access:{keep:{familyId:"keep",expiresAt:T+1000,superseded:false}},refresh:{keep:{familyId:"keep",consumed:false}},consumedInitData:{keep:true},
  grants:{[P]:{[J]:{rostered:true,membershipEpoch:7,grantEpoch:7},[U]:{rostered:true,membershipEpoch:7,grantEpoch:7},[F]:{rostered:true,membershipEpoch:7,grantEpoch:7},[OLD]:{rostered:false,membershipEpoch:7,grantEpoch:6}}},
  assignments:{[J]:assignment(J,D),[U]:assignment(U,id(21),C-1000,T+1000),[F]:assignment(F,id(22),T+10000,T+20000),[OLD]:assignment(OLD,id(23))},

@@ -5,7 +5,7 @@ test('sample layout dimensions retained',()=>{for(const s of ['width:min(1160px,
 test('sample fonts and sticky translucent nav retained',()=>{for(const s of ['Young Serif','Onest','height:68px','position:sticky;top:0','rgba(255,249,239,.9)','backdrop-filter:blur(10px)'])assert.ok(css.includes(s),s);});
 test('national geometric hero background retained',()=>{for(const s of ['.hero::before','width=\'88\'','opacity:.09'])assert.ok(css.includes(s),s);});
 const road=readFileSync(new URL('../src/Road.tsx',import.meta.url),'utf8');
-test('attachment road animation geometry and exact timing retained',()=>{for(const s of ['M100 486C340 476 350 380 205 360S60 290 210 250 350 190 235 140 120 92 235 36','getPointAtLength','(ts-s)/2400','1-Math.pow(1-k,3)','(0.3+n[0]*2.1)','strokeDasharray=(L*e)+" 3000"','Birinchi qadamni tashlang','bilimlarni tekshirish','siz eng zoriga loyiqsin','setTimeout(function(){el.classList.add("on")}'])assert.ok(road.includes(s),s);for(const s of ['pop .5s cubic-bezier(.3,1.6,.5,1)','pulse 2s ease-out infinite','chip .6s 2.4s forwards,bob 5s 3s ease-in-out infinite'])assert.ok(css.includes(s),s);assert.ok(!css.includes('.node { opacity:1; }'));});
+test('attachment road animation geometry and exact timing retained',()=>{for(const s of ['M100 486C340 476 350 380 205 360S60 290 210 250 350 190 235 140 120 92 235 36','getPointAtLength','(ts-s)/2400','1-Math.pow(1-k,3)','(0.3+n[0]*2.1)','strokeDasharray=(L*e)+" 3000"','Fanni tanlang','bilimlarni tekshirish','siz eng zoriga loyiqsin','setTimeout(function(){el.classList.add("on")}'])assert.ok(road.includes(s),s);for(const s of ['pop .5s cubic-bezier(.3,1.6,.5,1)','pulse 2s ease-out infinite','chip .6s 2.4s forwards,bob 5s 3s ease-in-out infinite'])assert.ok(css.includes(s),s);assert.ok(!css.includes('.node { opacity:1; }'));});
 const stack=readFileSync(new URL('../src/useStackedSections.ts',import.meta.url),'utf8');
 test('section navigation names, IDs and accessible active state',()=>{for(const s of ["id:'top',label:'Bosh sahifa'","id:'fanlar',label:'Fanlar'","id:'test',label:'Bilimni baholash'","aria-current=",'data-stack-panel'])assert.ok(app.includes(s),s);assert.equal((app.match(/data-stack-panel/g)||[]).length,5);});
 test('stacking uses native scroll with tall-panel and reduced-motion fallback',()=>{for(const s of ['min-height:calc(100svh - var(--nav-height))','position:sticky;top:var(--panel-top','scroll-snap-type:none;scroll-behavior:auto','.stack-panel{position:relative;top:auto}'])assert.ok(css.includes(s),s);assert.ok(stack.includes('Math.min(headerHeight,window.innerHeight-height)'));assert.ok(!stack.includes("addEventListener('wheel'"));assert.ok(!stack.includes("addEventListener('touchmove'"));});
@@ -19,7 +19,15 @@ test('original subject atlas preserves the calm panels and white cards',()=>{for
 test('polished hero copy and honest informational entry modes',()=>{for(const s of ['O‘zbek tilida barcha fanlardan bepul darslar.','Sertifikat imtihonlariga tayyorlaning.','Istalgan darajadan boshlang.','Videodarslar va testlar — hammasi bir joyda.','Istalgan joyda, o‘zingizga qulay usulda o‘rganing.','aria-label="O‘rganish usullari"',"label:'Web'","label:'Telegram'","label:'Mobil ilova'","window.alert('Bu kirish yo‘li hali ishga tushirilmagan.')"])assert.ok(app.includes(s),s);});
 test('hero entry controls are accessible icon-only touch targets',()=>{assert.ok(app.includes('type="button" aria-label={label}'));assert.ok(app.includes('<Icon aria-hidden="true"/></button>'));assert.ok(!app.includes('<span>{label}</span>'));assert.ok(css.includes('width:46px;height:46px'));});
 
-test('original in-page logo is 1.5x and supplied image is favicon only',()=>{assert.ok(app.includes('width="51" height="51"'));assert.ok(css.includes('.brand-mark{display:block;width:51px;height:51px;object-fit:contain;flex:none}'));const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.equal((html.match(/qadam-staircase-book.png/g)||[]).length,2);assert.ok(!app.includes('qadam-staircase-book.png'));});
+test('navigation, browser and Apple touch icons use the UniverAcademy mark', () => {
+ const icon = '/brand/favicon-512.png';
+ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+ assert.ok(app.includes('width="51" height="51"'));
+ assert.ok(css.includes('.brand-mark{display:block;width:51px;height:51px;object-fit:contain;flex:none}'));
+ assert.equal(html.split('href="' + icon + '"').length - 1, 2);
+ assert.ok(app.includes('src="' + icon + '"'));
+ assert.ok(readFileSync(new URL('../public' + icon, import.meta.url)).length);
+});
 
 test('hero ornament is evenly visible without fade mask',()=>{assert.ok(!css.includes('mask:radial-gradient'));});
 

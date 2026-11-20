@@ -1,7 +1,7 @@
-import {StudentApiError,StudentClientProtocolError} from './student-client.ts';
+import {StudentApiError,StudentClientProtocolError,STUDENT_PROFILE_ACCEPT} from './student-client.ts';
 import type {StudentSchema} from './student-client.ts';
-export const TELEGRAM_ATOMIC_CONTRACT_SHA256='092bd6f1d2ff2aa9f16e4c79251545556a065d1ca89a6b871ed6bb23c2d78553';
-export const TELEGRAM_ATOMIC_CONTRACT_VERSION='0.1.0-atomic-telegram-review.1';
+export const TELEGRAM_ATOMIC_CONTRACT_SHA256='2d575800ef4548634867a1dbae622539d537d9f45dd900aa039f8ce15614b13a';
+export const TELEGRAM_ATOMIC_CONTRACT_VERSION='0.1.1-univeracademy-id.1';
 export type TelegramAtomicInput={init_data:string;confirmation:'link-telegram-account-v1'};
 export type TelegramAtomicClientOptions={mode:'production';contractSha256:string;baseUrl:string;transport(request:Request):Promise<Response>;timeoutMs?:number};
 function bad(code='CLIENT_INVALID_RESPONSE'):never{throw new StudentClientProtocolError(code);}
@@ -14,7 +14,7 @@ function validateSession(value:unknown):StudentSchema['SuccessSession']{
  const d=value.data;
  if(Object.keys(d).sort().join(',')!=='access_token,expires_at,profile,refresh_expires_at,refresh_token,token_type'||d.token_type!=='Bearer'||!token(d.access_token)||!token(d.refresh_token)||d.access_token===d.refresh_token||!date(d.expires_at)||!date(d.refresh_expires_at)||Date.parse(d.expires_at)>Date.parse(d.refresh_expires_at)||!plain(d.profile))bad();
  const p=d.profile;
- if(Object.keys(p).sort().join(',')!=='active_group_id,first_name,last_name,person_id,qadam_id,registration_complete,roles'||!uuid(p.person_id)||typeof p.first_name!=='string'||typeof p.last_name!=='string'||[p.first_name,p.last_name].some(s=>Array.from(s).length>100||/[\x00-\x1f\x7f]/.test(s))||typeof p.registration_complete!=='boolean'||!Array.isArray(p.roles)||p.roles.some(r=>typeof r!=='string'||!['student','teacher','admin','owner'].includes(r))||!(p.active_group_id===null||uuid(p.active_group_id))||!(p.roles.includes('student')?(typeof p.qadam_id==='string'&&/^\d{10}$/.test(p.qadam_id)):p.qadam_id===null))bad();
+ if(Object.keys(p).sort().join(',')!=='active_group_id,first_name,last_name,person_id,registration_complete,roles,univeracademy_id'||!uuid(p.person_id)||typeof p.first_name!=='string'||typeof p.last_name!=='string'||[p.first_name,p.last_name].some(s=>Array.from(s).length>100||/[\x00-\x1f\x7f]/.test(s))||typeof p.registration_complete!=='boolean'||!Array.isArray(p.roles)||p.roles.some(r=>typeof r!=='string'||!['student','teacher','admin','owner'].includes(r))||!(p.active_group_id===null||uuid(p.active_group_id))||!(p.roles.includes('student')?(typeof p.univeracademy_id==='string'&&/^\d{10}$/.test(p.univeracademy_id)):p.univeracademy_id===null))bad();
  return value as unknown as StudentSchema['SuccessSession'];
 }
 /** Backend-owned additive client. No token storage, identity fields, retry,
@@ -37,7 +37,7 @@ export function createProductionTelegramAtomicClient(options:TelegramAtomicClien
   let abort:(()=>void)|undefined;
   const cancelled=new Promise<never>((_,reject)=>{abort=()=>{void reader?.cancel().catch(()=>{});reject(new StudentClientProtocolError('CLIENT_REQUEST_UNCONFIRMED'));};controller.signal.addEventListener('abort',abort,{once:true});});
   const work=async()=>{
-   const response=await transport(new Request(endpoint,{method:'POST',headers:{accept:'application/json','content-type':'application/json',authorization:'Bearer '+clerkJWT},body:JSON.stringify({init_data:raw.value,confirmation:confirmation.value}),credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal}));
+   const response=await transport(new Request(endpoint,{method:'POST',headers:{accept:STUDENT_PROFILE_ACCEPT,'content-type':'application/json',authorization:'Bearer '+clerkJWT},body:JSON.stringify({init_data:raw.value,confirmation:confirmation.value}),credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal}));
    if(controller.signal.aborted){void response?.body?.cancel().catch(()=>{});bad('CLIENT_REQUEST_UNCONFIRMED');}
    if(!(response instanceof Response)||response.redirected||(response.url&&response.url!==endpoint)||!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))bad();
    reader=response.body?.getReader();if(!reader)bad();let length=0;const chunks:Uint8Array[]=[];

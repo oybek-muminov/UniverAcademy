@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "UniverAcademy atomic Telegram entry review",
-    "version": "0.1.0-atomic-telegram-review.1",
-    "description": "Review-only default-disabled operation. Both identities and profile/session/link/replay commit atomically. Activation requires replacing old Telegram two-step fallback and actual account-choice/reverification UX."
+    "version": "0.1.1-univeracademy-id.1",
+    "description": "Review-only default-disabled operation. Both identities and profile/session/link/replay commit atomically. Activation requires replacing old Telegram two-step fallback and actual account-choice/reverification UX. Clients send Accept: application/json; profile=univeracademy-id-v2 to receive the session representation specified below. Bare application/json selects the previous profile format."
   },
   "servers": [
     {
@@ -57,7 +57,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "./telegram-return.openapi.json#/components/schemas/SuccessSession"
                 }
@@ -94,5 +94,11 @@
         "bearerFormat": "Clerk JWT"
       }
     }
+  },
+  "x-student-contract-sha256": "430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455",
+  "x-legacy-contract": {
+    "url": "https://github.com/oybek-muminov/UniverAcademy/blob/d62adb0f090b3e964450163d6607387c248d56bc/contracts/telegram-atomic-entry.review.openapi.json",
+    "sha256": "092bd6f1d2ff2aa9f16e4c79251545556a065d1ca89a6b871ed6bb23c2d78553",
+    "accept": "application/json"
   }
 }

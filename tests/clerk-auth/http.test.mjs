@@ -9,7 +9,7 @@ test("fresh Clerk account is a new UUID student with no Telegram/group/grant/sta
   const f=await clerkFixture({fresh:true});f.activate(users.student,sids.first);
   const token=await f.sign({claims:{roles:["owner"],o:{rol:"admin"},email:"same-as-someone@example.com",name:"Claimed owner"}}),r=await f.exchange(token);
   assert.equal(r.status,200,JSON.stringify(r));const session=r.json.data,p=session.profile;
-  assert.ok(validate("SuccessSession",r.json));assert.match(p.person_id,/^[0-9a-f-]{36}$/);assert.match(p.qadam_id,/^\d{10}$/);
+  assert.ok(validate("SuccessSession",r.json));assert.match(p.person_id,/^[0-9a-f-]{36}$/);assert.match(p.univeracademy_id,/^\d{10}$/);
   assert.deepEqual(p.roles,["student"]);assert.equal(p.registration_complete,false);assert.equal(p.active_group_id,null);assert.equal(p.first_name,"");
   assert.equal(f.store.state.domain.student.people[p.person_id].telegramId,null);assert.deepEqual(f.store.state.domain.staff,{});
   assert.deepEqual((await f.client.exams(session.access_token)).data,[]);

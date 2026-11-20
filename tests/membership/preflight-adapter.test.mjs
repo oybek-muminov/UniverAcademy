@@ -23,7 +23,7 @@ function fixture(){
     {id:id(100),optionIds:[id(200),id(201),id(202),id(203)],correctOptionId:id(200),individualPoints:{numerator:5n,denominator:2n}},
     {id:id(101),optionIds:[id(204),id(205),id(206),id(207)],correctOptionId:id(204),individualPoints:{numerator:5n,denominator:2n}}]};
   return {student:{people:{[P]:{telegramId:null,enabled:true,profile:{person_id:P,roles:["student"],registration_complete:true,
-      active_group_id:G,first_name:"Port",last_name:"Synthetic",qadam_id:"0100000001"}}},families:{},access:{},refresh:{},consumedInitData:{},
+      active_group_id:G,first_name:"Port",last_name:"Synthetic",univeracademy_id:"0100000001"}}},families:{},access:{},refresh:{},consumedInitData:{},
     grants:{[P]:{[J]:{rostered:true,membershipEpoch:7,grantEpoch:7}}},
     assignments:{[J]:{admission:{assignmentId:J,groupId:G,activeGroupId:G,rostered:true,profileComplete:true,membershipEpoch:7,grantEpoch:7,opensAt:C-1000,closesAt:C+1000},published:clone(published),title:"Literal preflight",instructions:[],contents:{},cancelled:false,
       reviewGate:{id:id(50),status:"blocked",revision:0,barrier_revision:0,barrier_complete:false,eligible_unresolved_count:1,active_count:0,recovery_ready_count:0,timezone:"Asia/Tashkent",first_opened_at:null,opens_at:null,closes_at:null}}},

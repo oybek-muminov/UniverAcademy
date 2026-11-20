@@ -18,7 +18,7 @@ test("production and local constructors share the same operation surface; produc
   assert.deepEqual(Object.keys(client),Object.keys(local));
   await client.telegramLogin({init_data:"synthetic-init-data"});await client.me("synthetic-access");
   await client.logoutByRefresh({refresh_token:"synthetic-refresh"});
-  for(const r of requests){assert.equal(r.redirect,"error");assert.equal(r.credentials,"omit");assert.equal(r.cache,"no-store");assert.equal(r.headers.get("accept"),"application/json");}
+  for(const r of requests){assert.equal(r.redirect,"error");assert.equal(r.credentials,"omit");assert.equal(r.cache,"no-store");assert.equal(r.headers.get("accept"),"application/json; profile=univeracademy-id-v2");}
   assert.equal(requests[0].url,"https://api.univeracademy.uz/api/v1/auth/telegram");assert.equal(requests[0].headers.get("authorization"),null);
   assert.equal(requests[1].headers.get("authorization"),"Bearer synthetic-access");
   assert.equal(requests[2].headers.get("authorization"),null);assert.deepEqual(await requests[2].json(),{refresh_token:"synthetic-refresh"});

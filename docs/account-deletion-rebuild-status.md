@@ -19,7 +19,7 @@ Before activation: verify deployed PostgreSQL adapter and actual scoped request/
 
 A 404 status is unknown/expired, not proof of completed deletion. A failed request after uncertain commit may have created a job: retain receipt. Definite authorization rejection after confirmed rollback may clear only that new receipt, not the current cabinet session.
 
-Clerk-only accounts are never enumerated or deleted. Staff/owner deletion is fail-closed pending an explicit shared-resource transfer policy. Existing 10-digit IDs and current qadam_id names are not renamed by this change.
+Clerk-only accounts are never enumerated or deleted. Staff/owner deletion is fail-closed pending an explicit shared-resource transfer policy. Account deletion preserves the existing ten-digit UniverAcademy IDs of other accounts.
 
 ## Sources checked
 - https://clerk.com/docs/guides/sessions/session-tokens

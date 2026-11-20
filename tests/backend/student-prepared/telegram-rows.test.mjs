@@ -122,7 +122,7 @@ async function fixture(){
   const pool=new TelegramPool(),person=structuredClone(initialState().people[ids.person]);person.telegramId=null;
   person.profile.first_name='';person.profile.last_name='';person.profile.registration_complete=false;
   pool.data.people[ids.person]=person;pool.data.people[other]=structuredClone(person);
-  pool.data.people[other].profile.person_id=other;pool.data.people[other].profile.qadam_id='9999999999';
+  pool.data.people[other].profile.person_id=other;pool.data.people[other].profile.univeracademy_id='9999999999';
   for(const [id,p]of Object.entries(pool.data.people))pool.data.members[id]={active:p.profile.active_group_id!==null,epoch:0,revision:0,affinityGroupId:p.profile.active_group_id};
   const token='synthetic-profile-opaque-session',digest=await proofHash(token),family=crypto.randomUUID();
   pool.data.families[family]={personId:ids.person,expiresAt:clock+60000,revokedAt:null,logoutRetainUntil:null,authProvider:'clerk'};

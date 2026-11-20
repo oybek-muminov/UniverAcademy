@@ -1,4 +1,5 @@
 import {ApiFault} from '../supabase/functions/univeracademy-api/fault.ts';
+import {studentResponse} from '../supabase/functions/univeracademy-api/student-response.ts';
 import {createDeletionVerifier} from './account-deletion-verifier.mjs';
 import {requireFreshDeletionProof} from '../supabase/functions/univeracademy-api/account-deletion.ts';
 /** Review-only Telegram route. The fresh verifier is shared with sensitive
@@ -7,7 +8,7 @@ import {requireFreshDeletionProof} from '../supabase/functions/univeracademy-api
 export function createTelegramClerkEntryHttp({enabled=false,verifier,entry,allowedOrigins,timeoutMs=10000}={}){
  if(!Array.isArray(allowedOrigins)||!allowedOrigins.length||allowedOrigins.some(x=>{try{return new URL(x).origin!==x||!x.startsWith('https://');}catch{return true;}})||!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000)throw Error('Invalid entry configuration');
  const verify=createDeletionVerifier(verifier);
- const response=(status,code,origin,data)=>new Response(JSON.stringify(data?{data}:{error:{code,message:code}}),{status,headers:{'content-type':'application/json','cache-control':'no-store','vary':'Origin',...(origin?{'access-control-allow-origin':origin}:{})}});
+ const response=(status,code,origin)=>new Response(JSON.stringify({error:{code,message:code}}),{status,headers:{'content-type':'application/json','cache-control':'no-store','vary':'Origin',...(origin?{'access-control-allow-origin':origin}:{})}});
  return async request=>{
   const origin=request.headers.get('origin');
   if(!origin||!allowedOrigins.includes(origin))return response(403,'FORBIDDEN');
@@ -33,7 +34,7 @@ export function createTelegramClerkEntryHttp({enabled=false,verifier,entry,allow
    const fresh=await verify(token);requireFreshDeletionProof(fresh,verifier.now());
    if(request.signal.aborted)throw new ApiFault('SERVICE_UNAVAILABLE',503);
    const result=await entry.enter(fresh,body.init_data);
-   return response(200,null,origin,result);
+   return studentResponse(request,result,{'access-control-allow-origin':origin,'vary':'Origin'});
   }catch(e){return response(e instanceof ApiFault?e.status:503,e instanceof ApiFault?e.code:'SERVICE_UNAVAILABLE',origin);}
  };
 }

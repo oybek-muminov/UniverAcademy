@@ -10,6 +10,8 @@ import { spawnSync } from 'node:child_process';
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
 const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
+const brandOverlay = 'apps/mini-app/tests/fixtures/univeracademy-id-overlay.json';
+const brandManifest = JSON.parse(readFileSync(join(source,brandOverlay), 'utf8'));
 const deletionOverlay='apps/mini-app/tests/fixtures/backend-account-deletion-review-manifest.json';
 const deletionManifest=JSON.parse(readFileSync(join(source,deletionOverlay),'utf8'));
 const currentRuntime = 'apps/mini-app/tests/fixtures/backend-clerk-runtime-overlay-20261116.json';
@@ -17,6 +19,9 @@ const previousContentBase = 'apps/mini-app/tests/fixtures/backend-accepted-fixtu
 const previousAssembly = 'apps/mini-app/tests/fixtures/backend-telegram-return-assembly-manifest.json';
 const previousClean = 'apps/mini-app/tests/fixtures/backend-d54d19c-clean-manifest.json';
 const lab208 = 'apps/mini-app/tests/fixtures/backend-d54d19c-manifest.json';
+// Exact release sources used only to reconstruct immutable pre-rebrand negative fixtures.
+const historicStudentState = 'apps/mini-app/tests/fixtures/student-state-d62adb0.ts.txt';
+const historicListener = 'apps/mini-app/tests/fixtures/review-listener-d62adb0.mjs.txt';
 const historicalAttempts = 'apps/mini-app/tests/fixtures/attempts-8a750ee.ts.txt';
 const copies = ['student-client.ts', 'student-types.d.ts'].map(name => 'apps/mini-app/src/owner-client/' + name);
 const attempts = 'supabase/functions/univeracademy-api/attempts.ts';
@@ -39,7 +44,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay]]);
+const manifestErrors = new Map([['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -47,7 +52,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -102,6 +107,12 @@ function oldAttempts(root) {
 }
 
 test('current guard accepts exact corrected types base plus two Backend corrections and both owner copies', () => check());
+test('profile contract overlay is fixed by the release pin', () => check(root => {
+  appendFileSync(join(root, brandOverlay), '\n');
+}, 'BRAND_OVERLAY_MISMATCH'));
+test('a modified profile response adapter fails verification', () => check(root => {
+  appendFileSync(join(root, 'supabase/functions/univeracademy-api/student-response.ts'), '\n');
+}, 'BACKEND_TARGET_SIZE_MISMATCH: supabase/functions/univeracademy-api/student-response.ts'));
 test('stale source claim for historical 194-target checkpoint is rejected', () => check(root => {
   mutateCurrentManifest(root, value => { value.source_commit = '8a750ee01eed794bda1942bc1bd0e89829c3a704'; });
 }, 'RUNTIME_MANIFEST_MISMATCH'));
@@ -239,7 +250,7 @@ test('missing Clerk fixture dependency fails closed', () => check(root => {
 
 const studentState = 'supabase/functions/univeracademy-api/student-state.ts';
 function oldStudentState(root) {
-  const raw = readFileSync(join(root, studentState), 'utf8');
+  const raw = readFileSync(join(root, historicStudentState), 'utf8');
   assert.equal(sha(Buffer.from(raw)), '208f220a3b72a572a37ab0ffba6763193b67beb3732aebe521f2295039333f72');
   const provenance = '  // Existing standalone handlers may omit it. The Clerk candidate requires\n'
     + '  // explicit provenance for every active family; missing is never "telegram".\n'
@@ -257,7 +268,7 @@ test('exact pre-F1 unmarked student state is rejected', () => check(root => {
   writeFileSync(join(root, studentState), oldStudentState(root));
 }, 'BACKEND_TARGET_SIZE_MISMATCH: ' + studentState));
 test('pre-F1 student state padded to the current length is rejected', () => check(root => {
-  const old = oldStudentState(root); writeFileSync(join(root, studentState), Buffer.concat([old, Buffer.alloc(7532 - old.length, 32)]));
+  const old = oldStudentState(root); writeFileSync(join(root, studentState), Buffer.concat([old, Buffer.alloc(lstatSync(join(root, studentState)).size - old.length, 32)]));
 }, 'BACKEND_TARGET_HASH_MISMATCH: ' + studentState));
 test('missing F1 family-context regression dependency fails closed', () => check(root => {
   rmSync(join(root, 'tests/clerk-auth/family-context.test.mjs'));
@@ -497,7 +508,7 @@ const reverseListenerEdit = [
   "  const base = JSON.parse(readFileSync(new URL(\"../../contracts/review-only.openapi.json\", import.meta.url)));\n  assert.equal(createHash(\"sha256\").update(raw).digest(\"hex\"), STUDENT_CONTRACT_SHA256);\n  assert.equal(review.info.version, STUDENT_CONTRACT_VERSION);\n  assert.equal(review['x-status'], STUDENT_CONTRACT_REVIEW_STATUS);\n  assert.equal(review['x-status'], \"PROVISIONAL / NOT ACCEPTED\");\n"
 ];
 function staleListenerContent(root) {
-  let text = readFileSync(join(root, listenerContentPath), 'utf8');
+  const text = readFileSync(join(root, historicListener), 'utf8');
   assert.equal(Buffer.byteLength(text), 11661, 'LISTENER_FIXTURE_PREPARATION_MISMATCH');
   assert.equal(sha(Buffer.from(text)), "095432668b0a0cac2b6e31df574e9da0ddb490a79f9ebbc3dc1bbff8e2a44c78", 'LISTENER_FIXTURE_PREPARATION_MISMATCH');
   const [from,to]=reverseListenerEdit;
@@ -511,7 +522,7 @@ function staleListenerContent(root) {
 }
 for(const padded of [false,true])test('actual stale listener content rejected; padded='+padded,()=>check(root=>{
  const raw=staleListenerContent(root);
- writeFileSync(join(root,listenerContentPath),padded?Buffer.concat([raw,Buffer.alloc(461,32)]):raw);
+ writeFileSync(join(root,listenerContentPath),padded?Buffer.concat([raw,Buffer.alloc(lstatSync(join(root,listenerContentPath)).size - raw.length,32)]):raw);
 },(padded?'BACKEND_TARGET_HASH_MISMATCH: ':'BACKEND_TARGET_SIZE_MISMATCH: ')+listenerContentPath));
 const listenerCases=[
  ['missing second',v=>{v.content_overlays.pop();},'COUNT'],

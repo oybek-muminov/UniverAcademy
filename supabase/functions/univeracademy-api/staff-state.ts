@@ -14,7 +14,7 @@ export type Assignment = components["schemas"]["Assignment"];
 export type QuestionWrite = components["schemas"]["QuestionWrite"];
 export type Publish = components["schemas"]["Publish"];
 export type AuthoredQuestion = Omit<QuestionWrite, "expected_revision">;
-export const STAFF_CONTRACT_SHA = "9c7518f887aafacc5cf53b73d33a87d42b11a9fcd46730185b39360e62fe3bb4";
+export const STAFF_CONTRACT_SHA = "430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455";
 
 export type StaffAccessRecord = {
   personId: string; enabled: boolean; approved: boolean;

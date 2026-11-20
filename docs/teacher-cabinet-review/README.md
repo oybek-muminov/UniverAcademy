@@ -2,6 +2,8 @@
 
 Bu ko‘rib chiqish arxivi. Undagi patchlar va SQL takliflari ishga ulanmagan. Ularni birgalikda yoki ishlab turgan bazaga qo‘llamang. Hozirgi `main`da faol kod yo‘liga kiritilgan yagona yangi qism — [Ustozga kirish sahifasi](../../apps/mini-app/teacher-entrance/); u ham hali joylashtirilmagan. Bu arxiv Mini, Clerk, Telegram yoki hisobni o‘chirish oqimlarini o‘zgartirmaydi.
 
+Arxivdagi sxema, SQL va kod parchalari o‘zining ko‘rsatilgan commitiga tegishli. Yangi kabinet uchun identifikator nomi **UniverAcademy ID**. Joriy API maydoni va eski mijozlar bilan moslik [ID hujjati](../univeracademy-id.md)da.
+
 ## Nazoratchi uchun ish tartibi
 
 Avval [fayllar ro‘yxati va holati](FAYLLAR.md)ni o‘qing. Har bir papkadagi patchlarni faqat bitta yo‘nalish sifatida, alohida ish nusxasida ko‘rib chiqing. Amaldagi `main` bilan taqqoslang: dastlabki ishlanmalar `3dbb714f2f758c7dbe03548a71c161718cf9cb53` bazasiga tayangan. Ko‘rsatilgan tartib texnik bog‘liqlikni bildiradi, deploy yoki ruxsat berish ko‘rsatmasi emas. Ko‘p asosiy patchlar birgalikda statik tekshirilgan; hammasi birgalikda qo‘llanmagan. Bitta o‘zgarishning bir necha varianti bor.

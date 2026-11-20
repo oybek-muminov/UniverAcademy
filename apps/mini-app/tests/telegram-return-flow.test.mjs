@@ -40,7 +40,7 @@ after(() => {
 
 function harness(options = {}) {
   const requests = [], sdkProofs = [];
-  const profile = { person_id: A, first_name: 'Edited', last_name: 'Preserved', qadam_id: '0000000001',
+  const profile = { person_id: A, first_name: 'Edited', last_name: 'Preserved', univeracademy_id: '0000000001',
     roles: ['student'], active_group_id: null, registration_complete: true, ...options.profile };
   let linked = false, unsafeReads = 0;
   const bridge = { initData: RAW };

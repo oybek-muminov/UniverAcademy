@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
-const PINNED = new Set(["49defb7dcdf455a6daf26e1354f890d309b3eabd8604b61d33172edbc555e010",
+const PINNED = new Set(["430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455",
+  "49defb7dcdf455a6daf26e1354f890d309b3eabd8604b61d33172edbc555e010",
   "f6226aa1cea63ae1fbc603b80aed9232bc4dd5213c4cc081cc13300ee0179b28", // exchange-only PROVISIONAL review
   "280503a6a306c62e60dacea8a067137b37bcde151e6c2101d0beb4cbe09a25eb",
   "882f3b9fd8e3693903f1af44deadb6535ae97132ddff01f3f4622caf580d63f6",

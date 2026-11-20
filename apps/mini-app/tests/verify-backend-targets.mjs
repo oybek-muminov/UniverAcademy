@@ -706,6 +706,19 @@ for(const file of deletion.files){
  assert(Number.isSafeInteger(file.result.bytes)&&file.result.bytes>=0&&/^[a-f0-9]{64}$/.test(file.result.sha256));
  selected.set(file.path,file.result);
 }
+// Pin the renamed profile contract without rewriting any earlier release manifest.
+// A null previous hash means this path was outside the earlier guard's scope.
+const BRAND_OVERLAY_SHA256 = '7e0a77d9b17aa9effcda013bd1692d99b251669bde82c0231eda91dd208a7944';
+const brandRaw = readTarget('apps/mini-app/tests/fixtures/univeracademy-id-overlay.json');
+assert.equal(sha256(brandRaw), BRAND_OVERLAY_SHA256, 'BRAND_OVERLAY_MISMATCH');
+const brand = JSON.parse(brandRaw);
+assert.equal(brand.base_commit, 'd62adb0f090b3e964450163d6607387c248d56bc');
+for (const file of brand.files) {
+  assert(canonicalPath(file.path), 'BRAND_TARGET_PATH_INVALID');
+  assert.equal(selected.get(file.path)?.sha256 ?? null, file.previous_sha256,
+    'BRAND_PREIMAGE_MISMATCH: ' + file.path);
+  selected.set(file.path, { path: file.path, bytes: file.bytes, sha256: file.sha256 });
+}
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {
@@ -716,7 +729,7 @@ for (const file of selected.values()) {
   assert.equal(sha256(bytes), file.sha256, `BACKEND_TARGET_HASH_MISMATCH: ${file.path}`);
 }
 for (const name of ['student-client.ts', 'student-types.d.ts']) {
-  const target = runtime.files.find(file => file.path === 'packages/api-client/' + name);
+  const target = selected.get('packages/api-client/' + name);
   assert(target, 'OWNER_CLIENT_TARGET_MISSING');
   const bytes = readTarget('apps/mini-app/src/owner-client/' + name);
   assert.equal(bytes.length, target.bytes, `OWNER_CLIENT_SIZE_MISMATCH: ${name}`);

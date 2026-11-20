@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-for(const test of ['native-atomic.test.mjs']){
+for(const test of ['native-atomic.test.mjs','native-cabinet-id.test.mjs']){
 const root=await mkdtemp(join(tmpdir(),'ua-delete-native-'));
 const password=randomBytes(24).toString('hex');
 const port=55435;

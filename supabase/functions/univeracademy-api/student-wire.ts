@@ -14,7 +14,7 @@ export function profileWire(person: Person) {
   const p = person.profile;
   return { person_id: p.person_id, first_name: p.first_name, last_name: p.last_name,
     roles: [...p.roles], registration_complete: p.registration_complete,
-    active_group_id: p.active_group_id, qadam_id: p.qadam_id };
+    active_group_id: p.active_group_id, univeracademy_id: p.univeracademy_id };
 }
 export function numberWire(value: Ratio, policy: NumericPresentation | undefined): number {
   if (!policy?.policyId || typeof policy.toFiniteNumber !== "function") {

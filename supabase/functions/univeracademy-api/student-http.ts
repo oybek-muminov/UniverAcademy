@@ -1,4 +1,5 @@
 import { ApiFault, fail } from "./fault.ts";
+import { studentResponse } from "./student-response.ts";
 import { startAttempt, saveAnswer, studentView, submitAttempt, result } from "./attempts.ts";
 import type { AttemptRecord, StudentAccess } from "./attempts.ts";
 import { verifyTelegramInitData } from "./telegram.ts";
@@ -287,7 +288,7 @@ export function createStudentHttpHandler(deps: StudentHttpDependencies) {
       });
       // A committed transaction has resolved. Mapping/serialization errors cannot undo expiry.
       const data = done.render();
-      return new Response(JSON.stringify({ data }), { status: 200, headers });
+      return studentResponse(request, data);
     } catch (error) {
       const fault = error instanceof ApiFault ? error : new ApiFault("INTERNAL_ERROR", 500);
       return new Response(JSON.stringify({ error: { code: fault.code, message: fault.code,

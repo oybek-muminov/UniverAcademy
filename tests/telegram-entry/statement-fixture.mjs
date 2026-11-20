@@ -55,7 +55,7 @@ export class Pool{
       else if(name==="ua_clerk_refresh")rows=Object.entries(draft.refresh).filter(([,r])=>draft.families[r.familyId]?.personId===owner).map(([key,r])=>({digest:key,family_id:r.familyId,consumed:r.consumed}));
       if(rows)return result(this.inject?this.inject(name,rows):structuredClone(rows));
       if(name==="ua_clerk_person_insert"){
-        if(draft.people[v[0]]||Object.values(draft.people).some(p=>p.profile.qadam_id===v[1]))return result([]);
+        if(draft.people[v[0]]||Object.values(draft.people).some(p=>p.profile.univeracademy_id===v[1]))return result([]);
         draft.people[v[0]]={telegramId:null,enabled:v[2],profile:JSON.parse(v[4])};
       }else if(name==="ua_clerk_member_insert")draft.members[v[0]]={active:false,epoch:0,revision:0,affinityGroupId:null};
       else if(name==="ua_clerk_identity_insert"){

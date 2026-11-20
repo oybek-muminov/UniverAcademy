@@ -44,7 +44,7 @@ test('renderer rejects numbers, exponents, whitespace and trailing line terminat
 
 test('owner-pinned point guard accepts1dp only; percentage remains2dp', () => {
   const packet = JSON.parse(readFileSync(new URL('./fixtures/wire.json', import.meta.url), 'utf8'));
-  assert.equal(packet.contract_sha256, '280503a6a306c62e60dacea8a067137b37bcde151e6c2101d0beb4cbe09a25eb');
+  assert.equal(packet.contract_sha256, '430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455');
   const source = structuredClone(packet.cases.ordinaryResult.data);
   const mapper = createWireMap({ assetUrl: value => value });
   assert.equal(mapper.result(source, source.attempt_id).earned, '1.5');

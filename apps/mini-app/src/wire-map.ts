@@ -54,8 +54,8 @@ export function createWireMap(policy: Policy) {
   }
   function profile(value: unknown): Student {
     const v = object(value);
-    const displayId = v.qadam_id === null ? '—' : text(v.qadam_id);
-    if (v.qadam_id !== null && !/^\d{10}$/.test(displayId)) bad();
+    const displayId = v.univeracademy_id === null ? '—' : text(v.univeracademy_id);
+    if (v.univeracademy_id !== null && !/^\d{10}$/.test(displayId)) bad();
     return { person: id(v.person_id), firstName: text(v.first_name), lastName: text(v.last_name),
       registrationComplete: bool(v.registration_complete), displayId };
   }

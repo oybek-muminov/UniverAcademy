@@ -26,8 +26,8 @@ test("algorithm/key/audience profile is explicit; unknown-key failure differs fr
   await assert.rejects(verify(await f.sign({privateKey:other.privateKey})),e=>e.status===401);
   await assert.rejects(verify(await f.sign({algorithm:"HS256",privateKey:new Uint8Array(32)})),e=>e.status===401);
   await assert.rejects(verify(await f.sign({claims:{aud:"another-api"}})),e=>e.status===401);
-  const required=createClerkVerifier({...f.verifier,audience:{kind:"required",value:"qadam-api"}});
-  await assert.rejects(required(await f.sign()),e=>e.status===401);await required(await f.sign({claims:{aud:"qadam-api"}}));
+  const required=createClerkVerifier({...f.verifier,audience:{kind:"required",value:"univeracademy-api"}});
+  await assert.rejects(required(await f.sign()),e=>e.status===401);await required(await f.sign({claims:{aud:"univeracademy-api"}}));
   const unavailable=createClerkVerifier({...f.verifier,trustedKeys:async()=>{throw Error("synthetic resolver outage");}});
   await assert.rejects(unavailable(await f.sign()),e=>e.status===503);
   for(const change of [{issuer:"http://clerk.example.com"},{authorizedParties:[]},{audience:undefined},{trustedKeys:undefined}])

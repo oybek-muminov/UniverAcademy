@@ -41,7 +41,7 @@ export async function clerkFixture({fresh=false,legacyTelegram=false,now}={}){
     bind(users.student,ids.person);
     for(const [role,userId]of Object.entries({admin:users.admin,teacher:users.teacher,owner:users.owner})){
       const personId=staffIds[role],record=domain.staff["synthetic-"+role];
-      domain.student.people[personId]={telegramId:null,enabled:true,profile:{person_id:personId,first_name:"Synthetic",last_name:role,roles:[role],registration_complete:true,active_group_id:null,qadam_id:null}};
+      domain.student.people[personId]={telegramId:null,enabled:true,profile:{person_id:personId,first_name:"Synthetic",last_name:role,roles:[role],registration_complete:true,active_group_id:null,univeracademy_id:null}};
       domain.staff[userId]=structuredClone(record);bind(userId,personId);
     }
   }
@@ -55,7 +55,7 @@ export async function clerkFixture({fresh=false,legacyTelegram=false,now}={}){
       .setProtectedHeader({alg:algorithm,kid:jwk.kid,...headers}).sign(privateKey);
   };
   const call=async(method,path,body,token,extraHeaders={})=>{
-    const r=await handler(new Request("https://api.example.com/api/v1"+path,{method,headers:{...(token?{authorization:"Bearer "+token}:{}),...(body!==undefined?{"content-type":"application/json"}:{}),...extraHeaders},...(body!==undefined?{body:typeof body==="string"?body:JSON.stringify(body)}:{})}));
+    const r=await handler(new Request("https://api.example.com/api/v1"+path,{method,headers:{accept:"application/json; profile=univeracademy-id-v2",...(token?{authorization:"Bearer "+token}:{}),...(body!==undefined?{"content-type":"application/json"}:{}),...extraHeaders},...(body!==undefined?{body:typeof body==="string"?body:JSON.stringify(body)}:{})}));
     return{status:r.status,json:await r.json()};
   };
   const exchange=async(token,body={})=>call("POST","/auth/clerk",body,token);

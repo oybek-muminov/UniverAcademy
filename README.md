@@ -46,6 +46,10 @@ Mini App build sozlamalari: [production.env.example](apps/mini-app/production.en
 
 `wrangler.api.jsonc`, bot konfiguratsiyasi va `vercel.json` hosting adapterlariga tegishli. API, baza, binding va Mini App hosting sozlamalarini tugatmasdan deploy qilinmaydi. Lokal test yoki build muvaffaqiyati ishlayotgan production integratsiyasini anglatmaydi. `npm start` zarur server konfiguratsiyasi berilmaguncha `CONFIG_REQUIRED` holatida qoladi.
 
+## UniverAcademy ID
+
+O‘quvchining o‘n raqamli UniverAcademy ID qiymati matn sifatida saqlanadi. Boshidagi nollar hisob raqamining bir qismidir. Mijozlarni yangilash tartibi [ID mosligi va chiqarish ketma-ketligi](docs/univeracademy-id.md)da.
+
 ## Ish qoidalari va litsenziya
 
 O‘zgarish va yuklash chegaralari: [AGENTS.md](AGENTS.md). Ishlatilgan shadcn kodining [MIT bildirishnomasi](apps/landing/THIRD_PARTY_LICENSE_SHADCN.md) saqlanadi.

@@ -2,8 +2,9 @@ import type { components } from "./student-types.d.ts";
 
 type Schema = components["schemas"];
 export type StudentSchema = Schema;
-export const STUDENT_CONTRACT_SHA256 = "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c";
-export const STUDENT_CONTRACT_VERSION = "0.3.1-telegram-return-review.1";
+export const STUDENT_CONTRACT_SHA256 = "430a2be52599c46f49ef1263ff579cd5c993954f62b7a37fd1a10814c8d05455";
+export const STUDENT_PROFILE_ACCEPT = "application/json; profile=univeracademy-id-v2";
+export const STUDENT_CONTRACT_VERSION = "0.3.2-univeracademy-id.1";
 export const STUDENT_CONTRACT_REVIEW_STATUS = "PROVISIONAL / NOT ACCEPTED";
 
 export class StudentClientProtocolError extends Error {
@@ -73,7 +74,7 @@ export function createProductionStudentClient(options: ProductionStudentClientOp
 function buildStudentClient(root: string, transport: (request: Request) => Promise<Response>, production: boolean) {
   async function send<T>(method: string, path: string,
     args: { accessToken?: string; body?: unknown; idempotencyKey?: string } = {}): Promise<T> {
-    const headers = new Headers({ accept: "application/json" });
+    const headers = new Headers({ accept: STUDENT_PROFILE_ACCEPT });
     if (args.accessToken) headers.set("authorization", `Bearer ${args.accessToken}`);
     if (args.idempotencyKey !== undefined) headers.set("idempotency-key", args.idempotencyKey);
     if (args.body !== undefined) headers.set("content-type", "application/json");

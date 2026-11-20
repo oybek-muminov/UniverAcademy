@@ -1,3 +1,4 @@
+import { readStoredProfile } from "./stored-profile.ts";
 import { fail } from "../fault.ts";
 import type { AssignmentRecord, Person, SeriesRecord, StudentState } from "../student-state.ts";
 import { AttemptRows, decodePublished, decodeRatio } from "./attempt-rows.ts";
@@ -14,7 +15,7 @@ export class StudentHttpRows {
     own(tx, personId);
     const p = (await query(tx, "ua_http_person", "SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1", [personId])).rows[0];
     if (!p) fail("NOT_FOUND", 404);
-    const profile = p.profile as Person["profile"];
+    const profile = readStoredProfile(p.profile);
     if (profile.person_id !== personId || !same(profile.roles, p.roles) || typeof p.enabled !== "boolean") fail("RESPONSE_INVARIANT_FAILED", 500);
     const s: StudentState = { people: { [personId]: { telegramId: p.telegram_id===null?null:integer(p.telegram_id), enabled: p.enabled, profile } },
       families: {},access: {},refresh: {},consumedInitData: {},grants: {[personId]:{}},assignments: {},series: {},attempts: {},receipts: {},bonuses: {},cancellations: {} };
@@ -66,7 +67,7 @@ export class StudentHttpRows {
     if (!same(Object.keys(after.people),[personId])) fail("SESSION_REVOKED",401); // Initial identity creation is not implemented here.
     const a=after.people[personId], b=before.people[personId];
     const identity=(p:Person)=>({telegramId:p.telegramId,enabled:p.enabled,personId:p.profile.person_id,roles:p.profile.roles,
-      group:p.profile.active_group_id,qadam:p.profile.qadam_id});
+      group:p.profile.active_group_id,cabinetId:p.profile.univeracademy_id});
     if(!same(identity(a),identity(b))) fail("RESPONSE_INVARIANT_FAILED",500);
     if(!this.options.externalAuthWriter&&!same(a.profile,b.profile)) {
       const r=await query(tx,"ua_http_profile_write","UPDATE ua_private.people SET profile=$1::jsonb WHERE id=$2 RETURNING id",[JSON.stringify(a.profile),personId]);

@@ -29,7 +29,7 @@ export function AccountDashboard({ student, flow, busy, onLogout, onDeleteAccoun
   return <section className="account-dashboard" aria-label="Hisob boshqaruvi">
     <form className="card" onSubmit={event => { event.preventDefault(); if (!locked) void save(event.currentTarget); }}>
       <h2>Shaxsiy ma’lumotlar</h2>
-      <p className="account-id">ID: {student.displayId}</p>
+      <p className="account-id">UniverAcademy ID: {student.displayId}</p>
       <label htmlFor="dashboard-first-name">Ism</label>
       <input id="dashboard-first-name" name="firstName" defaultValue={student.firstName} required maxLength={100} autoComplete="given-name" disabled={locked} />
       <label htmlFor="dashboard-last-name">Familiya</label>

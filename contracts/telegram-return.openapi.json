@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "UniverAcademy API — ordinary scoring and optional statistical bonus",
-    "version": "0.3.1-telegram-return-review.1",
-    "description": "PROVISIONAL / NOT ACCEPTED. Telegram link/resume derived review; prior endpoints retained byte-equivalent as JSON values. No runtime or deployment acceptance."
+    "version": "0.3.2-univeracademy-id.1",
+    "description": "PROVISIONAL / NOT ACCEPTED. The schemas in this contract describe the UniverAcademy ID representation. Profile and session clients select it using Accept: application/json; profile=univeracademy-id-v2. An unversioned request keeps the previous response format during rollout."
   },
   "servers": [
     {
@@ -31,7 +31,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -97,7 +97,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -239,7 +239,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessProfile"
                 }
@@ -297,7 +297,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessProfile"
                 }
@@ -1387,7 +1387,7 @@
       "post": {
         "operationId": "staffLogout",
         "summary": "staffLogout",
-        "description": "Qadam provider-session ledger immediate revocation before SDK signOut. Recognized repeated logout idempotent; other admin APIs deny revoked session. Provider refresh cannot bypass ledger. Staff auth separate from Telegram families.",
+        "description": "UniverAcademy provider-session ledger immediate revocation before SDK signOut. Recognized repeated logout idempotent; other admin APIs deny revoked session. Provider refresh cannot bypass ledger. Staff auth separate from Telegram families.",
         "security": [
           {
             "StaffJWT": []
@@ -1621,7 +1621,7 @@
       "get": {
         "operationId": "students",
         "summary": "students",
-        "description": "Scope before search/count/page: Admin all-group read confirmed; Teacher own-group students/results and approved-subject content-wide demos. Pending applicants denied. Request visibility requester/authorized approver only; no client role trust. Exact qadam_id optional filter inside existing authorized directory; no global expansion. Initial candidates use /admin/students/unassigned or /lookup.",
+        "description": "Scope before search/count/page: Admin all-group read confirmed; Teacher own-group students/results and approved-subject content-wide demos. Pending applicants denied. Request visibility requester/authorized approver only; no client role trust. Exact univeracademy_id optional filter inside existing authorized directory; no global expansion. Initial candidates use /admin/students/unassigned or /lookup.",
         "security": [
           {
             "StaffJWT": []
@@ -1662,10 +1662,10 @@
             }
           },
           {
-            "name": "qadam_id",
+            "name": "univeracademy_id",
             "in": "query",
             "schema": {
-              "$ref": "#/components/schemas/QadamId"
+              "$ref": "#/components/schemas/UniverAcademyId"
             }
           }
         ],
@@ -4355,14 +4355,14 @@
                   "const": "no-store"
                 }
               },
-              "X-Qadam-Snapshot-At": {
+              "X-UniverAcademy-Snapshot-At": {
                 "schema": {
                   "type": "string",
                   "format": "date-time",
                   "pattern": "Z$"
                 }
               },
-              "X-Qadam-Report-Revision": {
+              "X-UniverAcademy-Report-Revision": {
                 "schema": {
                   "type": "integer",
                   "minimum": 0
@@ -5324,7 +5324,7 @@
       "get": {
         "operationId": "lookupStudentForRoster",
         "summary": "lookupStudentForRoster",
-        "description": "O-01 exact ten-digit Qadam ID lookup for target group placement. Teacher current own-group manage_roster required; disclose only never-placed registered pupil or inactive pupil with same retained affinity. Wrong ID, other affinity, foreign current group or nonexistent pupil all404 NOT_FOUND with same envelope/timing class; never include that group/history/contact. Owner/Admin need source+target roster scope before any disclosure. No partial-ID or broad name search. Lookup grants no placement authority; mutation rechecks under locks.",
+        "description": "O-01 exact ten-digit UniverAcademy ID lookup for target group placement. Teacher current own-group manage_roster required; disclose only never-placed registered pupil or inactive pupil with same retained affinity. Wrong ID, other affinity, foreign current group or nonexistent pupil all404 NOT_FOUND with same envelope/timing class; never include that group/history/contact. Owner/Admin need source+target roster scope before any disclosure. No partial-ID or broad name search. Lookup grants no placement authority; mutation rechecks under locks.",
         "security": [
           {
             "StaffJWT": []
@@ -5341,11 +5341,11 @@
             }
           },
           {
-            "name": "qadam_id",
+            "name": "univeracademy_id",
             "in": "query",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/QadamId"
+              "$ref": "#/components/schemas/UniverAcademyId"
             }
           }
         ],
@@ -5599,7 +5599,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -5724,7 +5724,7 @@
               }
             },
             "content": {
-              "application/json": {
+              "application/json; profile=univeracademy-id-v2": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessSession"
                 }
@@ -6032,10 +6032,10 @@
               }
             ]
           },
-          "qadam_id": {
+          "univeracademy_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/QadamId"
+                "$ref": "#/components/schemas/UniverAcademyId"
               },
               {
                 "type": "null"
@@ -6050,7 +6050,7 @@
           "roles",
           "registration_complete",
           "active_group_id",
-          "qadam_id"
+          "univeracademy_id"
         ],
         "allOf": [
           {
@@ -6068,14 +6068,14 @@
             },
             "then": {
               "properties": {
-                "qadam_id": {
-                  "$ref": "#/components/schemas/QadamId"
+                "univeracademy_id": {
+                  "$ref": "#/components/schemas/UniverAcademyId"
                 }
               }
             },
             "else": {
               "properties": {
-                "qadam_id": {
+                "univeracademy_id": {
                   "type": "null"
                 }
               }
@@ -7684,8 +7684,8 @@
             "type": "integer",
             "minimum": 0
           },
-          "qadam_id": {
-            "$ref": "#/components/schemas/QadamId"
+          "univeracademy_id": {
+            "$ref": "#/components/schemas/UniverAcademyId"
           }
         },
         "required": [
@@ -7694,9 +7694,9 @@
           "last_name",
           "active_group_id",
           "membership_revision",
-          "qadam_id"
+          "univeracademy_id"
         ],
-        "description": "Scoped student read supplies current membership_revision for transfer precondition. Admin/Owner all-group student scope; Teacher own-group/approved-subject students only. A revision is not mutation authorization. Includes permanent Qadam ID; standard directory remains scoped. Narrow initial-placement and same-affinity lookup use separate candidate routes."
+        "description": "Scoped student read supplies current membership_revision for transfer precondition. Admin/Owner all-group student scope; Teacher own-group/approved-subject students only. A revision is not mutation authorization. Includes permanent UniverAcademy ID; standard directory remains scoped. Narrow initial-placement and same-affinity lookup use separate candidate routes."
       },
       "Demo": {
         "type": "object",
@@ -8183,7 +8183,7 @@
           "body_encoding",
           "success_status_codes"
         ],
-        "description": "Capability for one quarantine object only. PUT exact original bytes, no multipart/base64; required_headers verbatim; never attach Qadam bearer/refresh to upload_url. Expiry clock enforced by storage; URL is secret. Retry only identical bytes while ticket valid, before complete; success statuses supplied by ticket. Completion seals snapshot; validation promotes separate immutable copy."
+        "description": "Capability for one quarantine object only. PUT exact original bytes, no multipart/base64; required_headers verbatim; never attach UniverAcademy bearer/refresh to upload_url. Expiry clock enforced by storage; URL is secret. Retry only identical bytes while ticket valid, before complete; success statuses supplied by ticket. Completion seals snapshot; validation promotes separate immutable copy."
       },
       "OutboxStatus": {
         "type": "object",
@@ -8699,7 +8699,7 @@
           "expected_revision",
           "expected_membership_revision"
         ],
-        "description": "O-01: group revision AND membership revision CAS. Teacher initial placement, own-group removal, or same-affinity re-add only; different-affinity placement requires privileged transfer. Removal guard is separate; transfer blocks only a started active attempt and revokes unstarted recovery eligibility. UUID selected through authorized directory/candidate; Qadam ID itself grants nothing."
+        "description": "O-01: group revision AND membership revision CAS. Teacher initial placement, own-group removal, or same-affinity re-add only; different-affinity placement requires privileged transfer. Removal guard is separate; transfer blocks only a started active attempt and revokes unstarted recovery eligibility. UUID selected through authorized directory/candidate; UniverAcademy ID itself grants nothing."
       },
       "TeacherAssignment": {
         "type": "object",
@@ -12339,7 +12339,7 @@
         "description": "Confirmed project examination timezone: Asia/Tashkent (Uzbekistan). Persist IANA name; derive midnight with timezone calendar, never truncate started duration.",
         "const": "Asia/Tashkent"
       },
-      "QadamId": {
+      "UniverAcademyId": {
         "type": "string",
         "pattern": "^[0-9]{10}$",
         "minLength": 10,
@@ -12354,8 +12354,8 @@
             "type": "string",
             "format": "uuid"
           },
-          "qadam_id": {
-            "$ref": "#/components/schemas/QadamId"
+          "univeracademy_id": {
+            "$ref": "#/components/schemas/UniverAcademyId"
           },
           "first_name": {
             "type": "string"
@@ -12375,7 +12375,7 @@
         },
         "required": [
           "student_id",
-          "qadam_id",
+          "univeracademy_id",
           "first_name",
           "last_name",
           "membership_revision",
@@ -13269,7 +13269,7 @@
       "owner",
       "explicitly_authorized_admin"
     ],
-    "qadam_id": "student permanent 10-digit string, unique DB constraint+collision retry, not auth",
+    "univeracademy_id": "student permanent 10-digit string, unique DB constraint+collision retry, not auth",
     "membership_affinity": "retained last placement group; changes only privileged transfer; remove never clears",
     "membership_revoke": "new epoch revokes old unstarted access; no automatic revival on re-add",
     "review_window_roles": [
@@ -13302,8 +13302,8 @@
   "x-upload-transport": {
     "method": "PUT",
     "body": "raw binary; exact declared byte_length and sha256",
-    "headers": "Only ticket required_headers plus browser-managed transport headers. No Qadam session token. Ticket must include Content-Type.",
-    "response": "Any listed success_status_codes permits complete; storage errors are provider status/body, not Qadam Error schema.",
+    "headers": "Only ticket required_headers plus browser-managed transport headers. No UniverAcademy session token. Ticket must include Content-Type.",
+    "response": "Any listed success_status_codes permits complete; storage errors are provider status/body, not UniverAcademy Error schema.",
     "retry": "Before complete: network/5xx may retry same ticket with exact same bytes while unexpired; 429 obey Retry-After within expiry. No blind retries after complete. Never change bytes under existing ticket.",
     "expiry": "Expired/403 storage response or uncertain expiry: stop PUT; create new ticket with new K and upload same selected bytes; old ticket/asset remains unreferenced and expires. Same K returns original immutable ticket, never extends expiry.",
     "complete": "POST complete with original ticket upload_id, sha256, expected_revision and K; response202 quarantined/validating or200 validated/rejected; same K safe after lost response, authorize every replay. Poll authorized GET asset; never reference until validated. No overwrite serving copy.",
@@ -13377,7 +13377,7 @@
       "enforcement": "server scope + proposed DB constraints; conflicts409 NORMAL_ATTEMPT_USED/ACTIVE_EXAM_OR_RECOVERY"
     },
     {
-      "rule": "permanent Qadam ID regex/unique; cryptographic uniform generation including leading zeroes; INSERT unique violation retry before returning success; no UUID replacement or auth use",
+      "rule": "permanent UniverAcademy ID regex/unique; cryptographic uniform generation including leading zeroes; INSERT unique violation retry before returning success; no UUID replacement or auth use",
       "enforcement": "server and PostgreSQL UNIQUE; bounded exhausted collision retries503 SERVICE_UNAVAILABLE"
     },
     {
@@ -13457,11 +13457,11 @@
         "#/components/schemas/MemberWrite"
       ],
       "acceptance_scenario": "F7 first placement navigation and teacher-owned schedule",
-      "status": "pilot O-01 first placement and same-affinity re-add/removal; minimal Qadam ID discovery",
+      "status": "pilot O-01 first placement and same-affinity re-add/removal; minimal UniverAcademy ID discovery",
       "runtime_verified": false,
       "contract_section_heading": "9. Staff endpoint summary",
       "source_decision_summary": "O‘quvchi birinchi kirishda ism-familiyasini o‘zi kiritsin. O‘qituvchi uni aniqlab, guruhga qo‘lda biriktirsin.",
-      "reconstruction_supersession": "O-01 adds Qadam ID discovery, Teacher removal and same-affinity re-add"
+      "reconstruction_supersession": "O-01 adds UniverAcademy ID discovery, Teacher removal and same-affinity re-add"
     },
     {
       "id": "P05",
@@ -14083,5 +14083,14 @@
     ],
     "private_lookup": "not an HTTP operation",
     "automatic_retry": false
+  },
+  "x-id-representation": {
+    "accept": "application/json; profile=univeracademy-id-v2",
+    "vary": "Accept",
+    "legacy_full_openapi_sha256": "2eab3a7848b8fc439ca73e3e4d768b8706ec80f3063dbd3eeaf6d4966249918c",
+    "legacy_source_commit": "d62adb0f090b3e964450163d6607387c248d56bc",
+    "identity": "The same permanent ten-character identifier, including leading zeroes, is used by both representations.",
+    "legacy_full_openapi_url": "https://github.com/oybek-muminov/UniverAcademy/blob/d62adb0f090b3e964450163d6607387c248d56bc/contracts/telegram-return.openapi.json",
+    "scope": "Applies to successful profile and session JSON responses. For clients sending bare application/json, use the frozen legacy contract referenced here. Staff directory, ID lookup and XLSX export are contract proposals without mounted handlers."
   }
 }
