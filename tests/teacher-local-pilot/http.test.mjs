@@ -79,6 +79,52 @@ const source = {
   ]
 };
 
+test('scheduled admission opens at the selected instant and ends at Tashkent midnight while each student keeps a personal timer',async t=>{
+  const app=await pilot(t),teacher=await app.actor('teacher'),first=await app.actor('student1'),second=await app.actor('student2');
+  const initial=(await first.dashboard()).serverNow;
+  const startsAt=Date.parse('2026-11-20T18:59:59.250Z'),midnight=Date.parse('2026-11-20T19:00:00Z');
+  const group=success(await teacher.command('createGroup',{name:'Jadval'}));
+  for(const id of ['0100000001','0100000002'])success(await teacher.command('addMember',{groupId:group.id,univeracademy_id:id}));
+  async function published(){
+    const draft=success(await teacher.command('importTest',source));
+    return success(await teacher.command('publishTest',{testId:draft.id}));
+  }
+  const spec={groupId:group.id,testId:(await published()).id,startsAt},key=randomUUID();
+  for(const value of [initial,initial-1,null,'2026-11-20T18:00:00Z',startsAt+0.5,Number.MAX_SAFE_INTEGER]){
+    const bad=await teacher.command('assignTest',{...spec,startsAt:value});
+    assert.equal(bad.response.status,422);assert.equal(bad.payload.error.code,'INVALID_TIME_WINDOW');
+  }
+  const assigned=success(await teacher.command('assignTest',spec,key));
+  assert.deepEqual([assigned.opensAt,assigned.closesAt,assigned.timezone],[startsAt,midnight,'Asia/Tashkent']);
+  const unopened=success(await teacher.command('assignTest',{...spec,testId:(await published()).id}));
+  assert.equal((await teacher.dashboard()).assignments.find(a=>a.id===assigned.id).opensAt,startsAt);
+  const getStatus=async(actor,id)=>(await actor.dashboard()).assignments.find(a=>a.id===id).status;
+  const start=(actor,id)=>actor.command('startAttempt',{assignmentId:id});
+  app.advance(startsAt-initial-1);
+  assert.equal(await getStatus(first,assigned.id),'scheduled');
+  assert.equal((await start(first,assigned.id)).payload.error.code,'ADMISSION_CLOSED');
+  app.advance(1);
+  assert.equal(await getStatus(first,assigned.id),'available');
+  const firstAttempt=success(await start(first,assigned.id));
+  assert.equal(Date.parse(firstAttempt.deadlineAt),startsAt+source.duration_seconds*1000);
+  // Successful receipt replay remains valid even after its startsAt has passed.
+  assert.deepEqual(success(await teacher.command('assignTest',spec,key)),assigned);
+  const conflict=await teacher.command('assignTest',{...spec,startsAt:startsAt+1000},key);
+  assert.equal(conflict.payload.error.code,'IDEMPOTENCY_CONFLICT');
+  app.advance(500);
+  const secondAttempt=success(await start(second,assigned.id));
+  assert.equal(Date.parse(secondAttempt.deadlineAt),Date.parse(firstAttempt.deadlineAt)+500);
+  app.advance(250);
+  assert.equal((await second.dashboard()).serverNow,midnight);
+  assert.equal(await getStatus(first,unopened.id),'closed');
+  assert.equal((await start(first,unopened.id)).payload.error.code,'ADMISSION_CLOSED');
+  assert.equal(await getStatus(first,assigned.id),'in_progress');
+  const resumed=success(await first.command('resumeAttempt',{attemptId:firstAttempt.id}));
+  assert.equal(resumed.deadlineAt,firstAttempt.deadlineAt);
+  success(await first.command('submitAttempt',{attemptId:firstAttempt.id}));
+  assert.equal(await getStatus(first,assigned.id),'submitted');
+});
+
 function noAnswerKey(value) {
   if (!value || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value)) {
@@ -264,6 +310,18 @@ test('a teacher can reopen a saved draft in a new session and continue it withou
   assert.equal((await newSession.command('updateDraft', {...input,expectedRevision:updated.revision})).response.status, 409);
 });
 
+test('teacher JSON files accept hours and retain previous second-based durations', async t => {
+  const teacher = await (await pilot(t)).actor('teacher');
+  const {duration_seconds, ...file} = source;
+  for (const [fields, seconds] of [[{duration_hours:0.5},1800], [{duration_seconds:3701},3701]]) {
+    const saved = success(await teacher.command('importTest',{...file,...fields}));
+    assert.equal(success(await teacher.command('readDraft',{testId:saved.id})).draft.duration_seconds,seconds);
+  }
+  for (const fields of [{duration_hours:25}, {duration_hours:1,duration_seconds}]) {
+    assert.equal((await teacher.command('importTest',{...file,...fields})).response.status,422);
+  }
+});
+
 test('TXT preview reports the source line to its teacher and only a valid preview can be saved as a draft', async t => {
   const f = await pilot(t), teacher = await f.actor('teacher'), student = await f.actor('student1');
   const initial = await teacher.dashboard();
@@ -283,7 +341,9 @@ test('TXT preview reports the source line to its teacher and only a valid previe
   assert.equal((await teacher.preview(legacy.replace('D) N\n', ''))).response.status, 422);
   const parsed = success(await teacher.preview('\uFEFF' + sample.replaceAll('\n','\r\n')));
   assert.equal(parsed.title, 'Kinematika — qisqa sinov');
-  assert.equal(parsed.duration_seconds,300);
+  assert.equal(parsed.duration_seconds,1800);
+  assert.equal(success(await teacher.preview(sample.replace('Vaqt (soat): 0,5','Vaqt (soniya): 301'))).duration_seconds,301);
+  assert.equal((await teacher.preview(sample.replace('0,5','24,1'))).response.status,422);
   assert.deepEqual(parsed.questions.map(q => q.options[q.correctIndex]), ['5 m/s','Tezlik']);
   assert.deepEqual(await teacher.dashboard(),initial);
   const draft = success(await teacher.command('importTest',parsed));

@@ -10,6 +10,8 @@ import { spawnSync } from 'node:child_process';
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
 const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
+const teacherScheduleOverlay = 'apps/mini-app/tests/fixtures/teacher-test-schedule-overlay.json';
+const teacherScheduleFiles = JSON.parse(readFileSync(join(source, teacherScheduleOverlay), 'utf8')).files;
 const teacherDraftOverlay = 'apps/mini-app/tests/fixtures/teacher-draft-edit-overlay.json';
 const teacherDraftFiles = JSON.parse(readFileSync(join(source, teacherDraftOverlay), 'utf8')).files;
 const teacherGroupCreationOverlay = 'apps/mini-app/tests/fixtures/teacher-group-creation-overlay.json';
@@ -60,7 +62,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['TEACHER_DRAFT_EDIT_OVERLAY_MISMATCH',teacherDraftOverlay],['TEACHER_GROUP_CREATION_OVERLAY_MISMATCH',teacherGroupCreationOverlay],['TEACHER_ENTRY_OVERLAY_MISMATCH', teacherEntryOverlay],['WORKER_CABINET_OVERLAY_MISMATCH', workerCabinetOverlay],['LIVE_OVERLAY_MISMATCH', liveOverlay],['PROFILE_RELEASE_OVERLAY_MISMATCH', profileReleaseOverlay],['REGISTRATION_OVERLAY_MISMATCH', registrationOverlay],['STAGING_OVERLAY_MISMATCH', stagingOverlay],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
+const manifestErrors = new Map([['TEACHER_TEST_SCHEDULE_OVERLAY_MISMATCH',teacherScheduleOverlay],['TEACHER_DRAFT_EDIT_OVERLAY_MISMATCH',teacherDraftOverlay],['TEACHER_GROUP_CREATION_OVERLAY_MISMATCH',teacherGroupCreationOverlay],['TEACHER_ENTRY_OVERLAY_MISMATCH', teacherEntryOverlay],['WORKER_CABINET_OVERLAY_MISMATCH', workerCabinetOverlay],['LIVE_OVERLAY_MISMATCH', liveOverlay],['PROFILE_RELEASE_OVERLAY_MISMATCH', profileReleaseOverlay],['REGISTRATION_OVERLAY_MISMATCH', registrationOverlay],['STAGING_OVERLAY_MISMATCH', stagingOverlay],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -68,7 +70,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, teacherDraftOverlay, ...teacherDraftFiles.map(file => file.path), teacherGroupCreationOverlay, ...teacherGroupCreationFiles.map(file => file.path), teacherEntryOverlay, ...teacherEntryFiles.map(file => file.path), workerCabinetOverlay, ...workerCabinetFiles.map(file => file.path), liveOverlay, ...liveFiles.map(file => file.path), profileReleaseOverlay, ...profileReleaseFiles.map(file => file.path), registrationOverlay, ...registrationFiles.map(file => file.path), stagingOverlay, ...stagingManifest.files.map(file => file.path), brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, teacherScheduleOverlay, ...teacherScheduleFiles.map(file => file.path), teacherDraftOverlay, ...teacherDraftFiles.map(file => file.path), teacherGroupCreationOverlay, ...teacherGroupCreationFiles.map(file => file.path), teacherEntryOverlay, ...teacherEntryFiles.map(file => file.path), workerCabinetOverlay, ...workerCabinetFiles.map(file => file.path), liveOverlay, ...liveFiles.map(file => file.path), profileReleaseOverlay, ...profileReleaseFiles.map(file => file.path), registrationOverlay, ...registrationFiles.map(file => file.path), stagingOverlay, ...stagingManifest.files.map(file => file.path), brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -129,6 +131,9 @@ test('the live cabinet transition pins its selected files', () => check(root => 
 test('the Worker cabinet transition pins its selected files', () => check(root => {
   appendFileSync(join(root, workerCabinetOverlay), '\n');
 }, 'WORKER_CABINET_OVERLAY_MISMATCH'));
+test('editing the teacher schedule manifest fails its independent digest', () => check(root => {
+  appendFileSync(join(root, teacherScheduleOverlay), '\n');
+}, 'TEACHER_TEST_SCHEDULE_OVERLAY_MISMATCH'));
 test('editing the teacher draft manifest fails its independent digest', () => check(root => {
   appendFileSync(join(root, teacherDraftOverlay), '\n');
 }, 'TEACHER_DRAFT_EDIT_OVERLAY_MISMATCH'));

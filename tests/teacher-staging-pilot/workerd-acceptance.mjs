@@ -135,6 +135,16 @@ try {
   assert.deepEqual(reloaded.draft,open.draft);
   assert.equal(reloaded.draft.questions[0].correct_option_id,key);
   await good(teacherUI.command('publishTest',{testId:draft.id}));
+  const {duration_seconds,...scheduledFile}=open.draft;
+  await rejected(teacherUI.command('importTest',{...open.draft,duration_hours:0.5}),422);
+  const scheduledDraft=await good(teacherUI.command('importTest',{...scheduledFile,title:'Rejali nazorat',duration_hours:0.5}));
+  assert.equal(scheduledDraft.duration_seconds,1800);
+  await good(teacherUI.command('publishTest',{testId:scheduledDraft.id}));
+  const startsAt=Date.now()+3_600_000;
+  const scheduled=await good(teacherUI.command('assignTest',{testId:scheduledDraft.id,groupId:g.id,startsAt}));
+  assert.equal(scheduled.opensAt,startsAt);
+  assert.equal((await good(student.dashboard())).assignments.find(row=>row.id===scheduled.id).status,'scheduled');
+  await rejected(student.command('startAttempt',{assignmentId:scheduled.id}),409);
   const assignment=await good(teacherUI.command('assignTest',{testId:draft.id,groupId:g.id}));
   const attempt=await good(student.command('startAttempt',{assignmentId:assignment.id})),q=attempt.questions[0];
   assert.doesNotMatch(JSON.stringify(attempt),/correct_option_id|Maxsus o‘qituvchi izohi/);

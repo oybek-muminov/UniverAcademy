@@ -63,37 +63,56 @@
       </section>
       <section id="testlar" class="page" hidden>
         <h1>Testlar</h1>
-        <div class="card">
-          <h2>Test tuzish</h2>
+        <div class="test-tabs" role="tablist" aria-label="Test bo‘limlari">
+          <button type="button" role="tab" id="tab-new" aria-controls="tests-new" aria-selected="true">Yangi test</button>
+          <button type="button" role="tab" id="tab-drafts" aria-controls="tests-drafts" aria-selected="false" tabindex="-1">Qoralamalar</button>
+          <button type="button" role="tab" id="tab-published" aria-controls="tests-published" aria-selected="false" tabindex="-1">Nashr qilingan testlar</button>
+        </div>
+        <section id="tests-new" role="tabpanel" aria-labelledby="tab-new">
           <label id="test-subject-label" hidden>Test fani<select id="test-subject" required disabled></select></label>
-          <div id="question-editor"></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h2>Test faylini yuklash</h2><span class="pilot-links"><a href="./sample.txt" download="univeracademy-test-namunasi.txt">TXT namunasi</a><a href="./sample.json" download="univeracademy-test-namunasi.json">JSON namunasi</a></span></div>
-          <form id="test-form">
-            <label>Test fayli (TXT yoki JSON)<input id="test-file" type="file" accept=".txt,.json,text/plain,application/json" required aria-describedby="test-format"></label>
-            <p id="test-format" class="hint">Har bir savol uchun to‘rtta javob yozing. TXT faylida to‘g‘ri javob qatorini <code>*</code>, qolgan uchta javobni <code>-</code> bilan boshlang. Faylni UTF-8 kodlashda saqlang.</p>
-            <div id="preview" hidden></div>
-            <div class="actions"><button type="button" id="edit-file" disabled>Faylni muharrirda ochish</button><button type="submit" id="save-draft" disabled>Fayldan qoralama saqlash</button></div>
-          </form>
-        </div>
-        <div class="card">
-          <h2>Mening testlarim</h2>
-          <p id="tests-empty" class="empty">Hali test yuklanmagan.</p>
-          <div id="test-content" hidden>
-            <label>Test<select id="saved-test"></select></label>
-            <p id="test-meta" class="hint"></p>
-            <button id="edit-saved" type="button" hidden>Qoralamani tahrirlash</button>
-            <button id="view-saved" type="button">Saqlangan savollarni ko‘rish</button>
-            <section id="saved-preview" hidden aria-label="Saqlangan test ko‘rinishi"></section>
-            <button id="publish-button" type="button">Testni nashr qilish</button>
-            <form id="assign-form" class="line-form" hidden>
-              <label>Test beriladigan guruh<select id="assignment-group" required></select></label>
-              <button type="submit" class="primary">Guruhga tayinlash</button>
-            </form>
-            <p id="assignment-info" class="hint"></p>
+          <div id="new-editor-slot">
+            <button type="button" id="start-new" hidden>Yangi test tuzish</button>
+            <div class="card" id="editor-card">
+              <h2 id="editor-heading">Test tuzish</h2>
+              <div id="question-editor"></div>
+            </div>
           </div>
-        </div>
+          <div class="card">
+            <div class="card-head"><h2>Test faylini yuklash</h2><span class="pilot-links"><a href="./sample.txt" download="univeracademy-test-namunasi.txt">TXT namunasi</a><a href="./sample.json" download="univeracademy-test-namunasi.json">JSON namunasi</a></span></div>
+            <form id="test-form">
+              <label>Test fayli (TXT yoki JSON)<input id="test-file" type="file" accept=".txt,.json,text/plain,application/json" required aria-describedby="test-format"></label>
+              <p id="test-format" class="hint">Har bir savol uchun to‘rtta javob yozing. TXT faylida to‘g‘ri javob qatorini <code>*</code>, qolgan uchta javobni <code>-</code> bilan boshlang. Faylni UTF-8 kodlashda saqlang.</p>
+              <div id="preview" hidden></div>
+              <div class="actions"><button type="button" id="view-file" disabled>O‘quvchi ko‘rinishi</button><button type="button" id="edit-file" disabled>Faylni muharrirda ochish</button><button type="submit" id="save-draft" disabled>Fayldan qoralama saqlash</button></div>
+            </form>
+          </div>
+        </section>
+        <section id="tests-drafts" role="tabpanel" aria-labelledby="tab-drafts" hidden>
+          <div class="card" id="test-library">
+            <p id="tests-empty" class="empty">Hali test yuklanmagan.</p>
+            <div id="test-content" hidden>
+              <label>Test<select id="saved-test"></select></label>
+              <p id="test-meta" class="hint"></p>
+              <button id="edit-saved" type="button" hidden>Qoralamani tahrirlash</button>
+              <button id="view-saved" type="button">O‘quvchi ko‘rinishi</button>
+              <button id="publish-button" type="button">Testni nashr qilish</button>
+              <form id="assign-form" class="line-form" hidden>
+                <label>Test beriladigan guruh<select id="assignment-group" required></select></label>
+                <fieldset class="schedule-choice">
+                  <legend>Test qachon boshlanadi?</legend>
+                  <label><input type="radio" name="start-mode" value="now" required>Hozir boshlash</label>
+                  <label><input type="radio" name="start-mode" value="scheduled" required>Sana va vaqtni belgilash</label>
+                </fieldset>
+                <label id="assignment-start-label" hidden>Boshlanish sanasi va vaqti (Toshkent vaqti)<input id="assignment-start" type="datetime-local" step="60" disabled></label>
+                <p class="hint">O‘quvchilar belgilangan kuni Toshkent vaqti bilan yarim tungacha testni boshlashi mumkin.</p>
+                <button type="submit" class="primary">Guruhga tayinlash</button>
+              </form>
+              <p id="assignment-info" class="hint"></p>
+            </div>
+          </div>
+          <div id="draft-editor-slot"></div>
+        </section>
+        <section id="tests-published" role="tabpanel" aria-labelledby="tab-published" hidden></section>
       </section>
       <section id="natijalar" class="page" hidden>
         <div class="page-heading"><h1>Natijalar</h1><button type="button" id="refresh-results">Yangilash</button></div>
@@ -109,3 +128,9 @@
       <noscript>Kabinetdan foydalanish uchun brauzerda JavaScript yoqilgan bo‘lishi kerak.</noscript>
     </div>
   </div>
+  <dialog id="student-dialog" aria-modal="true" aria-labelledby="preview-heading">
+    <div class="preview-window">
+      <div class="preview-header"><h2 id="preview-heading">O‘quvchi ko‘rinishi</h2><button id="close-preview" type="button">Yopish</button></div>
+      <div id="preview-content"></div>
+    </div>
+  </dialog>

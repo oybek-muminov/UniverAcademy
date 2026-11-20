@@ -4,6 +4,7 @@ import { fail } from '../supabase/functions/univeracademy-api/fault.ts';
 import { nextRevision } from '../supabase/functions/univeracademy-api/staff-state.ts';
 import { writeDraftQuestion } from '../supabase/functions/univeracademy-api/staff-content.ts';
 import { validate } from './teacher-staging-contract.mjs';
+import { normalizeFileDuration } from '../packages/test-content/duration.mjs';
 import { validatePilotFormulas } from '../packages/test-content/validate-formula.mjs';
 
 const blocks = markdown => [{ type: 'text', markdown }];
@@ -75,7 +76,7 @@ function buildDraft(state, staff, input, now, subjectId, original) {
 }
 
 export function importDraft(state,staff,input,now,subjectId='physics'){
-  return buildDraft(state,staff,input,now,subjectId);
+  return buildDraft(state,staff,normalizeFileDuration(input),now,subjectId);
 }
 
 export function requireEditable(record){

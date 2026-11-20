@@ -6,6 +6,7 @@ import { mountTeacherWorkspace } from '/teacher/workspace.mjs';
 const prefix = '/local-pilot/teacher/';
 const maxBytes = 512 * 1024;
 const messages = {
+  INVALID_TIME_WINDOW: 'Boshlanish vaqtini tekshiring. Toshkent vaqti bo‘yicha kelajakdagi sana va vaqtni tanlang.',
   RESOURCE_REVISION_CONFLICT: 'Qoralama boshqa oynada o‘zgargan. So‘nggi nusxani «Qoralamani tahrirlash» orqali qayta oching.',
   DEMO_TITLE_SHARED: 'Bu nom testning boshqa versiyasida ham ishlatiladi. Savollarni tahrirlab saqlash uchun avvalgi nomni qoldiring.',
   VERSION_FROZEN: 'Bu test nashr qilingan. Testlar ro‘yxatini yangilang.',

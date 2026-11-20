@@ -11,7 +11,8 @@ export type PilotAttempt = {
 export type PilotResult = {attemptId?:string; title?:string; earned:string; maximum:string; percentage:string};
 export type PilotDashboard = {
   role:'student'; person_id:string; univeracademy_id:string; name:string; group:{id:string;name:string;status:string}|null;
-  assignments:{id:string;title:string;attemptId:string|null;status:string}[]; results:PilotResult[];
+  serverNow?:number;
+  assignments:{id:string;title:string;attemptId:string|null;status:string;opensAt?:number;closesAt?:number}[]; results:PilotResult[];
 };
 export type PilotCommands = {
   acceptInvite:[{token:string},{id:string;name:string}];
@@ -71,8 +72,12 @@ export function createStagingStudentPort(config: {
       if (value.role !== 'student' || value.person_id !== config.person || !Array.isArray(value.assignments) || !Array.isArray(value.results)) throw invalid();
       if (value.group !== null && (!value.group || typeof value.group.id !== 'string' || !value.group.id ||
           typeof value.group.name !== 'string' || !value.group.name || typeof value.group.status !== 'string')) throw invalid();
+      const validTime = (ms:unknown) => typeof ms === 'number' && Number.isSafeInteger(ms) && Math.abs(ms) <= 8.64e15;
+      if (value.serverNow !== undefined && !validTime(value.serverNow)) throw invalid();
       if (value.assignments.some(row => !row || typeof row.id !== 'string' || !row.id || typeof row.title !== 'string' ||
-          typeof row.status !== 'string' || !(row.attemptId === null || typeof row.attemptId === 'string')) ||
+          typeof row.status !== 'string' || ((row.opensAt !== undefined || row.status === 'scheduled') && !validTime(row.opensAt)) ||
+          (row.closesAt !== undefined && (!validTime(row.closesAt) || (row.opensAt !== undefined && row.closesAt <= row.opensAt))) ||
+          !(row.attemptId === null || typeof row.attemptId === 'string')) ||
           value.results.some(row => !row || typeof row.earned !== 'string' || typeof row.maximum !== 'string' || typeof row.percentage !== 'string' ||
           (row.title !== undefined && typeof row.title !== 'string') || (row.attemptId !== undefined && typeof row.attemptId !== 'string'))) throw invalid();
       return value;

@@ -1,3 +1,5 @@
+import { hoursFromSeconds, secondsFromHours } from '../../../packages/test-content/duration.mjs';
+
 function node(tag, text) {
   const item = document.createElement(tag);
   item.textContent = text;
@@ -23,30 +25,33 @@ function labelled(text, control) {
   return label;
 }
 export function showStudentView(box, draft, renderBlocks) {
-  box.replaceChildren(node('h3', 'O‘quvchi ko‘rinishi · ' + draft.title));
+  box.replaceChildren();
+  if (draft.instructions_blocks?.length) {
+    const instructions = document.createElement('div');
+    instructions.className = 'preview-blocks';
+    renderBlocks(instructions, draft.instructions_blocks);
+    box.append(instructions);
+  }
   for (const [index, question] of draft.questions.entries()) {
     const field = document.createElement('fieldset');
     field.append(node('legend', (index + 1) + '-savol'));
     const content = document.createElement('div');
     content.className = 'preview-blocks';
-    renderBlocks(content, question.prompt_blocks);
+    renderBlocks(content, question.prompt_blocks ?? [{type:'text',markdown:question.text}]);
     field.append(content);
     for (const option of question.options) {
       const label = document.createElement('label');
       label.className = 'preview-option';
       const radio = document.createElement('input');
-      radio.type = 'radio'; radio.name = box.id + '-' + question.id;
+      radio.type = 'radio'; radio.name = box.id + '-' + index;
       const blocks = document.createElement('span');
       blocks.className = 'preview-blocks';
-      renderBlocks(blocks, option.blocks);
+      renderBlocks(blocks, typeof option === 'string' ? [{type:'text',markdown:option}] : option.blocks);
       label.append(radio, blocks);
       field.append(label);
     }
     box.append(field);
   }
-  box.hidden = false;
-  box.tabIndex = -1;
-  box.focus();
 }
 function makeLayout(root) {
   function item(tag, id, text = '') {
@@ -67,8 +72,8 @@ function makeLayout(root) {
   title.maxLength = 160;
   title.required = true;
   const duration = item('input', 'editor-duration');
-  Object.assign(duration, { type: 'number', min: '1', max: '86400', value: '1800', required: true });
-  meta.append(labelled('Test nomi', title), labelled('Vaqt (soniya)', duration));
+  Object.assign(duration, { type: 'text', inputMode: 'decimal', value: '0.5', required: true });
+  meta.append(labelled('Test nomi', title), labelled('Davomiylik (soat)', duration));
   const nav = document.createElement('div');
   nav.className = 'line-form editor-nav';
   nav.append(labelled('Savol', item('select', 'editor-question')),
@@ -77,21 +82,18 @@ function makeLayout(root) {
   buttons.className = 'editor-actions actions';
   const save = action('save-editor', 'Test qoralamasini saqlash', 'submit');
   save.className = 'primary';
-  buttons.append(action('student-preview', 'O‘quvchi ko‘rinishi'), save, action('new-editor', 'Yangi test'));
+  buttons.append(action('student-preview', 'O‘quvchi ko‘rinishi'), save, action('new-editor', 'Yangidan boshlash'));
   const hint = node('p', 'PNG uchun 2 MiB, SVG uchun 256 KiB gacha rasm yuklashingiz mumkin.');
   hint.className = 'hint';
   const fields = item('fieldset', 'editor-controls');
   fields.setAttribute('aria-label', 'Test mazmuni');
   fields.append(meta, nav, hint, item('div', 'question-fields'));
   form.append(fields, buttons);
-  const preview = item('section', 'editor-preview');
-  preview.setAttribute('aria-label', 'O‘quvchi ko‘rinishi');
-  preview.hidden = true;
-  root.replaceChildren(form, preview);
+  root.replaceChildren(form);
 }
 
 // The host supplies the official block renderer, scoped media upload and a QuestionWrite draft saver.
-export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uploadImage, readDraft, saveDraft, onTargetChange, notify: notice}) {
+export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uploadImage, readDraft, saveDraft, onTargetChange, onNewTest, previewStudent, notify: notice}) {
   makeLayout(root);
   const el = id => root.querySelector('#' + id);
   let questions = [newQuestion()];
@@ -99,16 +101,11 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   const uploads = new Set();
   let dirty = false, busy = false, disposed = false;
   let target = null;
-  let metadata = {};
+  let metadata = {}, originalSeconds = 1800;
 
-  function hideStudentPreview() {
-    el('editor-preview').hidden = true;
-    el('editor-preview').replaceChildren();
-  }
   function changed() {
     dirty = true;
     el('save-editor').disabled = busy;
-    hideStudentPreview();
   }
   function blockGroup(question, blocks, legend, option) {
     const group = document.createElement('fieldset');
@@ -226,9 +223,10 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   function buildDraft(requireKey) {
     const title = el('editor-title').value.trim();
     if (!title) { el('editor-title').focus(); throw Error('Test nomini kiriting.'); }
-    const duration = el('editor-duration').valueAsNumber;
-    if (!Number.isInteger(duration) || duration < 1 || duration > 86400) {
-      el('editor-duration').focus(); throw Error('Vaqtni 1–86400 soniya oralig‘ida kiriting.');
+    const hours = el('editor-duration').value;
+    const duration = hours === hoursFromSeconds(originalSeconds) ? originalSeconds : secondsFromHours(hours);
+    if (duration === null) {
+      el('editor-duration').focus(); throw Error('Davomiylikni soatda kiriting. Masalan, 0.5 yoki 1.5. Eng ko‘p davomiylik 24 soat.');
     }
     if ([...uploads].some(upload => questions.includes(upload.question))) throw Error('Rasm yuklanishini kuting.');
     const result = questions.map((question, i) => {
@@ -253,7 +251,7 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   }
   el('editor-question').onchange = event => {
     current = questions.findIndex(question => question.id === event.target.value);
-    hideStudentPreview(); drawEditor(); notice();
+    drawEditor(); notice();
   };
   el('add-question').onclick = () => {
     if (questions.length >= 200) return;
@@ -271,8 +269,8 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   el('editor-duration').oninput = changed;
   el('student-preview').onclick = () => {
     try {
-      showStudentView(el('editor-preview'), buildDraft(false), renderBlocks);
-      notice('O‘quvchi ko‘rinishi ochildi.');
+      const draft = buildDraft(false);
+      void previewStudent(el('student-preview'), () => draft);
     } catch (error) { notice('', error.message); }
   };
 
@@ -292,7 +290,8 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     if (preview.instructions_blocks) metadata.instructions_blocks = structuredClone(preview.instructions_blocks);
     if (preview.grading_config) metadata.grading_config = structuredClone(preview.grading_config);
     el('editor-title').value = preview.title;
-    el('editor-duration').value = String(preview.duration_seconds ?? 1800);
+    originalSeconds = preview.duration_seconds ?? 1800;
+    el('editor-duration').value = hoursFromSeconds(originalSeconds);
     questions = preview.questions.map(source => {
       if (source.prompt_blocks) return structuredClone(source);
       const q = newQuestion();
@@ -304,7 +303,7 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     current = Math.min(index, questions.length - 1);
     target = reference;
     dirty = false;
-    hideStudentPreview(); drawEditor(); syncControls();
+    drawEditor(); syncControls();
   }
   function canReplace() {
     return !busy && (!dirty || window.confirm('Muharrirdagi saqlanmagan o‘zgarishlarni bekor qilasizmi?'));
@@ -350,9 +349,12 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   function reset() {
     replaceContent({title:'', duration_seconds:1800, questions:[newQuestion()]}, null);
   }
-  el('new-editor').onclick = () => {
-    if (canReplace()) { reset(); el('editor-title').focus(); notice(); }
-  };
+  function newTest() {
+    if (!canReplace()) return false;
+    reset(); onNewTest(); el('editor-title').focus(); notice();
+    return true;
+  }
+  el('new-editor').onclick = newTest;
   function openFile(preview) {
     if (!canReplace()) return;
     replaceContent(preview, null);
@@ -360,7 +362,7 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   }
   drawEditor();
   return {
-    openFile, openSaved,
+    openFile, openSaved, newTest,
     readyToPublish(id) { return !busy && (target?.id !== id || !dirty); },
     published(id) { if (target?.id === id) reset(); },
     dispose() { disposed = true; },

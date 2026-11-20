@@ -11,7 +11,7 @@ import {materializeElapsedAttempts} from '../supabase/functions/univeracademy-ap
 import {StaffFixture,validate} from '../tests/backend/staff-fixture.ts';
 import {testNumbers} from '../tests/backend/http-fixture.ts';
 import {studentDirectoryPageSize} from './teacher-student-directory.mjs';
-import {ungroupedSchedule} from './ungrouped-fixture.mjs';
+import {assignmentSchedule,studentAssignmentStatus} from './teacher-assignment-schedule.mjs';
 import {cleanText,editableDraft,importDraft,replaceDraft,requireEditable,verifyTeacherImage} from './teacher-pilot-import.mjs';
 
 const subject='physics', day=86_400_000;
@@ -91,7 +91,8 @@ function testFor(state,actor,id) {
 const groupView=g=>({id:g.id,name:g.name,status:g.status,subjectId:g.subjectId});
 const testView=(state,t)=>({id:t.wire.id,title:state.demos[t.wire.demo_id].title,status:t.wire.status,
   questionCount:t.questionIds.length,duration_seconds:t.wire.duration_seconds,revision:t.wire.revision,subjectId:t.subjectId});
-const assignView=a=>({id:a.admission.assignmentId,groupId:a.admission.groupId,testId:a.published.versionId,title:a.title});
+const assignView=a=>({id:a.admission.assignmentId,groupId:a.admission.groupId,testId:a.published.versionId,title:a.title,
+  opensAt:a.admission.opensAt,closesAt:a.admission.closesAt,timezone:a.reviewGate.timezone});
 function scoreView(ordinary) {
   const s=ordinary.display;
   return {earned:s.earned_points,maximum:s.max_points,percentage:s.percentage};
@@ -131,11 +132,11 @@ function dashboard(state,actor,time) {
     tests:Object.values(state.versions).filter(t=>t.teacherPersonId===actor.personId).map(t=>testView(state,t)),
     assignments:assignments.map(assignView),results};
   const p=state.student.people[actor.personId].profile, g=recordAt(state.groups,p.active_group_id);
-  return {...base,univeracademy_id:p.univeracademy_id,group:g?groupView(g):null,
+  return {...base,serverNow:time,univeracademy_id:p.univeracademy_id,group:g?groupView(g):null,
     inbox:state.pilot.inbox[actor.personId].filter(entry=>Date.parse(entry.expiresAt)>time)
       .map(entry=>({...entry})),
     assignments:assignments.map(a=>{const attempt=attempts.find(x=>x.assignmentId===a.admission.assignmentId);
-      return {...assignView(a),attemptId:attempt?.id??null,status:attempt?.status??'available'};}),results};
+      return {...assignView(a),attemptId:attempt?.id??null,status:studentAssignmentStatus(a.admission,time,attempt?.status,a.cancelled)};}),results};
 }
 
 function issueInvite(state,group,time,recipientId=null) {
@@ -224,8 +225,8 @@ function teacherCommand(state,actor,action,input,key,time) {
   if (test.wire.status!=='published') fail('TEST_NOT_PUBLISHED',409);
   const recipients=groupMembers(state,group).map(p=>p.profile.person_id);
   if (!recipients.length) fail('EMPTY_GROUP',409);
-  const body={group_id:group.id,demo_id:test.wire.demo_id,version_id:test.wire.id,student_ids:recipients,...ungroupedSchedule(time),
-    timezone:'Asia/Tashkent',review_policy:'teacher_approval',reminder_lead_seconds:null};
+  const body={group_id:group.id,demo_id:test.wire.demo_id,version_id:test.wire.id,student_ids:recipients,...assignmentSchedule(time,input.startsAt),
+    review_policy:'teacher_approval',reminder_lead_seconds:null};
   const a=createTeacherPilotAssignment(state,staff,body,'pilot-assignment/'+key,JSON.stringify(body),time,unique);
   state.pilot.assignmentMedia[a.id]=indexPublicImages(state.student.assignments[a.id]);
   return assignView(state.student.assignments[a.id]);
@@ -352,6 +353,7 @@ export function createTeacherPilot({now=Date.now}={}) {
         }
         const request=requestDigest(input), prior=state.pilot.receipts[commandKey];
         if (prior) {
+          if (action==='assignTest') { groupFor(state,actor,input.groupId);testFor(state,actor,input.testId); }
           if (action==='updateDraft') requireEditable(testFor(state,actor,input.testId));
           if (request!==prior.request) fail('IDEMPOTENCY_CONFLICT',409);
           return {value:structuredClone(prior.value)};

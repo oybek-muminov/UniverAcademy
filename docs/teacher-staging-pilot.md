@@ -1,6 +1,6 @@
 # Bitta guruh bilan o‘qituvchi kabinetini sinash
 
-O‘qituvchi Ustoz saytida avvaldan mavjud Clerk hisobi orqali kiradi. O‘z fanidan guruh yaratadi. Yangi guruh darhol faol bo‘ladi. O‘qituvchi guruhga kirmagan o‘quvchilar ro‘yxatidan ism va o‘n raqamli UniverAcademy ID bo‘yicha o‘quvchini tanlaydi va **Tanlangan o‘quvchini qo‘shish** tugmasini bosadi. O‘quvchini ID raqamini kiritib qo‘shish yoki Telegram orqali taklif qilish ham mumkin. Savol matni, LaTeX formulasi, xususiy rasm, to‘rtta variant, kalit va ixtiyoriy yechimdan test tuzadi. Testni nashr qiladi va faol guruhga tayinlaydi. O‘quvchi Mini App orqali javoblarini saqlab topshiradi. O‘qituvchi o‘z guruhi natijasini ko‘radi.
+O‘qituvchi Ustoz saytida avvaldan mavjud Clerk hisobi orqali kiradi. O‘z fanidan guruh yaratadi. Yangi guruh darhol faol bo‘ladi. O‘qituvchi guruhga kirmagan o‘quvchilar ro‘yxatidan ism va o‘n raqamli UniverAcademy ID bo‘yicha o‘quvchini tanlaydi va **Tanlangan o‘quvchini qo‘shish** tugmasini bosadi. O‘quvchini ID raqamini kiritib qo‘shish yoki Telegram orqali taklif qilish ham mumkin. Savol matni, LaTeX formulasi, xususiy rasm, to‘rtta variant, kalit va ixtiyoriy yechimdan test tuzadi. Test davomiyligini soatda kiritadi. Nashr qilingan testni faol guruhga tayinlashda darhol ochish yoki boshlanish sanasi va soatini belgilash mumkin. O‘quvchi Mini App orqali javoblarini saqlab topshiradi. O‘qituvchi o‘z guruhi natijasini ko‘radi.
 
 ## Mahalliy qabul
 
@@ -78,6 +78,7 @@ O‘qituvchiga rol berilgach, botdagi «Kabinet» tugmasi uni Ustoz sahifasiga o
 
 ## Pilotning amaliy chegaralari
 
+- Tayinlash vaqti Toshkent bo‘yicha belgilanadi. O‘quvchi test ochilguncha boshlanish sanasi va soatini ko‘radi. Yangi urinishni o‘sha kun yakunigacha boshlash mumkin. Boshlangan urinish uchun vaqt o‘quvchi testni ochgan paytdan hisoblanadi.
 - O‘quvchi ID satrida o‘nta raqam saqlanadi. Guruh almashishi alohida Admin amalidir. Tayinlash paytidagi ro‘yxat topshiriqqa bog‘lanadi. Shu topshiriqqa kirishi kerak bo‘lgan o‘quvchilarni avval guruhga qo‘shing.
 - O‘qituvchi LaTeX kodini yozadi; Teacher va Student bir xil KaTeX versiyasidan foydalanadi. Xato formulada server savol, blok va imkon bo‘lsa belgi o‘rnini ko‘rsatadi. Faol urinish faqat savol va variantlarni beradi.
 - Har rasm uchun PNG 2 MiB, statik SVG 256 KiB, tomonlari 2048 pikselgacha. Fayl tasdiqlangach qayta kodlangan PNG 8 MiB gacha yopiq PostgreSQL `bytea`da saqlanadi. Server o‘qituvchi egaligini yoki o‘quvchining joriy topshirig‘i, a’zolik davri va ochiq urinishini har o‘qishda tekshiradi. Test JSON so‘rovi 512 KiB gacha. Katta media keyin Backblaze B2 xususiy bucketiga ko‘chirilishi mumkin. Bunda kabinetdagi asset ID va har so‘rov uchun ruxsat tekshiruvi saqlanadi. Mavjud baytlar checksum orqali ko‘chirilib, zaxiradan tiklash sinovdan o‘tkaziladi. Bitta guruh pilotida rasmlar PostgreSQLda turadi.

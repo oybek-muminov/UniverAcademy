@@ -1,8 +1,9 @@
+import {assignmentSchedule} from './teacher-assignment-schedule.mjs';
 import {randomUUID} from 'node:crypto';
 import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
 import {encodePublished,decodePublished} from '../supabase/functions/univeracademy-api/storage/attempt-rows.ts';
 import {publishDraft} from '../supabase/functions/univeracademy-api/staff-content.ts';
-import {createTeacherPilotAssignment,isProtectedNextMidnight} from '../supabase/functions/univeracademy-api/pilot-provisioning.ts';
+import {createTeacherPilotAssignment} from '../supabase/functions/univeracademy-api/pilot-provisioning.ts';
 import {blocksWire} from '../supabase/functions/univeracademy-api/student-wire.ts';
 import {importDraft,replaceDraft,verifyTeacherImage} from './teacher-pilot-import.mjs';
 import {validate} from './teacher-staging-contract.mjs';
@@ -99,7 +100,7 @@ export async function preview(tx,actor,id){
     })};
   })};
 }
-export async function assign(tx,actor,g,testId){
+export async function assign(tx,actor,g,testId,startsAt){
   const {s,t,title}=await ownedTest(tx,actor,testId,true);
   if(t.wire.status!=='published')fail('TEST_NOT_PUBLISHED',409);
   if(g.subject_id!==t.subjectId)fail('NOT_FOUND',404);
@@ -115,13 +116,9 @@ export async function assign(tx,actor,g,testId){
     s.memberships[p.id]={active:true,epoch:Number(p.epoch),affinityGroupId:g.id};
     s.student.people[p.id]={enabled:true,profile:p.profile};
   }
-  const opensAt=Math.floor(tx.now/1000)*1000;
-  let closesAt=Math.ceil((opensAt+1)/3600000)*3600000;
-  const limit=closesAt+25*3600000;
-  while(closesAt<limit&&!isProtectedNextMidnight(opensAt,closesAt,'Asia/Tashkent'))closesAt+=3600000;
-  if(closesAt===limit)fail('INVALID_TIME_WINDOW',422);
-  const spec={group_id:g.id,version_id:testId,demo_id:t.wire.demo_id,student_ids:roster.map(p=>p.id),opens_at:new Date(opensAt).toISOString(),closes_at:new Date(closesAt).toISOString(),
-    timezone:'Asia/Tashkent',review_policy:'teacher_approval',reminder_lead_seconds:null};
+  const window=assignmentSchedule(tx.now,startsAt);
+  const spec={group_id:g.id,version_id:testId,demo_id:t.wire.demo_id,student_ids:roster.map(p=>p.id),...window,
+    review_policy:'teacher_approval',reminder_lead_seconds:null};
   const a=createTeacherPilotAssignment(s,actor,spec,'assign','assign',tx.now,randomUUID);
   const record=s.student.assignments[a.id];
   await query(tx,'INSERT INTO ua_private.assignments(id,group_id,demo_id,version_id,revision,record) VALUES($1,$2,$3,$4,0,$5)',[a.id,g.id,t.wire.demo_id,testId,{...record,published:encodePublished(record.published)}]);
@@ -129,5 +126,5 @@ export async function assign(tx,actor,g,testId){
     SELECT m.person_id,$1,true,m.epoch FROM ua_private.memberships m WHERE m.person_id=ANY($2::uuid[])`,[a.id,roster.map(p=>p.id)]);
   const ids=imageIds(t.publishedSnapshot.questions.map(({prompt_blocks,options})=>({prompt_blocks,options})));
   if(ids.length)await query(tx,'INSERT INTO ua_cabinet.assignment_media SELECT $1,unnest($2::uuid[])',[a.id,ids]);
-  return {id:a.id,title,groupId:g.id,testId};
+  return {id:a.id,title,groupId:g.id,testId,opensAt:record.admission.opensAt,closesAt:record.admission.closesAt,timezone:a.timezone};
 }

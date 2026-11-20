@@ -194,7 +194,7 @@ async function effect(tx,actor,action,input,subjectId,g){
     case 'importTest':{const {subjectId:_,...file}=input;return createDraft(tx,actor,file,subjectId);}
     case 'updateDraft':return saveDraft(tx,actor,g,input);
     case 'publishTest':return publish(tx,actor,input.testId);
-    case 'assignTest':return assign(tx,actor,g,input.testId);
+    case 'assignTest':return assign(tx,actor,g,input.testId,input.startsAt);
     default:fail('FORBIDDEN',403);
   }
 }
@@ -228,6 +228,13 @@ export async function runStagingPilot(tx,identity,action,input={},key){
     if(prior.payload!==payload)fail('IDEMPOTENCY_CONFLICT',409);
     if(action==='createGroup')return groupView(await group(tx,prior.response.id,actor,{requireActive:false,recoverPending:true}));
     if(action==='importTest')await ownedTest(tx,actor,prior.response.id);
+    if(action==='assignTest'&&prior.response.opensAt===undefined){
+      // Receipts written by older releases only contained the assignment identity.
+      const window=need(await query(tx,`SELECT record#>'{admission,opensAt}' AS "opensAt",record#>'{admission,closesAt}' AS "closesAt",
+        record#>>'{reviewGate,timezone}' AS timezone FROM ua_private.assignments WHERE id=$1 AND group_id=$2 AND version_id=$3`,
+        [prior.response.id,input.groupId,input.testId]));
+      return {...prior.response,...window};
+    }
     return prior.response;
   }
   const subject=action==='createGroup'?subjectFor(actor,input.subjectId):importSubject;

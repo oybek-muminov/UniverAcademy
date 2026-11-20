@@ -1,10 +1,12 @@
 import { renderBlocks } from '/pilot/blocks.mjs';
 
+import {openingLabel,nextScheduleDelay} from '../src/group-test-schedule.mjs';
+
 const root = document.querySelector('#content');
 const notice = document.querySelector('#notice');
 const invite = new URL(location.href).searchParams.get('invite');
 let dashboard, attempt, assignmentId, result, confirmSubmit = false, busy = false, needsRead = false;
-let expiryTimer;
+let expiryTimer, dashboardReceived = null;
 const pending = new Map();
 
 function element(tag, text, className) {
@@ -70,6 +72,7 @@ function actions(...nodes) {
 }
 async function refresh() {
   dashboard = await request('dashboard');
+  dashboardReceived = performance.now();
   attempt = result = assignmentId = null;
   confirmSubmit = needsRead = false;
 }
@@ -147,6 +150,8 @@ function showDashboard() {
       attempt = await command('startAttempt', {assignmentId:exam.id}); assignmentId = exam.id;
       if (attempt.status !== 'in_progress') await refresh();
     }));
+    else if (exam.status === 'scheduled') block.append(element('p',openingLabel(exam.opensAt),'meta'));
+    else if (exam.status === 'closed') block.append(element('p','Testni boshlash muddati tugagan.','meta'));
     else if (exam.status === 'in_progress') block.append(button('Testni davom ettirish', () => resume(exam)));
     else {
       const own = dashboard.results.find(row => row.attemptId === exam.attemptId);
@@ -220,6 +225,13 @@ function render() {
       element('p',result.percentage + '%'),button('Kabinetga qaytish',refresh,true));
     root.append(box);
   } else if (attempt) showAttempt();
-  else showDashboard();
+  else {
+    showDashboard();
+    const delay = dashboardReceived === null ? null : nextScheduleDelay(dashboard, performance.now() - dashboardReceived);
+    if (delay !== null) expiryTimer = setTimeout(() => run(async () => {
+      dashboardReceived = null;
+      await refresh();
+    }), delay);
+  }
 }
 run(startPage);

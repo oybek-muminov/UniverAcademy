@@ -117,8 +117,8 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
           assert.deepEqual(data,{groupId:newId,univeracademy_id:studentId});
           return located(success({queued:true}),url);
         case 'assignTest':
-          assert.deepEqual(data,{testId,groupId:newId});
-          assignments.push(data);
+          assert.deepEqual(data,{testId,groupId:newId,startsAt:Date.parse('2095-03-14T10:30:00Z')});
+          assignments.push({...data,opensAt:data.startsAt,closesAt:Date.parse('2095-03-14T19:00:00Z')});
           return located(success({id:crypto.randomUUID()}),url);
         default: assert.fail('Unexpected request ' + path);
       }
@@ -170,11 +170,26 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   submit('member-form',el('member-form').querySelector('[value="send"]'));
   await until(()=>settled() && el('notice').textContent.includes('navbatiga'));
   host.querySelector('nav a[href="#testlar"]').click();
-  assert(!el('testlar').hidden && !el('assign-form').hidden);
+  assert(!el('testlar').hidden && !el('tests-new').hidden);
+  el('tab-new').dispatchEvent(new window.KeyboardEvent('keydown', {key:'ArrowRight', cancelable:true}));
+  assert.equal(document.activeElement,el('tab-drafts'));
+  assert(!el('tests-drafts').hidden && !el('tests-empty').hidden);
+  el('tab-published').click();
+  assert(!el('tests-published').hidden && !el('assign-form').hidden);
   assert.equal(el('assignment-group').value,newId);
   assert(![...el('assignment-group').options].some(option=>option.textContent==='Algebra'));
   submit('assign-form');
+  assert(el('problem').textContent.includes('vaqtini tanlang'));
+  el('assign-form').querySelector('[value=scheduled]').click();
+  assert(!el('assignment-start').disabled && el('assignment-start').required);
+  el('assignment-start').value = '2020-03-14T15:30';
+  submit('assign-form');
+  assert(el('problem').textContent.includes('kelajakdagi'));
+  assert(!calls.some(([path]) => path.endsWith('/assignTest')));
+  el('assignment-start').value = '2095-03-14T15:30';
+  submit('assign-form');
   await until(()=>settled() && el('assignment-info').textContent.includes('8-A'));
+  assert.match(el('assignment-info').textContent,/15:30.*00:00.*Toshkent vaqti/);
   assert.deepEqual(calls.filter(([path])=>path.includes('/commands/')).map(([path])=>path.split('/').at(-1)),
     ['createGroup','addMember','addMember','createInvite','sendInvite','assignTest']);
   assert(!calls.some(([path])=>path.includes('/admin/')));

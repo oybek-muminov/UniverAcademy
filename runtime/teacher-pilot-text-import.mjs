@@ -1,4 +1,6 @@
 // Small, explicit file format for the first physics pilot. It produces a staff draft only.
+import {secondsFromHours} from '../packages/test-content/duration.mjs';
+
 const DEFAULT_DURATION = 300;
 const labels = ['A', 'B', 'C', 'D'];
 function invalid(line, reason) {
@@ -44,10 +46,12 @@ export function parseTeacherTestText(text) {
   if (title.length > 160) invalid(lines[0].line, 'Sarlavhani 160 belgigacha qisqartiring.');
   let duration_seconds = DEFAULT_DURATION;
   if (/^Vaqt\b/iu.test(lines[cursor]?.value ?? '')) {
-    const duration = take(/^Vaqt\s*\(soniya\):\s*(\d+)$/iu, 'Vaqtni «Vaqt (soniya): 300» shaklida yozing.');
-    duration_seconds = Number(duration.value);
-    if (!Number.isSafeInteger(duration_seconds) || duration_seconds < 1)
-      invalid(duration.row.line, 'Davomiylik musbat butun son bo‘lishi kerak.');
+    const row = lines[cursor++];
+    const hours = /^Vaqt\s*\(soat\):\s*(.+)$/iu.exec(row.value);
+    const legacy = /^Vaqt\s*\(soniya\):\s*(\d+)$/iu.exec(row.value);
+    duration_seconds = hours ? secondsFromHours(hours[1]) : legacy ? Number(legacy[1]) : null;
+    if (!Number.isSafeInteger(duration_seconds) || duration_seconds < 1 || duration_seconds > 86400)
+      invalid(row.line, 'Davomiylikni 24 soatgacha kiriting. Masalan, «Vaqt (soat): 0,5».');
   }
   const questions = [];
   while (cursor < lines.length) {

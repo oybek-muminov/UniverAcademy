@@ -1,3 +1,4 @@
+import {studentAssignmentStatus} from './teacher-assignment-schedule.mjs';
 import {AttemptRows,decodeRatio} from '../supabase/functions/univeracademy-api/storage/attempt-rows.ts';
 import {candidateHalfUp2,studentPointsHalfUp1} from '../supabase/functions/univeracademy-api/student-wire.ts';
 import {expireForMembershipGuard} from '../supabase/functions/univeracademy-api/attempts.ts';
@@ -39,7 +40,8 @@ export async function dashboard(tx,actor){
   const ids=groups.map(g=>g.id);
   await expireVisible(tx,person,ids,teacher);
   const assignments=await query(tx,`SELECT a.id,a.group_id "groupId",a.version_id "testId",d.title,
-    t.id "attemptId",coalesce(t.body->>'status','available') status FROM ua_private.assignments a
+    a.record#>'{admission,opensAt}' AS "opensAt",a.record#>'{admission,closesAt}' AS "closesAt",a.record#>>'{reviewGate,timezone}' AS timezone,
+    a.record->'cancelled' AS cancelled,t.id "attemptId",t.body->>'status' AS status FROM ua_private.assignments a
     JOIN ua_private.demos d ON d.id=a.demo_id LEFT JOIN ua_private.grants gr ON gr.assignment_id=a.id AND gr.person_id=$2
     LEFT JOIN ua_private.memberships m ON m.person_id=gr.person_id LEFT JOIN ua_private.exam_series es ON es.person_id=$2 AND es.demo_id=a.demo_id
     LEFT JOIN ua_private.attempts t ON t.id=es.current_attempt_id AND t.assignment_id=a.id
@@ -50,7 +52,8 @@ export async function dashboard(tx,actor){
     WHERE (($3::boolean AND a.group_id=ANY($1::uuid[])) OR (NOT $3 AND t.person_id=$2)) ORDER BY t.id`,[ids,person,teacher])).map(({profile,exact_result,...info})=>({
     ...info,studentName:displayName(profile),earned:studentPointsHalfUp1(decodeRatio(exact_result.earned)),maximum:studentPointsHalfUp1(decodeRatio(exact_result.maximum)),
     percentage:candidateHalfUp2(decodeRatio(exact_result.percentage))}));
-  if(!teacher)return {...base,univeracademy_id:actor.cabinetId,group:groups.length?groupView(groups[0]):null,assignments,results};
+  if(!teacher)return {...base,univeracademy_id:actor.cabinetId,group:groups.length?groupView(groups[0]):null,serverNow:tx.now,
+    assignments:assignments.map(({cancelled,...row})=>({...row,status:studentAssignmentStatus(row,tx.now,row.status,cancelled)})),results};
   const members=await query(tx,`SELECT m.affinity_group_id,p.profile,p.univeracademy_id FROM ua_private.people_registration p
     JOIN ua_private.memberships m ON m.person_id=p.id WHERE p.enabled AND m.active AND m.affinity_group_id=ANY($1::uuid[]) ORDER BY p.id`,[ids]);
   const tests=await query(tx,`SELECT v.id,d.title,v.status,d.subject_id "subjectId",(v.wire->>'duration_seconds')::int duration_seconds,
@@ -58,5 +61,5 @@ export async function dashboard(tx,actor){
     FROM ua_cabinet.test_owners o JOIN ua_private.test_versions v ON v.id=o.version_id JOIN ua_private.demos d ON d.id=v.demo_id
     WHERE o.teacher_id=$1 AND d.subject_id=ANY($2::text[]) ORDER BY v.id`,[person,actor.approvedSubjectIds]);
   return {...base,subjects:actor.approvedSubjectIds.map(id=>({id,title:id})),groups:groups.map(g=>({...groupView(g),members:members.filter(p=>p.affinity_group_id===g.id)
-    .map(p=>({name:displayName(p.profile),univeracademy_id:p.univeracademy_id}))})),tests,assignments:assignments.map(({attemptId,status,...a})=>a),results};
+    .map(p=>({name:displayName(p.profile),univeracademy_id:p.univeracademy_id}))})),tests,assignments:assignments.map(({attemptId,status,cancelled,...a})=>a),results};
 }

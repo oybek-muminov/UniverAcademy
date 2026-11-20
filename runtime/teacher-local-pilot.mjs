@@ -9,6 +9,8 @@ import { createTeacherPilot } from './teacher-pilot-domain.mjs';
 import { teacherPilotBotLinks, teacherPilotBotStart } from '../apps/telegram-bot/src/teacher-pilot-invite.mjs';
 
 const staticRoutes = new Map([
+  ['/packages/test-content/duration.mjs', '../packages/test-content/duration.mjs'],
+  ['/src/group-test-schedule.mjs', '../apps/mini-app/src/group-test-schedule.mjs'],
   ['/teacher/workspace.mjs', '../apps/teacher-web/src/workspace.mjs'],
   ['/', './teacher-local-ui/index.html'],
   ['/admin/', './teacher-local-ui/admin.html'],

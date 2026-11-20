@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createStagingStudentPort} from '../src/staging-student-port.ts';
+import {nextScheduleDelay,openingLabel} from '../src/group-test-schedule.mjs';
 import {StudentFailure} from '../src/transport.ts';
 const api = 'https://api.example.org/api/v1';
 function harness(fetcher) {
@@ -38,4 +39,18 @@ test('cross-account dashboards, unknown routes and media outside the active scop
   });
   const blob=await media.port.media({asset:{asset_id:'img',url:'/api/v1/student/pilot/media/img'}},new AbortController().signal);
   assert.equal(blob.type,'image/png');assert.equal(blob.size,2);
+});
+
+
+test('scheduled group tests use the server clock and show the opening time in Tashkent',async()=>{
+  const opensAt=Date.UTC(2026,10,21,19,30), closesAt=opensAt+86_400_000, serverNow=opensAt-30000;
+  const entry={id:'exam',title:'Fizika',status:'scheduled',attemptId:null,opensAt,closesAt};
+  const response=row=>Response.json({data:{role:'student',person_id:'student-one',group:null,serverNow,assignments:[row],results:[]}});
+  const dashboard=await harness(()=>response(entry)).port.dashboard();
+  assert.match(openingLabel(opensAt),/00:30/);
+  assert.equal(nextScheduleDelay(dashboard,10000),20050);
+  assert.equal(nextScheduleDelay({...dashboard,assignments:[{...entry,status:'closed'}]},0),null);
+  await assert.rejects(harness(()=>response({...entry,opensAt:null})).port.dashboard(),{code:'RESPONSE_INVARIANT_FAILED'});
+  await assert.rejects(harness(()=>response({...entry,closesAt:opensAt-1})).port.dashboard(),{code:'RESPONSE_INVARIANT_FAILED'});
+  assert.equal((await harness(()=>response({id:'old',title:'Avvalgi test',status:'available',attemptId:null})).port.dashboard()).assignments.length,1);
 });

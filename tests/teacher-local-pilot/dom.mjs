@@ -88,6 +88,14 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   const txt = await (await browserFetch('/teacher/sample.txt')).arrayBuffer();
   selectFile(el('test-file'), new File([txt], 'my.txt', { type: 'text/plain' }));
   await until(() => !el('edit-file').disabled, 'TXT preview');
+  el('view-file').click();
+  await until(() => el('preview-content').querySelector('input'), 'file in student modal');
+  assert(el('student-dialog').open);
+  assert(!el('preview-content').textContent.includes('To‘g‘ri javob'));
+  assert.equal(document.activeElement, el('close-preview'));
+  el('student-dialog').dispatchEvent(new window.KeyboardEvent('keydown', { key:'Escape', cancelable:true }));
+  assert(!el('student-dialog').open);
+  assert.equal(document.activeElement, el('view-file'));
   el('edit-file').click();
   assert(el('editor-title').value);
   const prompt = () => group('Savol mazmuni');
@@ -111,22 +119,38 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   input(option().querySelector('.block-row input:not([type])'), 'Tajriba chizmasi');
   input(prompt().querySelector('textarea'), '<b>Bu matn</b>');
   el('student-preview').click();
-  await until(() => el('editor-preview').querySelector('.katex'), 'student preview');
-  assert.equal(el('editor-preview').querySelector('b'), null);
-  const image = el('editor-preview').querySelector('img');
+  await until(() => el('preview-content').querySelector('.katex'), 'student preview');
+  assert.equal(el('preview-content').querySelector('b'), null);
+  const image = el('preview-content').querySelector('img');
   assert.equal(image.alt, 'Tajriba chizmasi');
   assert.equal((await browserFetch(image.src)).headers.get('content-type'), 'image/png');
+  el('close-preview').click();
+  assert.equal(document.activeElement, el('student-preview'));
+  input(el('editor-duration'), '1,5');
+  el('tab-drafts').click();
+  assert(!el('tests-empty').hidden && el('tests-new').hidden);
+  el('tab-new').click();
+  assert.equal(el('editor-duration').value, '1,5');
+  assert.equal(prompt().querySelector('textarea').value, '<b>Bu matn</b>');
   submit(el('editor-form'), el('save-editor'));
   await until(() => el('save-editor').textContent === 'O‘zgarishlarni saqlash' && !el('editor-controls').disabled, 'import and load canonical draft');
+  assert(!el('tests-drafts').hidden && el('tests-new').hidden);
+  assert(el('test-meta').textContent.includes('1.5 soat'));
   const savedId = el('saved-test').value;
   const before = await post('teacher/commands/readDraft', {testId:savedId});
+  assert.equal(before.draft.duration_seconds, 5400);
   el('new-editor').click();
   assert.equal(el('editor-title').value, '');
+  el('tab-drafts').click();
   el('edit-saved').click();
   await until(() => !el('editor-controls').disabled && el('editor-title').value === before.draft.title, 'resume from the saved list');
   assert.equal(option().querySelector('input[type=radio]').value, before.draft.questions[0].options[0].id);
   assert(option().querySelector('img[alt="Tajriba chizmasi"]'));
   input(prompt().querySelector('textarea'), 'Yangilangan savol');
+  el('tab-new').click();
+  assert(!el('start-new').hidden && el('tests-drafts').hidden);
+  el('tab-drafts').click();
+  assert.equal(prompt().querySelector('textarea').value, 'Yangilangan savol');
   submit(el('editor-form'), el('save-editor'));
   await until(() => el('save-editor').disabled && !el('editor-controls').disabled, 'save same draft');
   const after = await post('teacher/commands/readDraft', {testId:savedId});
@@ -139,10 +163,23 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   assert.deepEqual(after.draft.grading_config,before.draft.grading_config);
   assert.equal(el('saved-test').options.length,1);
   el('view-saved').click();
-  await until(() => el('saved-preview').querySelector('.katex'), 'reopen saved draft');
-  assert(el('saved-preview').querySelector('img[alt="Tajriba chizmasi"]'));
+  await until(() => el('preview-content').querySelector('.katex'), 'reopen saved draft');
+  assert(el('preview-content').querySelector('img[alt="Tajriba chizmasi"]'));
+  el('student-dialog').click();
+  assert(!el('student-dialog').open);
+  assert.equal(document.activeElement,el('view-saved'));
   el('publish-button').click();
   await until(() => el('test-meta').textContent.includes('Nashr qilingan'), 'publish');
+
+  assert(!el('tests-published').hidden && el('edit-saved').hidden);
+  el('tab-drafts').click();
+  assert.equal(el('saved-test').options.length, 0);
+  assert.match(el('tests-empty').textContent, /qoralama/i);
+  el('tab-published').click();
+  el('view-saved').click();
+  await until(() => el('preview-content').querySelector('img'), 'published preview');
+  assert(!el('preview-content').textContent.includes('To‘g‘ri javob'));
+  el('close-preview').click();
 
   window.location.hash = 'guruhlar';
   await until(() => !el('guruhlar').hidden, 'group workspace');
@@ -168,6 +205,9 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   el('invite-button').click();
   await until(() => !el('invite-detail').hidden, 'share invite');
   assert(el('invite-url').value.startsWith('https://t.me/'));
+  window.location.hash = 'testlar';
+  await until(() => !el('testlar').hidden && !el('assign-form').hidden,'published assignment form');
+  el('assign-form').querySelector('[value="now"]').click();
   submit(el('assign-form'), el('assign-form').querySelector('button'));
   await until(() => el('assignment-info').textContent.includes('Fizika <b>8A</b>'), 'assign');
   assert.equal(el('assignment-info').querySelector('b'), null);
@@ -189,8 +229,19 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   assert.equal(Number(score.percentage), 100);
 
   const options = ['A','B','C','D'].map(markdown => ({id: crypto.randomUUID(), blocks: [{type:'text', markdown}]}));
-  const canonical = {title:'Fayldan',grading_config:{individual_enabled:true},questions:[{id:crypto.randomUUID(), position:1, expected_revision:0,
+  el('tab-new').click();
+  const canonical = {title:'Fayldan',duration_seconds:3701,grading_config:{individual_enabled:true},questions:[{id:crypto.randomUUID(), position:1, expected_revision:0,
     individual_points:'3.500', prompt_blocks:[{type:'formula',latex:'a^2',display:'inline'}], options, correct_option_id:options[1].id, explanation_blocks:[]}]};
+  const mixed = {...canonical, duration_hours:1.5};
+  selectFile(el('test-file'), new File([JSON.stringify(mixed)], 'mixed.json', {type:'application/json'}));
+  await until(() => el('problem').textContent && el('edit-file').disabled, 'two duration units rejected');
+  const sample = await (await browserFetch('/teacher/sample.json')).text();
+  selectFile(el('test-file'), new File([sample], 'hours.json', {type:'application/json'}));
+  await until(() => !el('edit-file').disabled, 'JSON hours accepted');
+  el('edit-file').click();
+  assert.equal(el('editor-duration').value, String(JSON.parse(sample).duration_hours));
+  window.confirm = () => true;
+  el('new-editor').click();
   selectFile(el('test-file'), new File([JSON.stringify(canonical)], 'source.json', {type:'application/json'}));
   await until(() => !el('edit-file').disabled && el('preview').textContent.includes('Fayldan'), 'canonical JSON preview');
   el('edit-file').click();
@@ -216,5 +267,6 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
     const stored = await post('teacher/commands/readDraft',{testId:weightedId});
     assert.deepEqual(stored.draft.questions.map(q=>q.individual_points), ['3.500',points]);
     assert(stored.draft.grading_config.individual_enabled);
+    assert.equal(stored.draft.duration_seconds, 3701);
   }
 });

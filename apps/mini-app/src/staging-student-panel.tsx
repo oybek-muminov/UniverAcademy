@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {readStagingInvite} from './staging-student-port.ts';
 import type {PilotAttempt, PilotCommands, PilotDashboard, PilotResult, QuestionBlock, StagingStudentPort} from './staging-student-port.ts';
+import {openingLabel,nextScheduleDelay} from './group-test-schedule.mjs';
 import {renderBlocks} from './rich-blocks.mjs';
 import {asFailure, createOperationJournal, failureMessage, StudentFailure} from './transport.ts';
 import './rich-blocks.css';
@@ -27,7 +28,7 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
   const [invite,setInvite] = useState(() => readStagingInvite()), [notice,setNotice] = useState(''), [busy,setBusy] = useState(false);
   const [previouslyGrouped,setPreviouslyGrouped] = useState(false);
   const [confirm,setConfirm] = useState(false), [needsRead,setNeedsRead] = useState(false);
-  const mounted = useRef(false), lock = useRef(false);
+  const mounted = useRef(false), lock = useRef(false), dashboardReceived = useRef(0);
   const [journal] = useState(() => {
     try { return createOperationJournal(window.sessionStorage); } catch { return createOperationJournal(); }
   });
@@ -48,6 +49,7 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
       throw error;
     }
     if (!mounted.current) return;
+    dashboardReceived.current = performance.now();
     setPreviouslyGrouped(next.group?.status === 'active');
     setStartIntent(null); setDashboard(next); setAttempt(null); setResult(null); setNeedsRead(false); setConfirm(false);
     return next;
@@ -62,13 +64,21 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
       if (failure.kind === 'auth') { setDashboard(null); setAttempt(null); setResult(null); onAuthLost(); return; }
       if (failure.kind === 'forbidden' || failure.kind === 'missing') { setAttempt(null); setDashboard(null); setResult(null); }
       else if (attempt) { setNeedsRead(true); setConfirm(false); }
-      const messages: Record<string,string> = {INVALID_INVITE:'Taklif topilmadi yoki bu hisob uchun berilmagan.',
+      if (failure.code === 'ADMISSION_CLOSED') setStartIntent(null);
+      const messages: Record<string,string> = {ADMISSION_CLOSED:'Hozir bu testni boshlash mumkin emas. Guruh jadvalini yangilang.',INVALID_INVITE:'Taklif topilmadi yoki bu hisob uchun berilmagan.',
         INVITE_EXPIRED:'Taklif muddati tugagan. O‘qituvchidan yangi taklif so‘rang.',
         GROUP_MEMBERSHIP_CONFLICT:'Siz boshqa guruhga biriktirilgansiz. Adminga murojaat qiling.'};
       setNotice(messages[failure.code] ?? failureMessage(failure,'clerk'));
     } finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
   useEffect(() => { mounted.current = true; void run(refresh); return () => { mounted.current = false; }; },[port]);
+  useEffect(() => {
+    if (!dashboard || busy || attempt || result || startIntent) return;
+    const delay = nextScheduleDelay(dashboard, performance.now() - dashboardReceived.current);
+    if (delay === null) return;
+    const timer = setTimeout(() => void run(refresh), delay);
+    return () => clearTimeout(timer);
+  },[dashboard,busy,attempt,result,startIntent,port]);
   useEffect(() => {
     if (!attempt) return;
     const delay = Math.max(0, Date.parse(attempt.deadlineAt) - Date.now());
@@ -146,7 +156,9 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
     {dashboard && grouped && <><h2>Guruh testlari</h2>
       {!dashboard.assignments.length && <p>Hozircha sizga guruh testi tayinlanmagan.</p>}
       {dashboard.assignments.map(exam=><section key={exam.id}><h3>{exam.title}</h3>
-        {exam.status==='available' ? <button disabled={busy} onClick={()=>setStartIntent(exam)}>Testni boshlash</button> :
+        {exam.status==='scheduled' && exam.opensAt !== undefined ? <p>{openingLabel(exam.opensAt)}</p> :
+          exam.status==='closed' ? <p>Testni boshlash muddati tugagan.</p> :
+          exam.status==='available' ? <button disabled={busy} onClick={()=>setStartIntent(exam)}>Testni boshlash</button> :
           exam.status==='in_progress' && exam.attemptId ? <button disabled={busy} onClick={()=>void run(async()=>adopt(await command('resumeAttempt',{attemptId:exam.attemptId!}),exam.title))}>Testni davom ettirish</button> :
           dashboard.results.some(r=>r.attemptId===exam.attemptId) ? <button disabled={busy} onClick={()=>setResult(dashboard.results.find(r=>r.attemptId===exam.attemptId)!)}>Natijani ko‘rish</button> :
           <p>Test yakunlangan.</p>}</section>)}

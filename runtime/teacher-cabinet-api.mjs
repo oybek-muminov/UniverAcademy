@@ -170,7 +170,7 @@ export function createCabinetApi(options, normalizeImage) {
       }
       return reply(200,{data:result});
     }catch(error){
-      const known=error instanceof ApiFault || (error.status===422&&['INVALID_FORMULA','INVALID_TEXT_IMPORT','INVALID_IMAGE'].includes(error.code));
+      const known=error instanceof ApiFault || (error.status===422&&['INVALID_FORMULA','INVALID_TEXT_IMPORT','INVALID_IMAGE','INVALID_TEST_FILE'].includes(error.code));
       const status=known?error.status:500;
       const code=known?error.code:'INTERNAL_ERROR';
       return reply(status,{error:{code,message:typeof error.detail==='string'?error.detail.slice(0,300):code}});

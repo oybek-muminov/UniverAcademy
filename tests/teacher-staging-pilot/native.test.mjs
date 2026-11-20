@@ -1,3 +1,4 @@
+import {setTimeout as delay} from 'node:timers/promises';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -368,6 +369,52 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     await rejected(teacher.call(directory),409);
     await db.query('UPDATE ua_private.staff_group_scope SET revoked_at_ms=1 WHERE person_id=$1 AND group_id=$2',[teacherRow.id,ownerGroup.id]);
     await rejected(teacher.call(directory),404);
+  });
+
+  await t.test('a scheduled PostgreSQL assignment denies early admission and opens through the same HTTP route at the selected time',async()=>{
+    const test=await good(teacher.command('importTest',{title:'Belgilanadigan vaqt',duration_seconds:300,
+      questions:[{text:'1+1',options:['1','2','3','4'],correctIndex:1}]}));
+    await good(teacher.command('publishTest',{testId:test.id}));
+    const now=(await good(student.dashboard())).serverNow,startsAt=now+4500;
+    const spec={groupId:group.id,testId:test.id,startsAt},key=randomUUID();
+    await rejected(teacher.command('assignTest',{...spec,startsAt:now-1}),422);
+    await rejected(other.command('assignTest',spec),404);
+    const [scheduled,retry]=await Promise.all([1,2].map(()=>good(teacher.command('assignTest',spec,key))));
+    assert.deepEqual(retry,scheduled);assert.equal(scheduled.opensAt,startsAt);
+    assert.equal(scheduled.timezone,'Asia/Tashkent');
+    assert.equal((await good(teacher.dashboard())).assignments.find(a=>a.id===scheduled.id).closesAt,scheduled.closesAt);
+    const scheduledRow=(await good(student.dashboard())).assignments.find(a=>a.id===scheduled.id);
+    assert.equal(scheduledRow.status,'scheduled');assert.equal(scheduledRow.opensAt,startsAt);
+    const attemptKey=randomUUID();
+    const start=()=>student.command('startAttempt',{assignmentId:scheduled.id},attemptKey);
+    await rejected(start(),409);
+    assert.equal(await scalar('SELECT count(*) n FROM ua_private.attempts WHERE assignment_id=$1',[scheduled.id]),0);
+    const saved=(await db.query("SELECT record->'admission' admission FROM ua_private.assignments WHERE id=$1",[scheduled.id])).rows[0].admission;
+    assert.deepEqual([saved.opensAt,saved.closesAt],[scheduled.opensAt,scheduled.closesAt]);
+    await delay(Math.max(0,startsAt-Date.now())+10);
+    assert.equal((await good(student.dashboard())).assignments.find(a=>a.id===scheduled.id).status,'available');
+    const live=await good(start());
+    assert.equal(live.status,'in_progress');
+    const times=(await db.query('SELECT body FROM ua_private.attempts WHERE id=$1',[live.id])).rows[0].body;
+    assert.ok(times.startedAt>=startsAt);
+    assert.equal(times.deadlineAt,times.startedAt+300000);
+    assert.deepEqual(await good(teacher.command('assignTest',spec,key)),scheduled);
+    await rejected(teacher.command('assignTest',{...spec,startsAt:startsAt+60000},key),409);
+
+    // A pre-release receipt stores the identity only. Replaying it reads the immutable admission window.
+    const oldKey=randomUUID(),legacyInput={groupId:group.id,testId:draft.id};
+    const digest=value=>createHash('sha256').update(value).digest('hex');
+    const receipt=teacherRow.id+'/staging/assignTest/'+digest(oldKey);
+    const oldResponse={id:assignment.id,groupId:group.id,testId:draft.id,title:assignment.title};
+    await db.query('BEGIN');
+    try{
+      await db.query('INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,0,$5)',
+        [receipt,teacherRow.id,'assignTest',assignment.id,Date.now()]);
+      await db.query('INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4)',
+        [teacherRow.id,receipt,digest(JSON.stringify(legacyInput)),oldResponse]);
+      await db.query('COMMIT');
+    }catch(error){await db.query('ROLLBACK');throw error;}
+    assert.deepEqual(await good(teacher.command('assignTest',legacyInput,oldKey)),assignment);
   });
 
   await t.test('a late audit write failure rolls back group, scope, request and receipt; the same command can retry',async()=>{

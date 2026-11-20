@@ -1,5 +1,5 @@
 Nomi: Kinematika — qisqa sinov
-Vaqt (soniya): 300
+Vaqt (soat): 0,5
 
 1. Jism 4 soniyada 20 metr yo‘l bosdi. O‘rtacha tezlik qancha?
 - 4 m/s

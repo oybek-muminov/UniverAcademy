@@ -1,0 +1,198 @@
+{
+  "format_version": 1,
+  "base_commit": "a2a10e6c8786d1b74d5ac80560d504d2039e73a0",
+  "files": [
+    {
+      "path": "apps/mini-app/local-teacher-pilot/student.mjs",
+      "previous_sha256": null,
+      "bytes": 11750,
+      "sha256": "261b0ded2df3243b5e9bca8e3b63c855de6aef60a64a965afb21bfc0f5fc7e89"
+    },
+    {
+      "path": "apps/mini-app/src/group-test-schedule.d.mts",
+      "previous_sha256": null,
+      "bytes": 207,
+      "sha256": "49dde01f73e1dad31427fc9a7c5537dd48fa3093af17a4feecfe949d666cfba1"
+    },
+    {
+      "path": "apps/mini-app/src/group-test-schedule.mjs",
+      "previous_sha256": null,
+      "bytes": 857,
+      "sha256": "e5bbdc8bd8b2de555d2c8d6a689660ea4e561d74deaa05505864db11e8c926ff"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-panel.tsx",
+      "previous_sha256": "4d72b225ba65b6c4480208b329758e8b76f6103949eee5aeaad90b73537d4ff8",
+      "bytes": 12418,
+      "sha256": "986f87d8a6137feccf63a79225d633259b063dca28c4fbd0b8b8b0e45589d467"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-port.ts",
+      "previous_sha256": "18c935c4d204918cf7e69db3d8666c04187d4d0de7614d8eda388174a391e7de",
+      "bytes": 6871,
+      "sha256": "8d85cbba587f189da408f600eb8cb4069b7972fea8e0d13e6850ca89156cb8b4"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-transport.mjs",
+      "previous_sha256": "e3adda46f275c049d222ab508aa1d000ab064f8692ab96cf1262e04fe618a363",
+      "bytes": 7412,
+      "sha256": "e1121728474be2ab92fe6dd5dee94097fb7594a8d76931b6be1725a1948c7e9a"
+    },
+    {
+      "path": "apps/mini-app/tests/staging-student-port.test.mjs",
+      "previous_sha256": "b47f90c1b4797b0e7681ffeda806b2b6a67b9828138b4f292bb6c6f613d1e951",
+      "bytes": 3849,
+      "sha256": "a092dc97cd02e6c62ea71d79c991e729c0ae9721a8cb3860e7ad742337b25ceb"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/rich-editor.mjs",
+      "previous_sha256": "541e41f4789c89afd3dd1e6443ff68486759b8506b352ccfe694e08bc685cd5b",
+      "bytes": 17013,
+      "sha256": "c372728949102b891049264c44e1c7f9ed9c3d6e925efd348aaf723b2c86bb99"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/sample.json",
+      "previous_sha256": null,
+      "bytes": 488,
+      "sha256": "3cc47d6ee00e6d7d76bdfb0b2068e4074b7f195a8b0bab1aa1bf59881fe6507f"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/sample.txt",
+      "previous_sha256": "19f64a49484ff55b848dbaec523cb32a6db03a81fa754256ebbf2670a8292e9b",
+      "bytes": 278,
+      "sha256": "24f9107c87d3f9d81e2e4c51dbd6bfca3747b95814f5e5ace4468019b893b42d"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/styles.css",
+      "previous_sha256": "20a8a6ac972d501e51e1e3d5231f1d2385a2e84f5caac0a32925e861ba25ec5e",
+      "bytes": 8431,
+      "sha256": "b855cd1502d01d1729f8f48cd761124e2c3614bb1db07a1d5703f0ff0fe17c49"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/teacher.mjs",
+      "previous_sha256": "0d800ef7fdcfac8609a12a4e70c88865b57fc32b3c319b9301d839e8a7a1fa50",
+      "bytes": 5269,
+      "sha256": "21a7a35b93059ab25bda2c4678d6d626e9444bfd5c23f3b3664e9c4fb3e1dd1c"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.html",
+      "previous_sha256": "57c0d5976984e9f5e937a2426f78aeb24c6fd59536d155a37311d9b3be84e0e9",
+      "bytes": 9111,
+      "sha256": "890d55fb53c21ce07a7ce686b43f539fb8eb9e417cb09edb9c76e43880dcd434"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "0bb007305291ada49ded0a9a8f3d7494cc264835fc8b1ebf037e3a635e0db805",
+      "bytes": 27677,
+      "sha256": "464007731b8fe33a5a9ca2a7e8095b99ba3cfbea7cac4a11dc964f6ce8e0be59"
+    },
+    {
+      "path": "docs/teacher-local-pilot.md",
+      "previous_sha256": "a343e4ffb3efcbef78d6095c1ac24de1a594517c5235ded7cd93a0544f22e8e2",
+      "bytes": 8061,
+      "sha256": "b29b2b79589b67a1eeb9171c5bed45ac9b6758efc3d221d7fbff1a7be83fddc0"
+    },
+    {
+      "path": "docs/teacher-staging-pilot.md",
+      "previous_sha256": "271c602906662965a28bb3188cb65499a8f84575cd1cf0e48b35fd9b6a56294c",
+      "bytes": 15193,
+      "sha256": "e1f050d79d81b47f7d1f32ed2efdd2df444b437cfb87cfd8998e438c05f91ed3"
+    },
+    {
+      "path": "packages/test-content/duration.mjs",
+      "previous_sha256": null,
+      "bytes": 1158,
+      "sha256": "22d78fb31f7cdd94512a506ed3cdd9ef582eeeeb838389ffd1661f614c259c1c"
+    },
+    {
+      "path": "runtime/teacher-assignment-schedule.mjs",
+      "previous_sha256": null,
+      "bytes": 2197,
+      "sha256": "81c4dea57ad608a0441a9a635daa86ff4a507f84e7d022a8ae37cd333d315af6"
+    },
+    {
+      "path": "runtime/teacher-cabinet-api.mjs",
+      "previous_sha256": "7c8ab001cb2969d0a56826e58d7a3eafc9a8f40416f6861141b99436980d40b2",
+      "bytes": 11280,
+      "sha256": "375ee6ee1436ea10811fa815b7319cb43e9ebd930d65f179fdebc731da91fde8"
+    },
+    {
+      "path": "runtime/teacher-local-pilot.mjs",
+      "previous_sha256": "08851f126e6c03603303797a005e95f56b3fa50df0dee68aee2bb1513b0e7194",
+      "bytes": 11351,
+      "sha256": "e8e093c3a3a4610cda9fabf43c21257ae4e2b68f8a9526ba14f9ee9769d6b7aa"
+    },
+    {
+      "path": "runtime/teacher-pilot-domain.mjs",
+      "previous_sha256": "f353aeb01240832be891b318c475709f3a434437413d99ca0f507603a587d97a",
+      "bytes": 22649,
+      "sha256": "8c4adc3fd23c7d215c473c026b0a8a7df76d884b9997e80bfe0651f568cae3b2"
+    },
+    {
+      "path": "runtime/teacher-pilot-import.mjs",
+      "previous_sha256": "1d34bbbbf0ba74c560714cb73adfb8a68782812925c7f829d15916152ed38b2a",
+      "bytes": 6082,
+      "sha256": "0d7eda5bee113949b7ddc718585846b62685c1736d5700fedd537c9998f4281e"
+    },
+    {
+      "path": "runtime/teacher-pilot-text-import.mjs",
+      "previous_sha256": "f15fd08e5dfa4235e3f10563b325896a757f062b098f02b03391aa82e95860e7",
+      "bytes": 3330,
+      "sha256": "28232d45f0bcc7b65b9e39dd9f27b46240b075573d015fee143c40109603af39"
+    },
+    {
+      "path": "runtime/teacher-staging-content.mjs",
+      "previous_sha256": "9ae16e9847794fd9a6df36f37051385c2c30d4066898300ab6ad0502f13299a6",
+      "bytes": 9499,
+      "sha256": "a7de78d217023869bbc8daafe16e99355f6d0b8f3b15f9c6765c892268b5adfb"
+    },
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": "37c2dc9f261526257424d5e0fbce803a31ddd152570f2530e788d00e88278ecb",
+      "bytes": 6138,
+      "sha256": "57bedc35cd8510e2cbf29869c1666d5d50ce2bf79529a77f0e9dd4dcbfae4afe"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "86d0b1178e423b723676ea4a156d1a85d6b3d2aeb0c8af52a2d9a0da07f5228e",
+      "bytes": 16674,
+      "sha256": "bcac503302072633ef2c6341a8aa7f0a49e1b72378aa0caa1b62fa0ef9d1fcd1"
+    },
+    {
+      "path": "tests/teacher-local-pilot/browser.py",
+      "previous_sha256": "495c581bc60908bb91e58afeab22eccbfc3185be6fecb33c452d33c05fd037f0",
+      "bytes": 10551,
+      "sha256": "dfa7cdcc6a3a9e1c51cc7f0460001854464e8032070288e072fbc7ba1c1e156b"
+    },
+    {
+      "path": "tests/teacher-local-pilot/dom.mjs",
+      "previous_sha256": "da505d43ebe4d7ab70db7874adea821e0132e1b4f50c36648dd56d7d5fe59b75",
+      "bytes": 16263,
+      "sha256": "50566665f78b3fe1525a3950ec9de11c67540643210410dae6aa02a2403d94dd"
+    },
+    {
+      "path": "tests/teacher-local-pilot/http.test.mjs",
+      "previous_sha256": "f955b9263ddf73297225718de92570071fcaa2a0adc2e0779186729de14eb35e",
+      "bytes": 29714,
+      "sha256": "d3b3968887bdd155ae5f27c9e4b068a24799ddc01f3d9c196de52b5e930411ed"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/native.test.mjs",
+      "previous_sha256": "6a47026eac61a6b30e330cfbe670048a2aa5369db1d93f30fedd64d359ee4e4d",
+      "bytes": 35075,
+      "sha256": "75cba97451466a9b3a0484c173c8f4cca575173ea633d5fb9f9ce5048bab46df"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "214a8b61bc645008b5f7cb7d691c7948245d9909d954452931ada9a8a4fac3ae",
+      "bytes": 20417,
+      "sha256": "a9f2ba820821bd584458998a853a61aff06c7667a7dfd1a01bfce0a7c0cbbc52"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/workerd-acceptance.mjs",
+      "previous_sha256": "f00252191aa89f7b02e01e52a472d3c36e1c965ce42f3081ecca1458e8413b6d",
+      "bytes": 13193,
+      "sha256": "beea9b0affd6944e95b813cd1ea3d4d50cb99a47121ba27680f3cd292b473c23"
+    }
+  ]
+}
