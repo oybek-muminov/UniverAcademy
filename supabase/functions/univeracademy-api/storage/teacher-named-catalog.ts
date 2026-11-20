@@ -1,0 +1,116 @@
+// Review-only authoritative metadata for the independent browser pilot.
+import { fail } from "../fault.ts";
+import { own, query } from "./postgres-transaction.ts";
+import type { LockedTransaction } from "./postgres-transaction.ts";
+
+type Scope=Readonly<{personId:string;subjectIds:readonly string[];groupIds:readonly string[]}>;
+type Row=Readonly<{id:string;title:string}>;
+type TitledCatalog=Readonly<{
+  personId:string;complete:true;name:string;subjects:readonly Row[];groups:readonly Row[];
+  tests:readonly (Row & Readonly<{groupId:string;subjectId:string}>)[];
+}>;
+
+type Input=Readonly<{
+  // Only from review-approved server configuration. No supplied default, no
+  // enumeration from a browser, and no title from a demo or marketing card.
+  approvedSubjectTitles:Readonly<Record<string,string>>;
+  // Deliberate composition policy; do not enable before confirming that the
+  // Teacher bootstrap lists only assigned demos in explicit groups.
+  listingPolicy:"approved-subject-assigned-demos";
+}>;
+const maxGroups=500,maxSubjects=100,maxTests=500;
+const id=(x:unknown):x is string=>typeof x==="string"&&x.length===36&&
+  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x);
+const label=(x:unknown):x is string=>typeof x==="string"&&x.length<=200&&x.trim().length>0&&
+  !/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u.test(x);
+const key=(x:unknown):x is string=>label(x)&&x===x.trim();
+const bad=():never=>fail("RESPONSE_INVARIANT_FAILED",500);
+
+const sql=`
+WITH actor AS MATERIALIZED (
+  SELECT p.id,p.profile->>'first_name' AS first_name,p.profile->>'last_name' AS last_name
+  FROM ua_private.people p JOIN ua_private.staff_access s ON s.person_id=p.id
+  WHERE p.id=$1::uuid AND p.enabled IS TRUE AND s.approved IS TRUE AND 'teacher'=ANY(p.roles)
+    AND pg_catalog.current_setting('ua.phase',true)='domain'
+    AND pg_catalog.current_setting('ua.person_id',true)=p.id::text
+), owned AS MATERIALIZED (
+  SELECT g.group_id FROM ua_private.staff_group_scope g
+    JOIN actor ON actor.id=g.person_id
+    JOIN ua_private.groups gr ON gr.id=g.group_id AND gr.status='active'
+    WHERE g.revoked_at_ms IS NULL
+), approved AS MATERIALIZED (
+  SELECT s.subject_id FROM ua_private.teacher_subject_approvals s
+    JOIN actor ON actor.id=s.person_id WHERE s.approved IS TRUE AND s.revoked_at_ms IS NULL
+)
+SELECT actor.id::text AS person_id,actor.first_name,actor.last_name,
+  ARRAY(SELECT subject_id FROM approved ORDER BY subject_id LIMIT 101) AS subject_ids,
+  (SELECT coalesce(jsonb_agg(w),'[]'::jsonb) FROM (
+    SELECT owned.group_id::text AS id,g.name AS title
+    FROM owned LEFT JOIN ua_private.groups g ON g.id=owned.group_id
+    ORDER BY owned.group_id LIMIT 501
+  ) w) AS group_rows,
+  (SELECT coalesce(jsonb_agg(w),'[]'::jsonb) FROM (
+    SELECT a.id::text AS id,a.group_id::text AS group_id,d.subject_id,d.title
+    FROM ua_private.assignments a JOIN owned ON owned.group_id=a.group_id
+    JOIN ua_private.test_versions v ON v.id=a.version_id AND v.demo_id=a.demo_id AND v.status='published'
+    LEFT JOIN ua_private.demos d ON d.id=a.demo_id
+    WHERE d.id IS NULL OR EXISTS(SELECT 1 FROM approved s WHERE s.subject_id=d.subject_id)
+    ORDER BY a.id LIMIT 501
+  ) w) AS test_rows
+FROM actor`;
+
+export function createTeacherNamedCatalog(config:Input) {
+  const configured=config?.approvedSubjectTitles;
+  if(config?.listingPolicy!=="approved-subject-assigned-demos"||!configured||
+     Object.getPrototypeOf(configured)!==Object.prototype) fail("SERVICE_UNAVAILABLE",503);
+  const keys=Reflect.ownKeys(configured);
+  if(!keys.length||keys.length>maxSubjects) fail("SERVICE_UNAVAILABLE",503);
+  const titles=new Map<string,string>();
+  for(const k of keys){
+    const prop=Object.getOwnPropertyDescriptor(configured,k);
+    if(!key(k)||!prop||!Object.hasOwn(prop,"value")||!label(prop.value)) fail("SERVICE_UNAVAILABLE",503);
+    titles.set(k,prop.value.trim());
+  }
+  // Inject only into the canonical Clerk-bound Teacher transaction after
+  // scope authorization and verified DB policy. GUC assertions are not auth.
+  return async(tx:LockedTransaction,scope:Scope,signal:AbortSignal):Promise<TitledCatalog>=>{
+    signal.throwIfAborted();
+    if(!id(scope.personId)||tx.personIds.length!==1||tx.personIds[0]!==scope.personId||
+      !scope.groupIds.every(id)||!scope.subjectIds.every(key)||scope.groupIds.length>maxGroups||
+      !scope.subjectIds.length||scope.subjectIds.length>maxSubjects) return bad();
+    own(tx,scope.personId);
+    const groupsInScope=new Set(scope.groupIds),subjectsInScope=new Set(scope.subjectIds);
+    if(groupsInScope.size!==scope.groupIds.length||subjectsInScope.size!==scope.subjectIds.length) return bad();
+    const subjects=scope.subjectIds.map(subjectId=>{
+      const title=titles.get(subjectId);if(title===undefined) fail("SERVICE_UNAVAILABLE",503);
+      return Object.freeze({id:subjectId,title});
+    });
+    const result=await query(tx,"ua_teacher_named_catalog_v1",sql,[scope.personId]);
+    signal.throwIfAborted();
+    if(result.rows.length!==1) fail("FORBIDDEN",403);
+    const r=result.rows[0];
+    if(r.person_id!==scope.personId||!Array.isArray(r.subject_ids)||
+      r.subject_ids.length!==subjectsInScope.size||new Set(r.subject_ids).size!==subjectsInScope.size||
+      r.subject_ids.some(s=>typeof s!=="string"||!subjectsInScope.has(s))||
+      !Array.isArray(r.group_rows)||r.group_rows.length!==groupsInScope.size||
+      !Array.isArray(r.test_rows)||r.test_rows.length>maxTests) return bad();
+    if(typeof r.first_name!=="string"||typeof r.last_name!=="string") return bad();
+    const name=[r.first_name.trim(),r.last_name.trim()].filter(Boolean).join(" ");
+    if(!label(name)) fail("SERVICE_UNAVAILABLE",503);
+    const foundGroups=new Set<string>(),foundTests=new Set<string>();
+    const groups=(r.group_rows as Record<string,unknown>[]).map(g=>{
+      if(!g||!id(g.id)||!groupsInScope.has(g.id)||foundGroups.has(g.id)) return bad();
+      if(!label(g.title)) fail("SERVICE_UNAVAILABLE",503); // Unknown legacy name, never an ID as label.
+      foundGroups.add(g.id);
+      return Object.freeze({id:g.id,title:g.title});
+    });
+    const tests=(r.test_rows as Record<string,unknown>[]).map(t=>{
+      if(!t||!id(t.id)||!id(t.group_id)||!foundGroups.has(t.group_id)||
+        !key(t.subject_id)||!subjectsInScope.has(t.subject_id)||!label(t.title)||foundTests.has(t.id)) return bad();
+      foundTests.add(t.id);
+      return Object.freeze({id:t.id,groupId:t.group_id,subjectId:t.subject_id,title:t.title});
+    });
+    return Object.freeze({personId:scope.personId,complete:true as const,name,
+      subjects:Object.freeze(subjects),groups:Object.freeze(groups),tests:Object.freeze(tests)});
+  };
+}

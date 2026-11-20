@@ -1,13 +1,15 @@
-// Isolated existing-account entrance. Does not call UniverAcademy APIs,
-// declare platform authority, exchange sessions, create accounts or redirect.
-import { createElement as h, useRef, useState } from 'react';
+// Existing-account entrance for the separate Ustoz origin.
+import { createElement as h, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ClerkProvider, ClerkFailed, ClerkLoaded, ClerkLoading, useSession, useSignIn } from '@clerk/react';
+import { ClerkProvider, ClerkFailed, ClerkLoaded, ClerkLoading, useClerk, useSession, useSignIn } from '@clerk/react';
+
+import { mountTeacherReadOnlyCabinet } from '../../teacher-web/src/read-only-entry.mjs';
+import '../../teacher-web/src/style.css';
 
 const origin = 'https://ustoz.univeracademy.uz';
 const unavailable = 'Kirish hozircha mavjud emas.';
 const product = 'O‘qituvchi kabinetiga kirish';
-const heading = (body) => h('section', null, h('h1', null, product), body);
+const heading = (body) => h('section', { className: 'status-card' }, h('h1', null, product), body);
 const message = (value) => h('p', { role: 'status' }, value);
 
 function matchingPublishingKey(key) {
@@ -16,12 +18,47 @@ function matchingPublishingKey(key) {
   catch { return false; }
 }
 
+function SignedInCabinet({ sessionId, userId }) {
+  const clerk = useClerk();
+  const host = useRef(null);
+  useLayoutEffect(() => {
+    function currentSession() {
+      const session = clerk.session;
+      return session?.id === sessionId && session.user?.id === userId &&
+        session.status === 'active' && !session.currentTask ? session : null;
+    }
+    const identity = {
+      current: () => currentSession() ? { userId, generation: sessionId } : null,
+      subscribe(notify) {
+        let active = Boolean(currentSession());
+        return clerk.addListener(() => {
+          const next = Boolean(currentSession());
+          if (next !== active) { active = next; notify(); }
+        });
+      },
+      async signOut() {
+        if (!currentSession()) throw new Error('Session changed');
+        await clerk.signOut({ sessionId, redirectUrl: origin + '/' });
+      },
+    };
+    return mountTeacherReadOnlyCabinet(host.current, {
+      origin, identity, getCurrentClerkToken: () => currentSession()?.getToken(),
+      fetch: window.fetch.bind(window),
+    });
+  }, [clerk, sessionId, userId]);
+  return h('div', { ref: host });
+}
+
 function EmailCodeEntrance() {
   const { isLoaded, isSignedIn, session } = useSession();
   const { signIn } = useSignIn();
   const running = useRef(false), attemptId = useRef(null), [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
   const [challenge, setChallenge] = useState(null);
   if (!isLoaded) return heading(message('Kirish oynasi tayyorlanmoqda…'));
+  if (isSignedIn && session?.status === 'active' && !session.currentTask && session.user?.id &&
+      import.meta.env.VITE_USTOZ_CABINET_READ_ENABLED === 'true') {
+    return h(SignedInCabinet, { key: session.id + '/' + session.user.id, sessionId: session.id, userId: session.user.id });
+  }
   if (isSignedIn) return heading(message(session?.status === 'active' && !session.currentTask
     ? 'Clerk hisobingizga kirdingiz. Kabinetga ruxsatni tekshirish va kabinet ma’lumotlari hozircha ulanmagan.'
     : 'Kirishni yakunlash uchun hisobingizda qo‘shimcha tasdiqlash kerak.'));

@@ -1,0 +1,76 @@
+// Opt-in isolated browser entry. Main and Student entry are unchanged.
+import { mountTeacherCabinet } from './mount.mjs';
+
+const route = '/api/v1/teacher/cabinet';
+const maximumBytes = 1_048_576;
+const unavailable = () => new Error('teacher read unavailable');
+const plain = value => value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype;
+
+async function boundedJson(response) {
+  if (!response.body || !/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type') ?? ''))
+    throw unavailable();
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let total = 0, text = '', done = false;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) { done = true; break; }
+      total += chunk.value.byteLength;
+      if (total > maximumBytes) throw unavailable();
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    return JSON.parse(text + decoder.decode());
+  } finally {
+    if (!done) void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+
+// Programmatic integration only; origin is reviewed HTTPS and MUST be the
+// static page's origin. No JWT is transferred outside that origin, via URLs,
+// in browser storage, or across Telegram. No adapter SDK or session creation.
+export function mountTeacherReadOnlyCabinet(root, { origin, identity, getCurrentClerkToken, fetch: send } = {}) {
+  if (typeof origin !== 'string' || typeof getCurrentClerkToken !== 'function' ||
+      typeof send !== 'function' || typeof identity?.current !== 'function') throw unavailable();
+  const parsed = new URL(origin);
+  if (parsed.protocol !== 'https:' || parsed.origin !== origin || globalThis.location.origin !== origin)
+    throw unavailable();
+  const endpoint = origin + route;
+  return mountTeacherCabinet(root, { identity, transport: { async read({ expected, signal }) {
+    const bound = AbortSignal.any([signal, AbortSignal.timeout(5000)]);
+    const check = () => {
+      bound.throwIfAborted();
+      const current = identity.current();
+      if (!current || current.userId !== expected.userId || current.generation !== expected.generation)
+        throw unavailable();
+    };
+    check();
+    // Clerk does not take a signal. Stop waiting even if its token request stalls.
+    let onAbort;
+    const aborted = new Promise((_, reject) => { onAbort = () => reject(bound.reason); });
+    bound.addEventListener('abort', onAbort, { once: true });
+    let token;
+    try { token = await Promise.race([getCurrentClerkToken({ expected, signal: bound }), aborted]); }
+    finally { bound.removeEventListener('abort', onAbort); }
+    check();
+    if (typeof token !== 'string' || !token || token.length > 8185 || /[^\x21-\x7e]/u.test(token))
+      throw unavailable();
+    const response = await send(endpoint, { method: 'GET', cache: 'no-store', credentials: 'omit',
+      redirect: 'error', signal: bound, headers: { accept: 'application/json', authorization: 'Bearer ' + token } });
+    check();
+    if (!(response instanceof Response) || response.redirected || response.url !== endpoint ||
+        !(response.headers.get('cache-control') ?? '').split(',').some(part => part.trim().toLowerCase() === 'no-store'))
+      throw unavailable();
+    if (response.status === 401 || response.status === 403) {
+      if (response.body) void response.body.cancel().catch(() => {});
+      return { status: response.status, data: null };
+    }
+    if (response.status !== 200) throw unavailable();
+    const envelope = await boundedJson(response);
+    check();
+    if (!plain(envelope) || Reflect.ownKeys(envelope).length !== 1 || !Object.hasOwn(envelope, 'data') ||
+        !plain(envelope.data)) throw unavailable();
+    return { status: 200, data: envelope.data };
+  } } });
+}

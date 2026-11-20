@@ -1,0 +1,72 @@
+// Unregistered pilot handler for independent, ordinary browser Clerk login.
+// NOT a Telegram handoff, Student exchange, login widget, or linking flow.
+import { createClerkVerifier } from "./clerk-auth.ts";
+import type { ClerkLiveness, ClerkProof, ClerkVerifierConfiguration } from "./clerk-auth.ts";
+import { ApiFault, fail } from "./fault.ts";
+import { readTeacherCabinetBootstrap } from "./teacher-cabinet-bootstrap.ts";
+
+export const TEACHER_BROWSER_PILOT_PATH="/api/v1/teacher/cabinet";
+type BootstrapScope=Omit<Parameters<typeof readTeacherCabinetBootstrap>[0],"proof"|"signal"|"liveness">;
+type TrustedRunner=Readonly<{
+  // Derive the person by exact current Clerk issuer + subject mapping, using
+  // the independently authorized staff reader, then lock only that person.
+  // A false or missing locator may never create a person. No Student ledger,
+  // profile/application writes, or existing sign-in policy change.
+  run<T>(proof:ClerkProof,signal:AbortSignal,
+    read:(scope:BootstrapScope)=>Promise<T>):Promise<T>;
+}>;
+type Dependencies=Readonly<{
+  browserOrigin:string; // Configured canonical HTTPS origin, not caller headers.
+  verifier:ClerkVerifierConfiguration;
+  liveness:ClerkLiveness;
+  runner:TrustedRunner; // Before commit: verify current minimum lease and abort.
+}>;
+
+function origin(value:string):string{
+  let url:URL;
+  try { url=new URL(value); } catch { return fail("SERVICE_UNAVAILABLE",503); }
+  if(url.protocol!=="https:"||url.origin!==value||url.username||url.password)
+    fail("SERVICE_UNAVAILABLE",503);
+  return url.origin;
+}
+
+const headers=Object.freeze({
+  "content-type":"application/json; charset=utf-8",
+  "cache-control":"no-store",
+  "x-content-type-options":"nosniff",
+});
+
+export async function handleTeacherBrowserPilot(request:Request,deps?:Dependencies):Promise<Response> {
+  try {
+    if(!deps||typeof deps.runner?.run!=="function"||typeof deps.liveness!=="function")
+      fail("SERVICE_UNAVAILABLE",503);
+    const allowed=origin(deps.browserOrigin);
+    const url=new URL(request.url), suppliedOrigin=request.headers.get("origin");
+    if(request.method!=="GET"||url.origin!==allowed||url.pathname!==TEACHER_BROWSER_PILOT_PATH||
+       url.search||url.hash||url.username||url.password||(suppliedOrigin!==null&&suppliedOrigin!==allowed))
+      fail("NOT_FOUND",404);
+    const {signal}=request;
+    signal.throwIfAborted();
+    const header=request.headers.get("authorization");
+    const token=header&&header.length<=8192?header.match(/^Bearer ([^\s]+)$/i)?.[1]:null;
+    if(!token) fail("CLERK_TOKEN_INVALID",401);
+    if (!deps.verifier.authorizedParties.includes(allowed)) fail("SERVICE_UNAVAILABLE",503);
+    const proof=await createClerkVerifier({...deps.verifier,authorizedParties:[allowed]})(token);
+    signal.throwIfAborted();
+
+    // No expected person ID, role, URL credential, or Telegram launch
+    // parameter is admitted. Identity is solely the fresh browser proof.
+    const value=await deps.runner.run(proof,signal,async scope=>{
+      signal.throwIfAborted();
+      return readTeacherCabinetBootstrap({...scope,proof,signal,liveness:deps.liveness});
+    });
+    signal.throwIfAborted();
+    return new Response(JSON.stringify({data:value}),{status:200,headers});
+  } catch(error) {
+    const status=error instanceof ApiFault&&[401,403,404,503].includes(error.status)?error.status:
+      request.signal.aborted?503:500;
+    const code=status===401?"CLERK_TOKEN_INVALID":status===403?"FORBIDDEN":
+      status===404?"NOT_FOUND":status===503?"SERVICE_UNAVAILABLE":"INTERNAL_ERROR";
+    return new Response(JSON.stringify({error:{code}}),{status,headers});
+  }
+}

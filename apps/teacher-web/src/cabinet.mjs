@@ -33,17 +33,17 @@ export class TeacherCabinet {
   async leave(action) {
     if (this.#leaving || this.#disposed || this.state.kind !== 'ready') return;
     if (action !== 'student' && action !== 'signout') return;
-    this.#leaving = true; ++this.#epoch; this.#abort?.abort();
+    this.#leaving = true; const epoch = ++this.#epoch; this.#abort?.abort();
     this.#set({ kind: 'leaving', tab: 'overview' });
     try {
       await (action === 'student' ? this.#port.openStudent() : this.#port.signOut());
-      this.#set({ kind: action === 'student' ? 'student' : 'signed-out', tab: 'overview' });
-    } catch { this.#set({ kind: 'error', tab: 'overview' }); }
-    finally { this.#leaving = false; }
+      if (epoch === this.#epoch) this.#set({ kind: action === 'student' ? 'student' : 'signed-out', tab: 'overview' });
+    } catch { if (epoch === this.#epoch) this.#set({ kind: 'error', tab: 'overview' }); }
+    finally { if (epoch === this.#epoch) this.#leaving = false; }
   }
   suspend() {
     if (this.#disposed) return;
-    ++this.#epoch; this.#abort?.abort();
+    ++this.#epoch; this.#abort?.abort(); this.#leaving = false;
     this.#set({ kind: 'idle', tab: 'overview' });
   }
   dispose() { this.#disposed = true; ++this.#epoch; this.#abort?.abort(); }

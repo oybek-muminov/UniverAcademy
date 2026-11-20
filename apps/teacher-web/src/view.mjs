@@ -33,7 +33,9 @@ export function renderCabinet(root, state, actions) {
     frame.append(panel); return;
   }
   const account = element('div', undefined, 'account');
-  account.append(element('span', state.name), button('O‘quvchi rejimi', actions.student), button('Chiqish', actions.signout)); header.append(account);
+  account.append(element('span', state.name));
+  if (typeof actions.student === 'function') account.append(button('O‘quvchi rejimi', actions.student));
+  account.append(button('Chiqish', actions.signout)); header.append(account);
   const layout = element('div', undefined, 'layout'); frame.append(layout);
   const nav = element('nav'); nav.setAttribute('aria-label', 'Kabinet bo‘limlari');
   for (const [id, label] of [['overview', 'Umumiy'], ['groups', 'Guruhlar'], ['tests', 'Testlar']]) {

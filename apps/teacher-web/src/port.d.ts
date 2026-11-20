@@ -13,3 +13,27 @@ export interface TeacherCabinetPort {
   /** Use the configured Clerk instance; revoke local view immediately. */
   signOut(): Promise<void>;
 }
+
+/** Internal review integration. Do not wire to a provisional HTTP API. */
+export interface VerifiedBrowserIdentity {
+  readonly userId: string;
+  /** Opaque local provider-session generation, never a bearer token or URL field. */
+  readonly generation: string;
+}
+export interface TeacherBrowserReviewIntegration {
+  identity: {
+    /** Null means verified signed out; throw if identity state is unavailable. */
+    current(): VerifiedBrowserIdentity | null;
+    /** Report account/session changes and available server grant invalidations. */
+    subscribe(invalidate: () => void): () => void;
+    /** Compare the expected provider generation at dispatch. */
+    signOut(expected: VerifiedBrowserIdentity): Promise<void>;
+  };
+  transport: {
+    /** Take auth from verified provider integration, not this browser identity DTO. */
+    read(input: {
+      expected: VerifiedBrowserIdentity;
+      signal: AbortSignal;
+    }): Promise<{ status: number; data: unknown }>;
+  };
+}

@@ -1,10 +1,10 @@
 name: Teacher browser groundwork
 on:
   pull_request:
-    paths: ['apps/teacher-web/**', '.github/workflows/teacher-web.yml']
+    paths: ['apps/teacher-web/**', 'apps/mini-app/teacher-entrance/**', 'apps/mini-app/tools/clerk-load-promise-fix.mjs', 'apps/mini-app/package*.json', '.github/workflows/teacher-web.yml']
   push:
     branches: [main]
-    paths: ['apps/teacher-web/**', '.github/workflows/teacher-web.yml']
+    paths: ['apps/teacher-web/**', 'apps/mini-app/teacher-entrance/**', 'apps/mini-app/tools/clerk-load-promise-fix.mjs', 'apps/mini-app/package*.json', '.github/workflows/teacher-web.yml']
 permissions:
   contents: read
 jobs:
@@ -20,3 +20,8 @@ jobs:
           node-version: '24.15.0'
       - run: npm --prefix apps/teacher-web test
       - run: npm --prefix apps/teacher-web run build
+      - run: npm ci --prefix apps/mini-app --ignore-scripts --no-audit --no-fund
+      - run: ./node_modules/.bin/vite build --config teacher-entrance/vite.config.mjs --mode production
+        working-directory: apps/mini-app
+        env:
+          VITE_USTOZ_CABINET_READ_ENABLED: 'true'
