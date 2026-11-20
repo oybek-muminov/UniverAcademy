@@ -721,18 +721,24 @@ for (const file of brand.files) {
 }
 // Preserve each historical selected digest, then verify the staging candidate bytes.
 const STAGING_OVERLAY_SHA256 = '68b0bd4a828aeede2f211ed45fb2fafeb645197ae2ba9278280b583b4cdbf7a6';
-const stagingRaw = readTarget('apps/mini-app/tests/fixtures/teacher-staging-overlay.json');
-assert.equal(sha256(stagingRaw), STAGING_OVERLAY_SHA256, 'STAGING_OVERLAY_MISMATCH');
-const staging = JSON.parse(stagingRaw);
-assert.equal(staging.base_commit, 'ce9bade40533020117cdc111b20b7763ef6d0e59');
-const stagedPaths = new Set();
-for (const file of staging.files) {
-  assert(canonicalPath(file.path) && !stagedPaths.has(file.path), 'STAGING_TARGET_PATH_INVALID');
-  stagedPaths.add(file.path);
-  assert.equal(selected.get(file.path)?.sha256 ?? null, file.previous_sha256, 'STAGING_PREIMAGE_MISMATCH: ' + file.path);
-  assert(Number.isSafeInteger(file.bytes) && file.bytes >= 0 && /^[0-9a-f]{64}$/.test(file.sha256));
-  selected.set(file.path, {path:file.path, bytes:file.bytes, sha256:file.sha256});
+const REGISTRATION_OVERLAY_SHA256 = '4a71790fcf1f584065ccadcee06452edc2ca67ad3179f02f6a541ac93d34ef09';
+function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
+  const raw = readTarget('apps/mini-app/tests/fixtures/' + filename);
+  assert.equal(sha256(raw), expectedHash, diagnostic + '_OVERLAY_MISMATCH');
+  const transition = JSON.parse(raw);
+  assert.equal(transition.format_version, 1);
+  assert.equal(transition.base_commit, baseCommit);
+  const paths = new Set();
+  for (const file of transition.files) {
+    assert(canonicalPath(file.path) && !paths.has(file.path), diagnostic + '_TARGET_PATH_INVALID');
+    paths.add(file.path);
+    assert.equal(selected.get(file.path)?.sha256 ?? null, file.previous_sha256, diagnostic + '_PREIMAGE_MISMATCH: ' + file.path);
+    assert(Number.isSafeInteger(file.bytes) && file.bytes >= 0 && /^[0-9a-f]{64}$/.test(file.sha256));
+    selected.set(file.path, {path:file.path, bytes:file.bytes, sha256:file.sha256});
+  }
 }
+applySourceTransition('teacher-staging-overlay.json', STAGING_OVERLAY_SHA256, 'ce9bade40533020117cdc111b20b7763ef6d0e59', 'STAGING');
+applySourceTransition('registration-storage-overlay.json', REGISTRATION_OVERLAY_SHA256, 'deb3636755c2f5b222dc3460e8e410aaa37c1fc5', 'REGISTRATION');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

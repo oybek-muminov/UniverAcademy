@@ -1,0 +1,72 @@
+{
+  "format_version": 1,
+  "base_commit": "deb3636755c2f5b222dc3460e8e410aaa37c1fc5",
+  "files": [
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+      "previous_sha256": "d6b25516472fc9d654eb3a0b7725690c9dda3869ec433af94b2d6617200a14cc",
+      "bytes": 27912,
+      "sha256": "177480a6b512016bdb17bc326bfc7c19b87a3116cf2ba839511efb2f9758451c"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/stored-profile.ts",
+      "previous_sha256": "1b4441e6ad14f2a10632ce43f36611dc037391823ffdef12abc9d919f29efa86",
+      "bytes": 2906,
+      "sha256": "e3f277ba9e4fae229842d1f1d0b630afc607e97dfa0533f115ed1ac3ef5e64db"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-http-rows.ts",
+      "previous_sha256": "87783dc72c0ac127448654b876427890e45c2f7de3d90c54991c59ac36b4c45c",
+      "bytes": 13923,
+      "sha256": "e0e5bf238b44c864074eec011c7f6d9e244c4c95c0eaab2789088acb72dd2c0c"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/student-identity-rows.ts",
+      "previous_sha256": "2f0a025e93bcdd45a3a2b48e1509cfd809919a3fcc71741cd32f55b584c2d39f",
+      "bytes": 3236,
+      "sha256": "961c28b8da7f1e617897f816271126f150d9867e0f16030ca73be5d1939b52a0"
+    },
+    {
+      "path": "tests/backend/student-prepared/profile-context.test.mjs",
+      "previous_sha256": "44f885eb1c66660dea3102c82c2bd14cff31ef4c2487d2fa3d3d8a5ca7c04154",
+      "bytes": 25138,
+      "sha256": "787d1ee41adee18a934978387ce5bc158eefa73bef6e616e5c1ef05a7b21511b"
+    },
+    {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "previous_sha256": "261b2a2a4f3358e0990cdb81811065cfcf25a7626bfd58c5ccc28d9a791b9c05",
+      "bytes": 41938,
+      "sha256": "33c79b3d1afc6cca747d07c331cc753677690acd764ec54aa92551797e6c3917"
+    },
+    {
+      "path": "tests/clerk-auth/scoped-store.test.mjs",
+      "previous_sha256": "2f1ed9c3aa81bd0636967f4b4c1ee41fadebb227f65f6e8416b85e0c3354821f",
+      "bytes": 22621,
+      "sha256": "1f4f3b309820e29ed1601e4440bcd856c7739daa9b8167619b9b18190ea80002"
+    },
+    {
+      "path": "tests/persistent-http/executor.mjs",
+      "previous_sha256": "0957a66e08bdf0664dc33b969a6d2762a811ef1be5adae4f74afb39cee4d6823",
+      "bytes": 7669,
+      "sha256": "74d8b198b246bcbe264752b4ece10541cfed55f7bc1528cd747ca57686306d0d"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/cluster.mjs",
+      "previous_sha256": null,
+      "bytes": 3792,
+      "sha256": "f215dcc2361480aa80bce2b4ad8d898b278db89a52f66743ecea6bcdeb6e6e3a"
+    },
+    {
+      "path": "tests/telegram-entry/native-registration-phases.test.mjs",
+      "previous_sha256": null,
+      "bytes": 12326,
+      "sha256": "c600d754f2df979373f38606a765d5bf49b1e0d07f752c6508ef618655299199"
+    },
+    {
+      "path": "tests/telegram-entry/statement-fixture.mjs",
+      "previous_sha256": "12143ef2bf363a7d3ab4cc2b51f3e622c311cbc8fc6d961538babe4b5d449524",
+      "bytes": 8608,
+      "sha256": "b8502d28a7d8dfa9a406a59c89f3b8d7521247f15ed8c64f171abb11eebbd930"
+    }
+  ]
+}

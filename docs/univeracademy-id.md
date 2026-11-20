@@ -13,10 +13,10 @@ Yangi mijozlar jadvaldagi aniq `Accept` qiymatini yuboradi. Har javobda bitta ID
 
 ## Chiqarish ketma-ketligi
 
-1. [Baza migratsiyasi](../supabase/migrations/cabinet-id/README.md)ning `expand` bosqichini bajaring. Eski server shu bosqichdan keyin ham mavjud hisobni o‘qishi va yangi o‘quvchini ro‘yxatdan o‘tkazishi kerak.
-2. Yangi API versiyasini barcha faol server nusxalariga chiqaring. Yangi frontendni chiqarishdan oldin bitta test hisobida jadvaldagi ikkala so‘rov o‘sha IDni qaytarishini tekshiring.
-3. Yangi Mini App va boshqa yangilangan mijozlarni tarqating. Eski ochiq veb-sahifalar va saqlangan mijozlar avvalgi javob shaklidan foydalanishda davom etadi.
-4. Eski server nusxalari xizmatdan chiqqach, bazada `forward`, keyin `backfill` bosqichlarini bajaring. Oldingi klientlarni qo‘llash uchun serverdagi javob mosligi saqlanadi.
+1. Yangi registration API versiyasini chiqarish mumkin. U dastlabki PostgreSQL sxemasida ham yangi o‘quvchi yaratadi va profil ismini yangilaydi. API chiqarilishi Supabase ustunining nomini o‘zgartirmaydi. Yangi frontendni chiqarishdan oldin jadvaldagi ikkala so‘rov o‘sha IDni qaytarishini tekshiring.
+2. Yangi Mini App va boshqa yangilangan mijozlarni tarqating. Avvalroq ochilgan ilovalar eski javob shaklini olishda davom etadi.
+3. Baza egasi jismoniy nomni almashtirishga ruxsat bergach, [ID migratsiyasidagi](../supabase/migrations/cabinet-id/README.md) tiklash nuqtasi va katalog tekshiruvlarini bajaring. `expand` yangi ko‘rinishni ochadi. U allaqachon bajarilgan bo‘lsa ham API shu sxemani taniydi. O‘qituvchi kabinetining PostgreSQL migratsiyasi shu ko‘rinishga tayanadi.
+4. Eski server nusxalari xizmatdan chiqib, ularning tranzaksiyalari tugagach, `forward` orqali ustun nomini almashtiring. So‘ng `backfill` eski profil JSONlarini yangilaydi. Oraliqda har ikkala ko‘rinish o‘qiladi. Ro‘yxatga olish, ismni yangilash va boshidagi nollar `node --test tests/telegram-entry/native-registration-phases.test.mjs` orqali uchala bosqichda sinaladi.
 
 Frontendni qaytarishda API ikkala ko‘rinishga ham xizmat qiladi. Serverning eski versiyasiga qaytish uchun avval eski frontendni tarqating va yangi `Accept` bilan ochiq qolgan mijozlar uchun mos API versiyasini saqlang. Baza yakunlovchi bosqichdan o‘tgan bo‘lsa, eski server trafik olishidan oldin bazada `rollback`, keyin `backfill` bosqichlarini bajaring.
 

@@ -54,6 +54,7 @@ export class Pool{
       else if(name==="ua_clerk_access")rows=Object.entries(draft.access).filter(([,r])=>draft.families[r.familyId]?.personId===owner).map(([key,r])=>({digest:key,family_id:r.familyId,expires_at_ms:String(r.expiresAt),superseded:r.superseded}));
       else if(name==="ua_clerk_refresh")rows=Object.entries(draft.refresh).filter(([,r])=>draft.families[r.familyId]?.personId===owner).map(([key,r])=>({digest:key,family_id:r.familyId,consumed:r.consumed}));
       if(rows)return result(this.inject?this.inject(name,rows):structuredClone(rows));
+      if(name==="ua_registration_write_target")return result([{expanded:true}]);
       if(name==="ua_clerk_person_insert"){
         if(draft.people[v[0]]||Object.values(draft.people).some(p=>p.profile.univeracademy_id===v[1]))return result([]);
         draft.people[v[0]]={telegramId:null,enabled:v[2],profile:JSON.parse(v[4])};

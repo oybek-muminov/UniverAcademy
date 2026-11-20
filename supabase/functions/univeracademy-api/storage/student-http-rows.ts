@@ -1,4 +1,4 @@
-import { readStoredProfile } from "./stored-profile.ts";
+import { readStoredProfile, updateRegistrationProfile } from "./stored-profile.ts";
 import { fail } from "../fault.ts";
 import type { AssignmentRecord, Person, SeriesRecord, StudentState } from "../student-state.ts";
 import { AttemptRows, decodePublished, decodeRatio } from "./attempt-rows.ts";
@@ -70,7 +70,7 @@ export class StudentHttpRows {
       group:p.profile.active_group_id,cabinetId:p.profile.univeracademy_id});
     if(!same(identity(a),identity(b))) fail("RESPONSE_INVARIANT_FAILED",500);
     if(!this.options.externalAuthWriter&&!same(a.profile,b.profile)) {
-      const r=await query(tx,"ua_http_profile_write","UPDATE ua_private.people SET profile=$1::jsonb WHERE id=$2 RETURNING id",[JSON.stringify(a.profile),personId]);
+      const r=await query(tx,"ua_http_profile_write",updateRegistrationProfile,[JSON.stringify(a.profile),personId]);
       if(r.rowCount!==1) fail("RESPONSE_INVARIANT_FAILED",500);
     }
     const snapshot=(s:StudentState)=>JSON.stringify({grants:s.grants,assignments:s.assignments,bonuses:s.bonuses,cancellations:s.cancellations},(_,v)=>typeof v==="bigint"?v.toString():v);

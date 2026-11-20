@@ -100,7 +100,7 @@ class Pool{
     if(name==='ua_clerk_refresh'||name==='ua_http_refresh')return rows(Object.entries(d.refresh).filter(([,a])=>d.families[a.familyId]?.personId===v[0]&&(!v[1]||a.familyId===v[1])).map(([digest,a])=>({digest,family_id:a.familyId,consumed:a.consumed})));
     if(['ua_http_replays','ua_http_grants','ua_http_assignments','ua_http_series','ua_http_attempt_ids','ua_http_receipts','ua_http_bonuses','ua_http_cancellations'].includes(name))return rows([]);
     if(name==='ua_clerk_profile_update'){
-      assert.equal(text,'UPDATE ua_private.people SET profile=$1::jsonb WHERE id=$2 RETURNING id');
+      assert.equal(text.replace(/\s+/g,' '), "UPDATE ua_private.people SET profile = profile || jsonb_build_object( 'first_name', $1::jsonb->'first_name', 'last_name', $1::jsonb->'last_name', 'registration_complete', $1::jsonb->'registration_complete') WHERE id=$2 RETURNING id");
       assert.equal(this.local.phase,'domain');assert.equal(this.local.person_id,v[1]);assert.deepEqual(JSON.parse(this.local.person_ids),[v[1]]);
       assert.equal(this.local.clerk_issuer,who.issuer);assert.equal(this.local.clerk_subject,who.userId);assert.equal(this.local.telegram_id,'');
       d.people[v[1]].profile=JSON.parse(v[0]);return ack();

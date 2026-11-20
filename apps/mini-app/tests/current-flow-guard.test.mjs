@@ -10,6 +10,8 @@ import { spawnSync } from 'node:child_process';
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 const guard = 'apps/mini-app/tests/verify-backend-targets.mjs';
 const current = 'apps/mini-app/tests/fixtures/backend-final-content-9bca9654-manifest.json';
+const registrationOverlay = 'apps/mini-app/tests/fixtures/registration-storage-overlay.json';
+const registrationFiles = JSON.parse(readFileSync(join(source,registrationOverlay),'utf8')).files;
 const stagingOverlay = 'apps/mini-app/tests/fixtures/teacher-staging-overlay.json';
 const stagingManifest = JSON.parse(readFileSync(join(source,stagingOverlay), 'utf8'));
 const brandOverlay = 'apps/mini-app/tests/fixtures/univeracademy-id-overlay.json';
@@ -46,7 +48,7 @@ const lab208Raw = readFileSync(join(source, lab208));
 assert.equal(lab208Raw.length, 42473);
 assert.equal(sha(lab208Raw), '5372551a2ca45bb2505a4f198445e9867273411b74ce998c4611851c1cb2005e');
 // Opaque historical byte fixture: its JSON target rows are never traversed.
-const manifestErrors = new Map([['STAGING_OVERLAY_MISMATCH', stagingOverlay],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
+const manifestErrors = new Map([['REGISTRATION_OVERLAY_MISMATCH', registrationOverlay],['STAGING_OVERLAY_MISMATCH', stagingOverlay],['RUNTIME_MANIFEST_MISMATCH', current], ['HISTORICAL_ATTEMPTS_FIXTURE_MISMATCH', historicalAttempts], ['CURRENT_RUNTIME_OVERLAY_MISMATCH', currentRuntime], ['ACCOUNT_DELETION_OVERLAY_MISMATCH',deletionOverlay], ['BRAND_OVERLAY_MISMATCH',brandOverlay]]);
 let pristinePassed = false;
 
 function check(mutate, expected, { rebindDigest = false } = {}) {
@@ -54,7 +56,7 @@ function check(mutate, expected, { rebindDigest = false } = {}) {
   if (expected) assert(pristinePassed, 'PRISTINE_GUARD_CONTROL_REQUIRED');
   const root = mkdtempSync(join(tmpdir(), 'ua-current-guard-'));
   try {
-    const inputs = [...new Set([guard, stagingOverlay, ...stagingManifest.files.map(file => file.path), brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
+    const inputs = [...new Set([guard, registrationOverlay, ...registrationFiles.map(file => file.path), stagingOverlay, ...stagingManifest.files.map(file => file.path), brandOverlay, ...brandManifest.files.map(file => file.path), 'runtime/contract-paths.mjs', 'apps/mini-app/tests/path-containment.mjs', deletionOverlay, ...deletionManifest.files.map(f=>f.path), current, currentRuntime, previousContentBase, previousAssembly, previousClean, lab208, historicalAttempts, historicStudentState, historicListener, ...copies, ...manifest.files.map(file => file.path), ...currentRuntimeManifest.files.map(file => file.path)])];
     const before = new Map();
     for (const name of inputs) {
       const path = join(root, name); mkdirSync(dirname(path), { recursive: true });
@@ -109,6 +111,12 @@ function oldAttempts(root) {
 }
 
 test('current guard accepts exact corrected types base plus two Backend corrections and both owner copies', () => check());
+test('registration storage overlay is fixed by its release pin', () => check(root => {
+  appendFileSync(join(root, registrationOverlay), '\n');
+}, 'REGISTRATION_OVERLAY_MISMATCH'));
+test('registration acceptance source cannot change under the approved storage overlay', () => check(root => {
+  appendFileSync(join(root, 'tests/telegram-entry/native-registration-phases.test.mjs'), '\n');
+}, 'BACKEND_TARGET_SIZE_MISMATCH: tests/telegram-entry/native-registration-phases.test.mjs'));
 test('staging candidate overlay is fixed by the release pin', () => check(root => {
   appendFileSync(join(root, stagingOverlay), '\n');
 }, 'STAGING_OVERLAY_MISMATCH'));

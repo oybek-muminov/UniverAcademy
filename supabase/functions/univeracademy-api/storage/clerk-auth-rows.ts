@@ -1,4 +1,4 @@
-import { readStoredProfile } from "./stored-profile.ts";
+import { readStoredProfile, registrationInsertTarget, updateRegistrationProfile } from "./stored-profile.ts";
 import {fail} from "../fault.ts";
 import {checkClerkProof,clerkReplayIdentity,requireLiveClerk,clerkIdentityKey,clerkSessionKey} from "../clerk-auth.ts";
 import type {ClerkIdentity,ClerkProof,ClerkLiveness} from "../clerk-auth.ts";
@@ -220,13 +220,15 @@ export class ClerkAuthRows{
       if(!s.identity)fail("SERVICE_UNAVAILABLE",503);
       if(person.telegramId!==null||!same(person.profile.roles,["student"])||person.profile.registration_complete||person.profile.active_group_id!==null||
         !same(Object.keys(after.identities),[clerkIdentityKey(s.identity)])||!same(after.membership,{active:false,epoch:0,revision:0,affinityGroupId:null}))fail("RESPONSE_INVARIANT_FAILED",500);
-      await write("ua_clerk_person_insert","INSERT INTO ua_private.people_registration(id,telegram_id,univeracademy_id,enabled,roles,profile) VALUES($1,NULL,$2,$3,$4,$5::jsonb) ON CONFLICT DO NOTHING RETURNING id",[s.personId,person.profile.univeracademy_id,person.enabled,person.profile.roles,JSON.stringify(person.profile)]);
+      const target=await registrationInsertTarget(s.client);
+      await write("ua_clerk_person_insert"+target.statementSuffix,target.insert+" VALUES($1,NULL,$2,$3,$4,$5::jsonb) ON CONFLICT DO NOTHING RETURNING id",
+        [s.personId,person.profile.univeracademy_id,person.enabled,person.profile.roles,target.profileJson(person.profile)]);
       await write("ua_clerk_member_insert","INSERT INTO ua_private.memberships(person_id,active,epoch,revision,affinity_group_id) VALUES($1,false,0,0,NULL) RETURNING person_id",[s.personId]);
       await write("ua_clerk_identity_insert","INSERT INTO ua_private.clerk_identities(issuer,subject,person_id,enabled) VALUES($1,$2,$3,true) RETURNING person_id",[s.identity.issuer,s.identity.userId,s.personId]);
     }else{
       const invariant=(p:Person)=>({telegramId:p.telegramId,enabled:p.enabled,roles:p.profile.roles,cabinetId:p.profile.univeracademy_id,group:p.profile.active_group_id});
       if(!same(invariant(before.person),invariant(person))||!same(before.membership,after.membership)||!same(before.identities,after.identities))fail("RESPONSE_INVARIANT_FAILED",500);
-      if(!same(before.person.profile,person.profile))await write("ua_clerk_profile_update","UPDATE ua_private.people SET profile=$1::jsonb WHERE id=$2 RETURNING id",[JSON.stringify(person.profile),s.personId]);
+      if(!same(before.person.profile,person.profile))await write("ua_clerk_profile_update",updateRegistrationProfile,[JSON.stringify(person.profile),s.personId]);
     }
     for(const key of Object.keys(after.consumedTokens))if(!before.consumedTokens[key]){
       if(key!==s.exchangeDigest)fail("RESPONSE_INVARIANT_FAILED",500);

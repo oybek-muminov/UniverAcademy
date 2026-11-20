@@ -18,7 +18,7 @@ async function availablePort() {
 }
 
 // The tests supply no external URL. Each run initializes a brand-new native cluster.
-export async function createCluster() {
+export async function createCluster({ expandCabinetId = true } = {}) {
   const host = '127.0.0.1', port = await availablePort();
   const root = await mkdtemp(join(tmpdir(), 'ua-teacher-stage-'));
   const password = randomBytes(32).toString('hex');
@@ -46,7 +46,7 @@ export async function createCluster() {
     await server.start();
     started = true;
     capture = await nativeFixture({ url:adminUrl });
-    await expand(capture.admin);
+    if (expandCabinetId) await expand(capture.admin);
     return { admin:capture.admin, adminUrl, installDeletion:capture.installDeletion, close };
   } catch (error) { await close(); throw error; }
 }
