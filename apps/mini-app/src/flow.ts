@@ -26,6 +26,7 @@ export type Draft = { questionId: string; optionId: string | null };
 export type SaveIntent = Draft & { attemptId: string; assignmentId: string; generation: number; expectedRevision: number };
 export type StudentPort = {
   stagingPilot?(person:string): import('./staging-student-port.ts').StagingStudentPort;
+  takeEntryDashboard?(exams:Exam[],person:string): import('./staging-student-port.ts').EntryGroupDashboard | undefined;
   profile(): Promise<Student | null>;
   register(firstName: string, lastName: string): Promise<Student>;
   exams(): Promise<Exam[]>;

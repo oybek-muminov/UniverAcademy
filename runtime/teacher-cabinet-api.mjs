@@ -11,7 +11,6 @@ import { locateStudentAccessOnClient } from '../supabase/functions/univeracademy
 import { setTrustedPhase } from '../supabase/functions/univeracademy-api/storage/trusted-server-context.ts';
 import { transactionPoolPort } from '../supabase/functions/univeracademy-api/storage/transaction-pool-port.ts';
 import { createClerkPersonTransactions } from '../supabase/functions/univeracademy-api/teacher-browser-pilot-postgres.ts';
-import { parseTeacherTestText } from './teacher-pilot-text-import.mjs';
 import { imageLimits } from '../packages/test-content/image-policy.mjs';
 import { CommittedAttemptError } from './teacher-staging-attempts.mjs';
 import { runStagingPilot } from './teacher-staging-store.mjs';
@@ -70,7 +69,7 @@ async function studentTransaction(options,pool,request,operation) {
     },
   },async tx=>{
     const personId=tx.personIds[0];
-    const {state,familyId}=await new ClerkAuthRows().loadSession({client:tx.client,personId,now:tx.now,existing:true},{kind:'access',digest},false);
+    const {state,familyId}=await new ClerkAuthRows().loadSession({client:tx.client,personId,now:tx.now,existing:true},{kind:'access',digest},false,{singleStatement:true});
     const materialized=combined(state),family=state.families[familyId],entry=state.access[digest];
     if (!entry||!family) fail('SESSION_REVOKED',401);
     checked=await clock(tx); tx.now=checked;
@@ -140,11 +139,6 @@ export function createCabinetApi(options, normalizeImage) {
       } else fail('NOT_FOUND',404);
       const pool=transactionPoolPort(options.pool);
       const operation=async(tx,actor)=>{
-        if(action==='previewText') {
-          // Check the teacher's current database role/subject grant even for a read-only preview.
-          await runStagingPilot(tx,actor,'dashboard',{},null);
-          return parseTeacherTestText(input.text);
-        }
         if(action==='putMedia') input={id:randomUUID(),contentType:'image/png',bytes:await normalizeImage(input.raw,input.type)};
         const data=await runStagingPilot(tx,actor,action,input,key);
         if(action==='createInvite'||action==='sendInvite') return {...data,telegramUrl:'https://t.me/univeracademybot?start='+encodeURIComponent(data.token)};

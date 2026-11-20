@@ -14,6 +14,7 @@ export type PilotDashboard = {
   serverNow?:number;
   assignments:{id:string;title:string;attemptId:string|null;status:string;opensAt?:number;closesAt?:number}[]; results:PilotResult[];
 };
+export type EntryGroupDashboard = {dashboard:PilotDashboard; receivedAt:number};
 export type PilotCommands = {
   acceptInvite:[{token:string},{id:string;name:string}];
   startAttempt:[{assignmentId:string},PilotAttempt]; resumeAttempt:[{attemptId:string},PilotAttempt];

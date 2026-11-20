@@ -1,0 +1,186 @@
+{
+  "format_version": 1,
+  "base_commit": "1f2eeeaaca8a718991f2151538cc0773e9122609",
+  "files": [
+    {
+      "path": "apps/mini-app/index.html",
+      "previous_sha256": null,
+      "bytes": 578,
+      "sha256": "f8aa12286469b04d9fc8478d446e6d1fbdcad87cf635ca102dd7248e929065ed"
+    },
+    {
+      "path": "apps/mini-app/public/_headers",
+      "previous_sha256": null,
+      "bytes": 63,
+      "sha256": "97c465063299ec4303b7e9d50a3a48a001a038ef85271d11df753b1c9fb93b81"
+    },
+    {
+      "path": "apps/mini-app/src/flow.ts",
+      "previous_sha256": "bdb171927241d5b0b28925eb164305b4ada452a486fe80d060e3683bffa94b40",
+      "bytes": 12314,
+      "sha256": "edd60615fcbcf7365e32642ee867c15fbfc298ee25597b6b5c085dc2ae53d48b"
+    },
+    {
+      "path": "apps/mini-app/src/main.tsx",
+      "previous_sha256": "375990e00169cbd9efab22702fd5028b376fc7fdd5b3d6e5dbd26251b5533ca0",
+      "bytes": 1544,
+      "sha256": "56407db28f2775a56e7b297706801429a851c6c28ce054e7ca20ff1c3bbaf6db"
+    },
+    {
+      "path": "apps/mini-app/src/owner-port.ts",
+      "previous_sha256": "baf23a95a074354976c4d55cc716c77e7711a7b92ae9eb79c17225751a749ac6",
+      "bytes": 15125,
+      "sha256": "e12000db2bbf4dc4be6f91a43a7d7224180b422799dddc7c9bfb0c39378853d5"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-panel.tsx",
+      "previous_sha256": "986f87d8a6137feccf63a79225d633259b063dca28c4fbd0b8b8b0e45589d467",
+      "bytes": 12991,
+      "sha256": "a7fabdacc124d34b4b4f345eb46b5b3a9392f4d285167e5caa99fb0151f2f3fb"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-port.ts",
+      "previous_sha256": "8d85cbba587f189da408f600eb8cb4069b7972fea8e0d13e6850ca89156cb8b4",
+      "bytes": 6952,
+      "sha256": "b8c7bd940cec2556d5aba9c6717b08fc159cff0c4792a00bb57399bed6b87db8"
+    },
+    {
+      "path": "apps/mini-app/src/student-app.tsx",
+      "previous_sha256": "14028b1df7edb7c3b6ffe81c0ee55f0512a86de4dbb1b306cacfd598005c58d2",
+      "bytes": 18625,
+      "sha256": "6c2e896a56a84b9e71ab6954413b5b35357359b8560373f2ad32bebaf58b393b"
+    },
+    {
+      "path": "apps/mini-app/src/transport.ts",
+      "previous_sha256": null,
+      "bytes": 16249,
+      "sha256": "55457a0d7471d4160c6f092f38ac3863a3dd609fb65ce158d6f3ea05a96f6c4f"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/entry.mjs",
+      "previous_sha256": null,
+      "bytes": 8586,
+      "sha256": "33cb8fa2980932a6802f4f2595e7277b6414574b86872ce7d5502d87fd782bde"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/public/_headers",
+      "previous_sha256": null,
+      "bytes": 63,
+      "sha256": "97c465063299ec4303b7e9d50a3a48a001a038ef85271d11df753b1c9fb93b81"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-views.mjs",
+      "previous_sha256": null,
+      "bytes": 4370,
+      "sha256": "efb1b1eff292a53abce05af86000ff857d4527e007eb100f6bb88c127c6d0d0c"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-workspace.mjs",
+      "previous_sha256": null,
+      "bytes": 4441,
+      "sha256": "1d1a4e528e10ff17b5c1afd17c502b0bf5fdd45a7bd46823fcb00ca39d83142e"
+    },
+    {
+      "path": "apps/mini-app/tests/production-entry-browser.mjs",
+      "previous_sha256": null,
+      "bytes": 4716,
+      "sha256": "0e2f8d6a1ba94aa2c4dcbbe01138d493dc5e7628b8ccb12005ce196e9c1534f0"
+    },
+    {
+      "path": "apps/mini-app/tests/student-pilot-coexistence.test.mjs",
+      "previous_sha256": "c99a27016d4d8c09a58d35b2db969dfa5960bceeb3c9462121862c67657b8961",
+      "bytes": 7655,
+      "sha256": "a1b7f65e828d19a60f62bf78bba0e0d94cf8dca83782c012ce391fe60dd50ea9"
+    },
+    {
+      "path": "apps/mini-app/vite.config.ts",
+      "previous_sha256": null,
+      "bytes": 1230,
+      "sha256": "bbc5c5df9838928a6c417dd222e9361f7fe69e2cbabc9601e16b9c06eef1e8f9"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/rich-editor.mjs",
+      "previous_sha256": "c372728949102b891049264c44e1c7f9ed9c3d6e925efd348aaf723b2c86bb99",
+      "bytes": 18164,
+      "sha256": "8d6e7585e5fbf517d0b1000f6e1f3f991c18286ecfb43be4a3092ca1aa478883"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/visual-formula.mjs",
+      "previous_sha256": null,
+      "bytes": 1872,
+      "sha256": "a3a38716b30128f47c0cc2f0fb581a468a6e155736b35033732d738106d70eff"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "464007731b8fe33a5a9ca2a7e8095b99ba3cfbea7cac4a11dc964f6ce8e0be59",
+      "bytes": 28806,
+      "sha256": "8420bfddcba8b12641d7603265e7c75efb0e1f41f619898ac779673344be0092"
+    },
+    {
+      "path": "runtime/teacher-cabinet-api.mjs",
+      "previous_sha256": "375ee6ee1436ea10811fa815b7319cb43e9ebd930d65f179fdebc731da91fde8",
+      "bytes": 10971,
+      "sha256": "875873d856c0d4fc33ee97ac393516e9643c93a9bfec460cf735c0d07ab1f76f"
+    },
+    {
+      "path": "runtime/teacher-staging-attempts.mjs",
+      "previous_sha256": "fd7b73ba0801bc80ac329388f7a59aa7b0fe95e86d0c6529477f8592d753f658",
+      "bytes": 8622,
+      "sha256": "9b1dddfc5f0012d83fc1401286ac1b79815da886d9eee022449ceb7443c8e6a1"
+    },
+    {
+      "path": "runtime/teacher-staging-content.mjs",
+      "previous_sha256": "a7de78d217023869bbc8daafe16e99355f6d0b8f3b15f9c6765c892268b5adfb",
+      "bytes": 9901,
+      "sha256": "65961f8cd6ca00c4eb373734e7cbd576772b93a0aa696e4746e7a6e3c5912b66"
+    },
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": "57bedc35cd8510e2cbf29869c1666d5d50ce2bf79529a77f0e9dd4dcbfae4afe",
+      "bytes": 6654,
+      "sha256": "e2b4ecff9d194318cb5e66ce8c4b5f87fa551d2fbb1314d1e0003f693f47782e"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "bcac503302072633ef2c6341a8aa7f0a49e1b72378aa0caa1b62fa0ef9d1fcd1",
+      "bytes": 17270,
+      "sha256": "53e7f49d93049cff0782240462f149483ae272ca9cc12cbc43750de287710f98"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-auth-rows.ts",
+      "previous_sha256": "177480a6b512016bdb17bc326bfc7c19b87a3116cf2ba839511efb2f9758451c",
+      "bytes": 29296,
+      "sha256": "f262ca490a95643cd412e00a86c62c9c3fa0cd0f623554b93045f490fedffaf6"
+    },
+    {
+      "path": "tests/teacher-local-pilot/dom.mjs",
+      "previous_sha256": "50566665f78b3fe1525a3950ec9de11c67540643210410dae6aa02a2403d94dd",
+      "bytes": 16469,
+      "sha256": "3bb70db60884aa4a4d4ce50d02e5199221b4349043bfccf2114f2dfd5a95e06a"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/data-path-native.test.mjs",
+      "previous_sha256": null,
+      "bytes": 6274,
+      "sha256": "d38e961ae4d63935ed6f7110e09f4769a48a20f843d4a631d919382b27143f8d"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "a9f2ba820821bd584458998a853a61aff06c7667a7dfd1a01bfce0a7c0cbbc52",
+      "bytes": 25911,
+      "sha256": "7dfbfec9c260341db113f80a14f48385cbf23f66294b649fa6f1c5fdc6399e71"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": null,
+      "bytes": 5297,
+      "sha256": "f9530862aee7e641398af4a8120adaff9240e834e2c22e65690525023b869820"
+    },
+    {
+      "path": "wrangler.api.registration-only.jsonc",
+      "previous_sha256": "53272dbef092fe236df0abbf8718ef98708b64cbf8ab88046e50d165e8d00c38",
+      "bytes": 2240,
+      "sha256": "0ac8297d4dea7768c4f32502e37c119ab30a524f83b9f9fdf3522dd82c5ad963"
+    }
+  ]
+}

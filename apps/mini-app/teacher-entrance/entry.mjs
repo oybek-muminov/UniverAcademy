@@ -5,6 +5,7 @@ import { ClerkProvider, ClerkFailed, ClerkLoaded, ClerkLoading, useClerk, useSes
 
 import { mountTeacherReadOnlyCabinet } from '../../teacher-web/src/read-only-entry.mjs';
 import '../../teacher-web/src/style.css';
+import { mountAuthenticatedWorkspace } from './staff-workspace.mjs';
 import { requestTeacherEmailCode } from './email-code.mjs';
 
 const origin = 'https://ustoz.univeracademy.uz';
@@ -46,12 +47,7 @@ function SignedInCabinet({ sessionId, userId }) {
     if (import.meta.env.VITE_USTOZ_CABINET_WRITE_ENABLED !== 'true') {
       return mountTeacherReadOnlyCabinet(host.current, options);
     }
-    const element = host.current;
-    let cancelled = false, unmount;
-    void import('./staff-workspace.mjs').then(({mountAuthenticatedWorkspace}) => {
-      if (!cancelled && currentSession()) unmount = mountAuthenticatedWorkspace(element, options);
-    }).catch(() => { if (!cancelled) element.textContent = unavailable; });
-    return () => { cancelled = true; unmount?.(); element.replaceChildren(); };
+    return mountAuthenticatedWorkspace(host.current, options);
   }, [clerk, sessionId, userId]);
   return h('div', { ref: host });
 }
@@ -168,7 +164,7 @@ if (mount) {
       import.meta.env.VITE_USTOZ_EXISTING_EMAIL_SIGNIN_APPROVED !== 'true' || !matchingPublishingKey(key)) {
     root.render(heading(message(unavailable)));
   } else {
-    root.render(h(ClerkProvider, { publishableKey: key, signInUrl: origin + '/' },
+    root.render(h(ClerkProvider, { publishableKey: key, prefetchUI: false, signInUrl: origin + '/' },
       h(ClerkLoading, null, heading(message('Kirish oynasi tayyorlanmoqda…'))),
       h(ClerkFailed, null, heading(message(unavailable))),
       h(ClerkLoaded, null, h(EmailCodeEntrance))));

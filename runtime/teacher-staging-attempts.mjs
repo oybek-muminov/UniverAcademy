@@ -47,43 +47,46 @@ export async function runStagingAttempt(tx,actor,action,input,key) {
   if (!(action in shapes) || Object.keys(input).sort().join(',')!==[...shapes[action]].sort().join(',')) fail('VALIDATION_ERROR',422);
   const person=actor.personId;
   const start=action==='startAttempt',saving=action==='saveAnswer',isRead=action==='resumeAttempt';
-  let assignmentId;
-  if (start) assignmentId=id(input.assignmentId);
-  else {
-    const row=(await ask(tx,'SELECT assignment_id FROM ua_private.attempts WHERE id=$1 AND person_id=$2',[id(input.attemptId),person])).rows[0];
-    if (!row) fail('NOT_FOUND',404);
-    assignmentId=row.assignment_id;
-  }
+  const requestedId=id(start?input.assignmentId:input.attemptId);
+  const assignmentLookup=start?'a.id=$1':'a.id=(SELECT assignment_id FROM ua_private.attempts WHERE id=$1 AND person_id=$2)';
+  // Answer and submission use the attempt's pinned test. Only start/resume return question content.
+  const projection=start||isRead?'a.record':`jsonb_build_object('cancelled',a.record->'cancelled',
+    'admission',jsonb_build_object('assignmentId',a.record#>'{admission,assignmentId}','groupId',a.record#>'{admission,groupId}'),
+    'published',jsonb_build_object('demoId',a.record#>'{published,demoId}','versionId',a.record#>'{published,versionId}')) AS record`;
+  const row=(await ask(tx,`SELECT a.id,a.demo_id,a.group_id,a.version_id,${projection},p.profile->'registration_complete' AS registered,
+    m.epoch,m.active,m.affinity_group_id,g.grant_epoch,g.rostered FROM ua_private.assignments a
+    JOIN ua_cabinet.group_requests own ON own.active_group_id=a.group_id
+    JOIN ua_private.groups gr ON gr.id=a.group_id AND gr.status='active'
+    JOIN ua_private.grants g ON g.assignment_id=a.id AND g.person_id=$2
+    JOIN ua_private.memberships m ON m.person_id=$2 JOIN ua_private.people p ON p.id=$2
+    WHERE ${assignmentLookup} AND p.enabled AND 'student'=ANY(p.roles)
+    FOR SHARE OF a,g,gr,m`,[requestedId,person])).rows[0];
+  if (!row) fail('NOT_FOUND',404);
   if (saving) {
     id(input.questionId);
     if (input.optionId!==null) id(input.optionId);
     if (!Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<0) fail('VALIDATION_ERROR',422);
   }
-  const row=(await ask(tx,`SELECT a.record,a.demo_id,a.group_id,a.version_id,p.profile,m.epoch,m.active,m.affinity_group_id,
-    g.grant_epoch,g.rostered FROM ua_private.assignments a JOIN ua_cabinet.group_requests own ON own.active_group_id=a.group_id
-    JOIN ua_private.groups gr ON gr.id=a.group_id AND gr.status='active'
-    JOIN ua_private.grants g ON g.assignment_id=a.id AND g.person_id=$2
-    JOIN ua_private.memberships m ON m.person_id=$2 JOIN ua_private.people p ON p.id=$2
-    WHERE a.id=$1 AND p.enabled AND 'student'=ANY(p.roles)
-    FOR SHARE OF a,g,gr,m`,[assignmentId,person])).rows[0];
-  if (!row) fail('NOT_FOUND',404);
   if (!row.active||!row.rostered||row.affinity_group_id!==row.group_id||String(row.epoch)!==String(row.grant_epoch)||row.record.cancelled)
     fail('EXAM_ACCESS_REVOKED',403);
-  if (!row.profile?.registration_complete) fail('PROFILE_INCOMPLETE',409);
-  const assignment=row.record, published=decodePublished(assignment.published);
-  if (published.demoId!==row.demo_id||published.versionId!==row.version_id||assignment.admission.assignmentId!==assignmentId||
-      assignment.admission.groupId!==row.group_id) fail('RESPONSE_INVARIANT_FAILED',500);
+  if (!row.registered) fail('PROFILE_INCOMPLETE',409);
+  const assignmentId=row.id,assignment=row.record;
+  if (assignment.published.demoId!==row.demo_id||assignment.published.versionId!==row.version_id||
+      assignment.admission.assignmentId!==assignmentId||assignment.admission.groupId!==row.group_id) fail('RESPONSE_INVARIANT_FAILED',500);
   const series=(await ask(tx,'SELECT current_attempt_id,generation FROM ua_private.exam_series WHERE person_id=$1 AND demo_id=$2 FOR UPDATE',[person,row.demo_id])).rows[0];
   const existing=series?await attemptRows.load(tx,person,series.current_attempt_id):null;
+  if(existing&&existing.assignmentId===assignmentId&&(existing.published.versionId!==row.version_id||existing.published.demoId!==row.demo_id))
+    fail('RESPONSE_INVARIANT_FAILED',500);
   if (!start && (!existing||existing.id!==input.attemptId)) fail('ATTEMPT_SUPERSEDED',409);
   const current=series&&{id:series.current_attempt_id,generation:Number(series.generation)};
-  const clock=(await ask(tx,'SELECT floor(extract(epoch FROM clock_timestamp())*1000)::text AS now')).rows[0];
+  const receiptKey=person+'/cabinet/v1/'+createHash('sha256').update(key??'').digest('hex');
+  const receiptSelect=isRead?'':', (SELECT row_to_json(r) FROM (SELECT payload,attempt_id FROM ua_private.command_receipts WHERE person_id=$1 AND key=$2) r) receipt';
+  const clock=(await ask(tx,'SELECT floor(extract(epoch FROM clock_timestamp())*1000)::text AS now'+receiptSelect,isRead?[]:[person,receiptKey])).rows[0];
   const now=Number(clock.now);
   if (!Number.isSafeInteger(now)||now<tx.now) fail('SERVICE_UNAVAILABLE',503);
   const access={proofKind:'student_session',personId:person,enabled:true,assignmentIds:[assignmentId]};
-  const receiptKey=person+'/cabinet/v1/'+createHash('sha256').update(key??'').digest('hex');
   const signature=JSON.stringify([action,...shapes[action].map(k=>input[k])]);
-  const receipt=isRead?null:(await ask(tx,'SELECT payload,attempt_id FROM ua_private.command_receipts WHERE person_id=$1 AND key=$2',[person,receiptKey])).rows[0];
+  const receipt=clock.receipt;
   let prior;
   if (receipt) {
     prior=JSON.parse(receipt.payload);
@@ -94,7 +97,7 @@ export async function runStagingAttempt(tx,actor,action,input,key) {
   if (start) {
     next=prior?studentView(access,existing,current,now).record:startAttempt({access,admission:{...assignment.admission,
       activeGroupId:row.affinity_group_id,rostered:true,profileComplete:true,membershipEpoch:Number(row.epoch),grantEpoch:Number(row.grant_epoch)},
-      published,existing,id:randomUUID(),confirmed:true,now});
+      published:decodePublished(assignment.published),existing,id:randomUUID(),confirmed:true,now});
   } else if (isRead) next=studentView(access,existing,current,now).record;
   else if (saving) {
     if (prior) {
@@ -114,8 +117,9 @@ export async function runStagingAttempt(tx,actor,action,input,key) {
     next=submitAttempt(access,existing,current,now).record;
     value=stagingOrdinaryScore(next.ordinary);
   }
-  if (existing) await attemptRows.persist(tx,existing,next);
-  else {
+  if (existing) {
+    if(next!==existing) await attemptRows.persist(tx,existing,next);
+  } else {
     await attemptRows.insert(tx,next);
     await ask(tx,`INSERT INTO ua_private.exam_series(person_id,demo_id,id,current_attempt_id,generation,state_revision,normal_attempt_used,official_attempt_id,recovery_state,recovery_window)
       VALUES($1,$2,$3,$4,1,1,true,NULL,'none',NULL)`,[person,row.demo_id,randomUUID(),next.id]);

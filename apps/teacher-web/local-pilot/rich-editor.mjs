@@ -24,12 +24,39 @@ function labelled(text, control) {
   label.append(control);
   return label;
 }
-export function showStudentView(box, draft, renderBlocks) {
+export function showStudentView(box, draft, renderBlocks, signal) {
+  const pending = new Map();
+  const Observer = box.ownerDocument.defaultView.IntersectionObserver;
+  const observer = Observer && signal ? new Observer(entries => {
+    if (signal.aborted) return;
+    for (const {target, isIntersecting} of entries) {
+      const block = pending.get(target);
+      if (!isIntersecting || !block) continue;
+      observer.unobserve(target);
+      pending.delete(target);
+      target.replaceChildren();
+      renderBlocks(target, [block], signal);
+    }
+  }, {root:box.closest('dialog'), rootMargin:'320px 0px'}) : null;
+  if (observer) signal.addEventListener('abort', () => { observer.disconnect(); pending.clear(); }, {once:true});
+  function renderPreview(container, blocks) {
+    if (!observer || !blocks.some(block => block.type === 'image')) {
+      renderBlocks(container, blocks, signal);
+      return;
+    }
+    for (const block of blocks) {
+      if (block.type !== 'image') { renderBlocks(container, [block], signal); continue; }
+      const slot = node('span', block.alt || 'Savol tasviri');
+      container.append(slot);
+      pending.set(slot, block);
+      observer.observe(slot);
+    }
+  }
   box.replaceChildren();
   if (draft.instructions_blocks?.length) {
     const instructions = document.createElement('div');
     instructions.className = 'preview-blocks';
-    renderBlocks(instructions, draft.instructions_blocks);
+    renderPreview(instructions, draft.instructions_blocks);
     box.append(instructions);
   }
   for (const [index, question] of draft.questions.entries()) {
@@ -37,7 +64,7 @@ export function showStudentView(box, draft, renderBlocks) {
     field.append(node('legend', (index + 1) + '-savol'));
     const content = document.createElement('div');
     content.className = 'preview-blocks';
-    renderBlocks(content, question.prompt_blocks ?? [{type:'text',markdown:question.text}]);
+    renderPreview(content, question.prompt_blocks ?? [{type:'text',markdown:question.text}]);
     field.append(content);
     for (const option of question.options) {
       const label = document.createElement('label');
@@ -46,7 +73,7 @@ export function showStudentView(box, draft, renderBlocks) {
       radio.type = 'radio'; radio.name = box.id + '-' + index;
       const blocks = document.createElement('span');
       blocks.className = 'preview-blocks';
-      renderBlocks(blocks, typeof option === 'string' ? [{type:'text',markdown:option}] : option.blocks);
+      renderPreview(blocks, typeof option === 'string' ? [{type:'text',markdown:option}] : option.blocks);
       label.append(radio, blocks);
       field.append(label);
     }

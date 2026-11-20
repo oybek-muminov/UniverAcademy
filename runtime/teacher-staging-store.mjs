@@ -1,31 +1,39 @@
 import { studentDirectoryPageSize } from './teacher-student-directory.mjs';
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
+import {parseTeacherTestText} from './teacher-pilot-text-import.mjs';
 import {cleanText,editableDraft,requireEditable} from './teacher-pilot-import.mjs';
-import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest} from './teacher-staging-content.mjs';
+import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest,requireOwnedTest} from './teacher-staging-content.mjs';
 import {dashboard} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
-const actions={teacher:new Set(['dashboard','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia']),
+const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia']),
  student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
 async function actorFor(tx,{personId,role}){
   if(!Object.hasOwn(actions,role))fail('FORBIDDEN',403);
-  const p=(await query(tx,'SELECT id,enabled,roles,profile,univeracademy_id FROM ua_private.people_registration WHERE id=$1',[needId(personId)]))[0];
-  if(!p?.enabled || !p.roles.includes(role))fail('FORBIDDEN',403);
-  const actor={personId,role,roles:p.roles,enabled:true,profile:p.profile,cabinetId:p.univeracademy_id};
+  needId(personId);
   if(role==='student'){
+    const p=(await query(tx,'SELECT enabled,roles,profile,univeracademy_id FROM ua_private.people_registration WHERE id=$1',[personId]))[0];
+    if(!p?.enabled||!p.roles.includes(role))fail('FORBIDDEN',403);
     if(!p.profile.registration_complete)fail('PROFILE_INCOMPLETE',409);
-    return actor;
+    return {personId,role,roles:p.roles,enabled:true,profile:p.profile,cabinetId:p.univeracademy_id};
   }
-  const s=(await query(tx,'SELECT * FROM ua_private.staff_access WHERE person_id=$1 FOR SHARE',[personId]))[0];
-  if(!s?.approved || role==='admin'&&!s.manage_roster)fail('FORBIDDEN',403);
-  const current=async(sql,field)=>(await query(tx,sql,[personId])).map(row=>row[field]);
-  actor.approved=true;
-  actor.approvedSubjectIds=await current('SELECT subject_id FROM ua_private.teacher_subject_approvals WHERE person_id=$1 AND approved AND revoked_at_ms IS NULL ORDER BY subject_id FOR SHARE','subject_id');
-  actor.scope={all_groups:s.all_groups,all_subjects:s.all_subjects,
-    group_ids:await current('SELECT group_id FROM ua_private.staff_group_scope WHERE person_id=$1 AND revoked_at_ms IS NULL ORDER BY group_id FOR SHARE','group_id'),
-    subject_ids:await current('SELECT subject_id FROM ua_private.staff_subject_scope WHERE person_id=$1 AND revoked_at_ms IS NULL ORDER BY subject_id FOR SHARE','subject_id')};
+  // The current request still locks each live authorization row, including subject and group grants.
+  const s=(await query(tx,`WITH staff AS MATERIALIZED (
+      SELECT p.id,p.roles,p.profile,p.univeracademy_id,a.all_groups,a.all_subjects
+      FROM ua_private.people_registration p JOIN ua_private.staff_access a ON a.person_id=p.id
+      WHERE p.id=$1 AND p.enabled AND $2=ANY(p.roles) AND a.approved AND ($2<>'admin' OR a.manage_roster)
+      FOR SHARE OF a
+    )
+    SELECT s.roles,s.profile,s.univeracademy_id,s.all_groups,s.all_subjects,
+      ARRAY(SELECT subject_id FROM ua_private.teacher_subject_approvals WHERE person_id=s.id AND approved AND revoked_at_ms IS NULL ORDER BY subject_id FOR SHARE) AS approved_subjects,
+      ARRAY(SELECT group_id FROM ua_private.staff_group_scope WHERE person_id=s.id AND revoked_at_ms IS NULL ORDER BY group_id FOR SHARE) AS group_ids,
+      ARRAY(SELECT subject_id FROM ua_private.staff_subject_scope WHERE person_id=s.id AND revoked_at_ms IS NULL ORDER BY subject_id FOR SHARE) AS subject_ids
+    FROM staff s`,[personId,role]))[0];
+  if(!s)fail('FORBIDDEN',403);
+  const actor={personId,role,roles:s.roles,enabled:true,approved:true,profile:s.profile,cabinetId:s.univeracademy_id,
+    approvedSubjectIds:s.approved_subjects,scope:{all_groups:s.all_groups,all_subjects:s.all_subjects,group_ids:s.group_ids,subject_ids:s.subject_ids}};
   if(role==='teacher'&&!actor.approvedSubjectIds.length)fail('FORBIDDEN',403);
   return actor;
 }
@@ -159,7 +167,6 @@ async function media(tx,actor,action,input){
 async function authorizeResource(tx,actor,action,input){
   if(['approveGroup','addMember','createInvite','sendInvite','assignTest'].includes(action)){
     const g=await group(tx,input.groupId,actor,{requireActive:action!=='approveGroup',recoverPending:actor.role==='teacher'});
-    if(action==='assignTest')await ownedTest(tx,actor,input.testId);
     return g;
   }
   if(action==='updateDraft'){
@@ -168,7 +175,6 @@ async function authorizeResource(tx,actor,action,input){
     requireEditable(loaded.t);
     return loaded;
   }
-  if(action==='publishTest')await ownedTest(tx,actor,input.testId);
   return null;
 }
 async function effect(tx,actor,action,input,subjectId,g){
@@ -207,6 +213,7 @@ export async function runStagingPilot(tx,identity,action,input={},key){
     if(actor.role==='teacher')await activatePending(tx,actor.personId,actor.approvedSubjectIds,actor.personId);
     return dashboard(tx,actor);
   }
+  if(action==='previewText')return parseTeacherTestText(input.text);
   if(action==='availableStudents')return availableStudents(tx,actor,input);
   if(action==='readMedia'||action==='putMedia')return media(tx,actor,action,input);
   if(action==='readDraft'){
@@ -225,9 +232,10 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   const receiptKey=actor.personId+'/staging/'+action+'/'+hash(key),payload=hash(canonical(input));
   const prior=(await query(tx,'SELECT payload,response FROM ua_private.staff_receipts WHERE actor_id=$1 AND key=$2',[actor.personId,receiptKey]))[0];
   if(prior){
+    if(action==='publishTest'||action==='assignTest')await requireOwnedTest(tx,actor,input.testId);
     if(prior.payload!==payload)fail('IDEMPOTENCY_CONFLICT',409);
     if(action==='createGroup')return groupView(await group(tx,prior.response.id,actor,{requireActive:false,recoverPending:true}));
-    if(action==='importTest')await ownedTest(tx,actor,prior.response.id);
+    if(action==='importTest')await requireOwnedTest(tx,actor,prior.response.id);
     if(action==='assignTest'&&prior.response.opensAt===undefined){
       // Receipts written by older releases only contained the assignment identity.
       const window=need(await query(tx,`SELECT record#>'{admission,opensAt}' AS "opensAt",record#>'{admission,closesAt}' AS "closesAt",

@@ -132,53 +132,81 @@ export class ClerkScopedAuthStore{
   }
 }
 
+const authSelect={
+  ua_clerk_person:"SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1",
+  ua_clerk_membership:"SELECT active,epoch::text,revision::text,affinity_group_id::text FROM ua_private.memberships WHERE person_id=$1",
+  ua_clerk_identities:"SELECT issuer,subject,person_id::text,enabled FROM ua_private.clerk_identities WHERE person_id=$1",
+  ua_clerk_families:"SELECT id::text,person_id::text,expires_at_ms::text,revoked_at_ms::text,logout_retain_until_ms::text,auth_provider FROM ua_private.student_families WHERE person_id=$1",
+  ua_clerk_bindings:"SELECT b.family_id::text,b.person_id::text,b.issuer,b.subject,b.sid FROM ua_private.clerk_family_bindings b JOIN ua_private.student_families f ON f.id=b.family_id WHERE f.person_id=$1",
+  ua_clerk_fences:"SELECT issuer,subject,sid,person_id::text,retired_at_ms::text FROM ua_private.clerk_student_sessions WHERE person_id=$1",
+  ua_clerk_replays:"SELECT digest,person_id::text FROM ua_private.clerk_exchange_replays WHERE person_id=$1",
+  ua_clerk_access:"SELECT a.digest,a.family_id::text,a.expires_at_ms::text,a.superseded FROM ua_private.student_access a JOIN ua_private.student_families f ON f.id=a.family_id WHERE f.person_id=$1",
+  ua_clerk_refresh:"SELECT r.digest,r.family_id::text,r.consumed FROM ua_private.student_refresh r JOIN ua_private.student_families f ON f.id=r.family_id WHERE f.person_id=$1",
+} as const;
+type AuthSelect=keyof typeof authSelect;
+const familyColumn:Partial<Record<AuthSelect,string>>={ua_clerk_families:"id",ua_clerk_bindings:"f.id",ua_clerk_access:"f.id",ua_clerk_refresh:"f.id"};
+function authSelectSql(name:AuthSelect,scopeFamily:boolean):string{
+  return authSelect[name]+(scopeFamily&&familyColumn[name]?" AND "+familyColumn[name]+"=$2":"");
+}
+// Read the exact same person- and family-scoped rows in one PostgreSQL snapshot.
+// The caller already holds the canonical person lock. No data survives the request.
+const sessionSelect=(Object.keys(authSelect) as AuthSelect[]).filter(name=>name!=="ua_clerk_replays");
+const sessionSnapshotSql="SELECT "+sessionSelect.map(name=>
+  `(SELECT COALESCE(json_agg(r),'[]'::json) FROM (${authSelectSql(name,true)}) r) AS ${name}`).join(", ");
+
 // Shared person-scoped auth rows. No transaction, HTTP or provider defaults.
 export class ClerkAuthRows{
-  async load(s:Scope,session?:{familyId:string;revocationOnly:boolean}):Promise<ClerkAuthSnapshot>{
+  async load(s:Scope,session?:{familyId:string;revocationOnly:boolean;singleStatement?:boolean}):Promise<ClerkAuthSnapshot>{
     const result:ClerkAuthSnapshot={person:null,membership:null,identities:{},families:{},access:{},refresh:{},familyBindings:{},studentSessions:{},consumedTokens:{}};
     if(!s.existing)return result;
-    const read=(name:string,text:string)=>{
-      const column:Record<string,string>={ua_clerk_families:"id",ua_clerk_bindings:"f.id",ua_clerk_access:"f.id",ua_clerk_refresh:"f.id"};
-      return session&&column[name]?query(s.client,name,text+" AND "+column[name]+"=$2",[s.personId,session.familyId]):query(s.client,name,text,[s.personId]);
+    const snapshot=session?.singleStatement?(await query(s.client,"ua_clerk_session_snapshot",sessionSnapshotSql,[s.personId,session.familyId])).rows[0]:undefined;
+    if(session?.singleStatement&&!snapshot)fail("RESPONSE_INVARIANT_FAILED",500);
+    const read=async(name:AuthSelect)=>{
+      if(snapshot){
+        const rows=snapshot[name];
+        if(!Array.isArray(rows))fail("RESPONSE_INVARIANT_FAILED",500);
+        return {rows:rows as Record<string,unknown>[]};
+      }
+      return query(s.client,name,authSelectSql(name,!!session),session&&familyColumn[name]?[s.personId,session.familyId]:[s.personId]);
     };
-    const p=(await read("ua_clerk_person","SELECT telegram_id::text,enabled,roles,profile FROM ua_private.people WHERE id=$1")).rows;
+    const p=(await read("ua_clerk_person")).rows;
     if(p.length!==1)fail("CLERK_IDENTITY_REVOKED",401);
     const profile=readStoredProfile(p[0].profile);
     if(profile.person_id!==s.personId||!same(profile.roles,p[0].roles))fail("RESPONSE_INVARIANT_FAILED",500);
     result.person={telegramId:p[0].telegram_id===null?null:integer(p[0].telegram_id),enabled:bool(p[0].enabled),profile};
-    const member=(await read("ua_clerk_membership","SELECT active,epoch::text,revision::text,affinity_group_id::text FROM ua_private.memberships WHERE person_id=$1")).rows;
+    const member=(await read("ua_clerk_membership")).rows;
     if(member.length!==1)fail("RESPONSE_INVARIANT_FAILED",500);
     result.membership={active:bool(member[0].active),epoch:integer(member[0].epoch),revision:integer(member[0].revision),affinityGroupId:member[0].affinity_group_id as string|null};
-    for(const r of (await read("ua_clerk_identities","SELECT issuer,subject,person_id::text,enabled FROM ua_private.clerk_identities WHERE person_id=$1")).rows){
+    for(const r of (await read("ua_clerk_identities")).rows){
       identity({issuer:r.issuer as string,userId:r.subject as string,sessionId:s.identity?.sessionId??"sess_ShapeCheck"});
       if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.identities[JSON.stringify([r.issuer,r.subject])]={personId:s.personId,enabled:bool(r.enabled)};
     }
-    for(const r of (await read("ua_clerk_families","SELECT id::text,person_id::text,expires_at_ms::text,revoked_at_ms::text,logout_retain_until_ms::text,auth_provider FROM ua_private.student_families WHERE person_id=$1")).rows){
+    for(const r of (await read("ua_clerk_families")).rows){
       if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);
       result.families[r.id as string]={personId:s.personId,expiresAt:integer(r.expires_at_ms),revokedAt:nullable(r.revoked_at_ms),logoutRetainUntil:nullable(r.logout_retain_until_ms),...(r.auth_provider===null?{}:{authProvider:r.auth_provider as "clerk"|"telegram"})};
     }
-    for(const r of (await read("ua_clerk_bindings","SELECT b.family_id::text,b.person_id::text,b.issuer,b.subject,b.sid FROM ua_private.clerk_family_bindings b JOIN ua_private.student_families f ON f.id=b.family_id WHERE f.person_id=$1")).rows){
+    for(const r of (await read("ua_clerk_bindings")).rows){
       if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.familyBindings[r.family_id as string]={issuer:r.issuer as string,userId:r.subject as string,sessionId:r.sid as string};
     }
-    for(const r of (await read("ua_clerk_fences","SELECT issuer,subject,sid,person_id::text,retired_at_ms::text FROM ua_private.clerk_student_sessions WHERE person_id=$1")).rows){
+    for(const r of (await read("ua_clerk_fences")).rows){
       if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.studentSessions[JSON.stringify([r.issuer,r.subject,r.sid])]={personId:s.personId,retiredAt:nullable(r.retired_at_ms)};
     }
-    for(const r of (session?[]:(await read("ua_clerk_replays","SELECT digest,person_id::text FROM ua_private.clerk_exchange_replays WHERE person_id=$1")).rows)){if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.consumedTokens[r.digest as string]=true;}
-    for(const r of (await read("ua_clerk_access","SELECT a.digest,a.family_id::text,a.expires_at_ms::text,a.superseded FROM ua_private.student_access a JOIN ua_private.student_families f ON f.id=a.family_id WHERE f.person_id=$1")).rows)
+    for(const r of (session?[]:(await read("ua_clerk_replays")).rows)){if(r.person_id!==s.personId)fail("RESPONSE_INVARIANT_FAILED",500);result.consumedTokens[r.digest as string]=true;}
+    for(const r of (await read("ua_clerk_access")).rows)
       result.access[r.digest as string]={familyId:r.family_id as string,expiresAt:integer(r.expires_at_ms),superseded:bool(r.superseded)};
-    for(const r of (await read("ua_clerk_refresh","SELECT r.digest,r.family_id::text,r.consumed FROM ua_private.student_refresh r JOIN ua_private.student_families f ON f.id=r.family_id WHERE f.person_id=$1")).rows)
+    for(const r of (await read("ua_clerk_refresh")).rows)
       result.refresh[r.digest as string]={familyId:r.family_id as string,consumed:bool(r.consumed)};
     checkSnapshot(s,result,session?.revocationOnly);
     if(s.identity&&result.studentSessions[clerkSessionKey(s.identity)]?.retiredAt!==null&&result.studentSessions[clerkSessionKey(s.identity)]!==undefined)fail("CLERK_SESSION_SUPERSEDED",401);
     return result;
   }
-  async loadSession(s:Scope,proof:{kind:"access"|"refresh";digest:string},revocationOnly:boolean):Promise<{familyId:string;state:ClerkAuthSnapshot}>{
+  async loadSession(s:Scope,proof:{kind:"access"|"refresh";digest:string},revocationOnly:boolean,options?:{singleStatement:true}):Promise<{familyId:string;state:ClerkAuthSnapshot}>{
     if(revocationOnly&&proof.kind!=="refresh")fail("SERVICE_UNAVAILABLE",503);
     const table=proof.kind==="access"?"student_access":"student_refresh";
     const r=await query(s.client,"ua_clerk_session_family",`SELECT p.family_id::text FROM ua_private.${table} p JOIN ua_private.student_families f ON f.id=p.family_id WHERE p.digest=$1 AND f.person_id=$2`,[proof.digest,s.personId]);
     if(!r.rows.length)fail(proof.kind==="access"?"SESSION_REVOKED":"REFRESH_INVALID",401);
     if(r.rows.length!==1||Object.keys(r.rows[0]).join(",")!=="family_id"||!uuid(r.rows[0].family_id))fail("RESPONSE_INVARIANT_FAILED",500);
-    const familyId=r.rows[0].family_id,state=await this.load(s,{familyId,revocationOnly});
+    const familyId=r.rows[0].family_id,state=await this.load(s,{familyId,revocationOnly,singleStatement:options?.singleStatement});
     if(!state.families[familyId])fail("RESPONSE_INVARIANT_FAILED",500);
     return {familyId,state};
   }

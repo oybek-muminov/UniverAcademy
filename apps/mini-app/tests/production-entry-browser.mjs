@@ -1,5 +1,6 @@
 import { build, preview } from 'vite';
 import { spawn } from 'node:child_process';
+import { gzipSync } from 'node:zlib';
 import { readdir, readFile } from 'node:fs/promises';
 import { STUDENT_CONTRACT_SHA256 } from '../src/owner-client/student-client.ts';
 const servers = [];
@@ -28,6 +29,12 @@ try {
         const html = await readFile(outDir + '/index.html', 'utf8');
         const sdk = html.indexOf('https://telegram.org/js/telegram-web-app.js?64');
         if (configured ? sdk < 0 || sdk > html.indexOf('type="module"') : sdk !== -1) throw new Error('SDK_HEAD_GATE_FAILED');
+        if (configured && !/<script[^>]*telegram-web-app[^>]*\sdefer[\s>]/.test(html)) throw new Error('TELEGRAM_SDK_BLOCKS_HTML');
+        if (!html.includes('role="status"')) throw new Error('MISSING_INITIAL_STATUS');
+        if (common && configured) {
+          const entry = html.match(/<script type="module"[^>]+src="([^"]+)"/)?.[1];
+          if (!entry || gzipSync(await readFile(outDir + entry)).length > 8192) throw new Error('EAGER_ENTRY_BUNDLE');
+        }
         for (const name of await readdir(outDir + '/assets')) {
           if (!/\.(?:js|css)$/.test(name)) continue;
           const js = await readFile(outDir + '/assets/' + name, 'utf8');

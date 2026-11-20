@@ -89,6 +89,38 @@ test('registration-only exam list absence permits only a confirmed pilot member 
   assert(!invite.paths.some(p=>p.includes('commands')));
 });
 
+test('grouped entry hands its authorized dashboard to one matching list render; refresh reads the server', async t => {
+  let now = 6000, reads = 0;
+  t.mock.method(performance, 'now', () => now);
+  const c = await student(() => failure(404, 'NOT_FOUND'), () => {
+    reads++;
+    return ok({...dashboard, group:{...group, name:'Fizika ' + reads}});
+  });
+  await c.port.profile();
+  const person = profile.person_id;
+  const exams = await c.port.exams();
+  assert.equal(c.port.takeEntryDashboard([], person), undefined);
+  const entry = c.port.takeEntryDashboard(exams, person);
+  assert.equal(entry.receivedAt, now);
+  assert.equal(entry.dashboard.group.name, 'Fizika 1');
+  assert.equal(c.port.takeEntryDashboard(exams, person), undefined);
+  assert.deepEqual(c.paths, ['/auth/clerk','/me','/exams','/student/pilot/dashboard']);
+  assert.equal((await c.port.stagingPilot(person).dashboard()).group.name, 'Fizika 2');
+
+  const delayed = await c.port.exams();
+  now += 5000;
+  assert.equal(c.port.takeEntryDashboard(delayed, person), undefined);
+  const otherPerson = await c.port.exams();
+  assert.equal(c.port.takeEntryDashboard(otherPerson, crypto.randomUUID()), undefined);
+  const oldSession = await c.port.exams();
+  c.auth.clear();
+  await c.auth.login('another-test-proof');
+  assert.equal(c.port.takeEntryDashboard(oldSession, person), undefined);
+  const oldProfile = await c.port.exams();
+  await c.port.profile();
+  assert.equal(c.port.takeEntryDashboard(oldProfile, person), undefined);
+});
+
 test('an optional pilot route failure does not reset the unrelated ordinary app session',async()=>{
   const c=await student(()=>ok([packet.cases.examOpen.data]),()=>failure(401,'UNKNOWN_GATEWAY'));
   await assert.rejects(c.port.stagingPilot(profile.person_id).dashboard(),{kind:'forbidden'});

@@ -253,6 +253,7 @@ export function createStudentTransport(options: {
     cancelLogoutReceipt(operationId: string) {
       if (receipt?.id === operationId) endReceipt(receipt, 'cancelled');
     },
+    sessionVersion() { return authEpoch; },
     person() { return proof?.person ?? null; },
   };
 }

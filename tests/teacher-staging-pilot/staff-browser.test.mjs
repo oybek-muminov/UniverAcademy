@@ -131,6 +131,9 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   const submit = (id, submitter) => el(id).dispatchEvent(new window.SubmitEvent('submit',{cancelable:true,submitter}));
   const settled = () => !el('main')?.hasAttribute('aria-busy');
   await until(() => oldListSignal && el('available-status').textContent.includes('yuklanmoqda'));
+  el('refresh-groups').click(); el('refresh-groups').click();
+  await pause(5);
+  assert.equal(calls.filter(([path])=>path.endsWith('/available-students')).length,1);
   el('group-name').value='8-A';
   submit('group-form');
   await until(()=>settled() && el('member-group')?.value===newId);
@@ -265,6 +268,7 @@ test('a delayed image and selected answer stay with their question; the first sa
     }
   });
   await until(()=>el('identity-name')?.textContent==='Ustoz');
+  host.querySelector('a[href="#testlar"]').click();
   type(el('editor-title'),'Masofalar');
   function fill(prompt,correct) {
     type(controls('Savol mazmuni').querySelector('textarea'),prompt);
@@ -339,4 +343,104 @@ test('private media uses the same bearer gate and accepts PNG only',async t=>{
     }});
   await assert.rejects(port.image(imageId));type='image/png';
   assert.equal((await port.image(imageId)).type,'image/png');assert.equal(calls,2);
+});
+
+test('focus and navigation share one pending dashboard, and returning to a hidden cabinet rechecks permission once', async t => {
+  const dom = new JSDOM('<div id="host"></div>',{url:origin+'/',pretendToBeVisual:true});
+  context(dom,t);
+  const mount = await workspace(t), host = document.getElementById('host');
+  const dashboard = {role:'teacher',person_id:person,name:'Ustoz',groups:[],subjects:[],tests:[],assignments:[],results:[]};
+  const reads = [];
+  const until = async predicate => {
+    for (let i=0; i<200; i++) { if (predicate()) return; await pause(5); }
+    assert.fail('The pending dashboard did not settle');
+  };
+  const dispose = mount(host,{origin,identity:{current:()=>identityValue,subscribe:()=>()=>{}},
+    getCurrentClerkToken:async ()=>'signed',
+    fetch(url) {
+      assert(new URL(url).pathname.endsWith('/teacher/pilot/dashboard'));
+      const response = Promise.withResolvers(); reads.push(response);
+      return response.promise.then(value => located(value,url));
+    }});
+  t.after(dispose);
+  await until(()=>reads.length === 1);
+  reads[0].resolve(success(dashboard));
+  await until(()=>host.querySelector('#identity-name')?.textContent==='Ustoz');
+  assert.equal(host.querySelector('#editor-form'),null);
+  window.dispatchEvent(new window.Event('focus'));
+  for (const section of ['testlar','natijalar','guruhlar']) host.querySelector('a[href="#'+section+'"]').click();
+  await until(()=>reads.length >= 2);
+  assert.equal(reads.length,2);
+  assert(host.querySelector('#editor-form'));
+  reads[1].resolve(success({...dashboard,name:'Yangilangan'}));
+  await until(()=>host.querySelector('#identity-name').textContent==='Yangilangan');
+  window.dispatchEvent(new window.Event('focus'));
+  await until(()=>reads.length === 3);
+  // A pending response from before suspension must never repaint the new session.
+  Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});
+  document.dispatchEvent(new window.Event('visibilitychange'));
+  assert.equal(host.textContent,'');
+  Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});
+  document.dispatchEvent(new window.Event('visibilitychange'));
+  await until(()=>reads.length === 4);
+  window.dispatchEvent(new window.PageTransitionEvent('pageshow',{persisted:true}));
+  await pause(5);
+  assert.equal(reads.length,4);
+  reads[3].resolve(new Response(null,{status:403,headers:{'cache-control':'no-store'}}));
+  await until(()=>host.textContent.includes('ruxsat berilmagan'));
+  reads[2].resolve(success(dashboard));
+  await pause(5);
+  assert.equal(host.querySelector('#identity-name'),null);
+});
+
+test('preview fetches private images as they approach the dialog and aborts deferred work at close', async t => {
+  const dom = new JSDOM('<dialog open><div id="body"></div></dialog>',{url:origin+'/'});
+  context(dom,t);
+  const {showStudentView} = await import('../../apps/teacher-web/local-pilot/rich-editor.mjs');
+  const observed = new Set(), loads = [], signal = new AbortController();
+  let observe;
+  window.IntersectionObserver = class {
+    constructor(callback,{root}) { observe=callback; assert.equal(root.tagName,'DIALOG'); }
+    observe(slot) { observed.add(slot); }
+    unobserve(slot) { observed.delete(slot); }
+    disconnect() { observed.clear(); }
+  };
+  const box = document.querySelector('#body');
+  const questions = Array.from({length:200},(_,i)=>({prompt_blocks:[
+    {type:'text',markdown:'Savol '+i},{type:'image',asset_id:String(i),alt:'Rasm '+i}],options:['bir','ikki','uch','to‘rt']}));
+  showStudentView(box,{questions},(parent,blocks,scope)=>{
+    assert.equal(scope,signal.signal);
+    for (const block of blocks) {
+      if (block.type==='image') loads.push(block.asset_id);
+      else parent.append(document.createTextNode(block.markdown));
+    }
+  },signal.signal);
+  assert.equal(box.querySelectorAll('input').length,800);
+  assert(box.textContent.includes('Savol 199') && box.textContent.includes('Rasm 199'));
+  assert.equal(observed.size,200);
+  assert.deepEqual(loads,[]);
+  const [first,second,third] = observed;
+  const shown = target=>({isIntersecting:true,target});
+  observe([shown(first),shown(second),shown(first)]);
+  assert.deepEqual(loads,['0','1']);
+  signal.abort(); observe([shown(third)]);
+  assert.equal(observed.size,0);
+  assert.deepEqual(loads,['0','1']);
+});
+
+test('formula input updates the saved source on every edit and typesets only the last value of a burst', async t => {
+  const dom = new JSDOM('<div id="formula"></div>',{url:origin+'/'});
+  context(dom,t);
+  const {mountVisualFormula} = await import('../../apps/teacher-web/local-pilot/visual-formula.mjs');
+  const changes=[], typeset=[];
+  const box=document.querySelector('#formula');
+  mountVisualFormula(box,{onChange:value=>changes.push(value),renderBlocks:(_,blocks)=>typeset.push(blocks[0].latex)});
+  const field=box.querySelector('textarea');
+  for (const input of ['x','x^','x^2']) { field.value=input; field.dispatchEvent(new window.Event('input')); }
+  assert.deepEqual(changes,['x','x^','x^2']);
+  await pause(120);
+  assert.deepEqual(typeset,['x^2']);
+  field.value='x^3'; field.dispatchEvent(new window.Event('input')); box.remove();
+  await pause(120);
+  assert.deepEqual(typeset,['x^2']);
 });

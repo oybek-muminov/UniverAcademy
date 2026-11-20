@@ -10,10 +10,11 @@ function mountStudentPicker(el, readAvailableStudents, addMember) {
   const list = el('available-list'), add = el('available-add');
   const previous = el('available-previous'), next = el('available-next'), retry = el('available-retry');
   const status = el('available-status');
-  let group = null, pages = [null], nextCursor = null, controller;
+  let group = null, pages = [null], nextCursor = null, controller, fetching = false;
 
   function clear() {
     controller?.abort();
+    fetching = false;
     el('available-form').removeAttribute('aria-busy');
     nextCursor = null;
     list.replaceChildren();
@@ -27,6 +28,7 @@ function mountStudentPicker(el, readAvailableStudents, addMember) {
     if (!group) return;
     const signal = (controller = new AbortController()).signal;
     const after = pages.at(-1);
+    fetching = true;
     status.textContent = 'O‘quvchilar yuklanmoqda…';
     el('available-form').setAttribute('aria-busy', 'true');
     try {
@@ -51,6 +53,7 @@ function mountStudentPicker(el, readAvailableStudents, addMember) {
       retry.hidden = false;
     } finally {
       if (!signal.aborted) {
+        fetching = false;
         previous.hidden = pages.length === 1;
         el('available-form').removeAttribute('aria-busy');
       }
@@ -71,15 +74,17 @@ function mountStudentPicker(el, readAvailableStudents, addMember) {
     event.preventDefault();
     if (group && !add.disabled && list.value) void addMember(group, list.value);
   };
-  return { show, refresh() { if (group) show(group, true); } };
+  return { show, refresh(afterMutation = false) {
+    if (group && (afterMutation || !fetching || pages.length > 1)) show(group, true);
+  } };
 }
 
 function mountStudentPreview(el, render) {
   const dialog = el('student-dialog'), close = el('close-preview'), body = el('preview-content');
-  let version = 0, opener;
+  let version = 0, opener, controller;
   let background = [];
   function dismiss(restore = true) {
-    version++;
+    version++; controller?.abort();
     if (!dialog.open) return;
     if (typeof dialog.close === 'function') dialog.close();
     else {
@@ -106,6 +111,7 @@ function mountStudentPreview(el, render) {
   };
   async function open(trigger, read) {
     const current = ++version;
+    controller?.abort(); controller = new AbortController();
     opener = trigger;
     el('preview-heading').textContent = 'O‘quvchi ko‘rinishi';
     body.textContent = 'Test yuklanmoqda…';
@@ -124,7 +130,7 @@ function mountStudentPreview(el, render) {
       const draft = await read();
       if (current !== version) return;
       el('preview-heading').textContent = 'O‘quvchi ko‘rinishi · ' + draft.title;
-      render(body, draft);
+      render(body, draft, controller.signal);
     } catch (error) {
       if (current === version) body.textContent = error.message || 'Testni ochib bo‘lmadi.';
     } finally {
@@ -161,9 +167,9 @@ export function mountTeacherWorkspace(root, {
   let editingId = null, savedSelection = 0;
   let activeTab = 'new', assignmentContext = '';
   const selectedTests = {drafts:'', published:''};
-  const modal = mountStudentPreview(el, (box, draft) => showStudentView(box, draft, renderBlocks));
+  const modal = mountStudentPreview(el, (box, draft, signal) => showStudentView(box, draft, renderBlocks, signal));
   let readVersion = 0;
-  let writing = false;
+  let writing = false, refreshing, editor;
   const retries = new Map();
   const invites = new Map();
   const picker = mountStudentPicker(el, readAvailableStudents, addStudent);
@@ -199,17 +205,21 @@ export function mountTeacherWorkspace(root, {
       }
     }
     selectRows('member-group', next.groups, selection.group, group => group.name);
-    selectRows('result-group', next.groups, undefined, group => group.name);
     renderGroup();
     displayTab(selection.tab ?? activeTab, selection.test, selection.group);
-    renderResults();
+    if (currentPage === 'natijalar') renderResults();
   }
-  async function refresh() {
-    if (writing) return;
-    try {
-      await load();
-      el('problem').textContent = '';
-    } catch (error) { notice('', error.message); }
+  function refresh() {
+    if (writing || disposed) return;
+    if (!refreshing) {
+      const operation = load().then(() => {
+        if (!disposed && !writing && refreshing === operation) el('problem').textContent = '';
+      }, error => {
+        if (refreshing === operation) notice('', error.message);
+      }).finally(() => { if (refreshing === operation) refreshing = undefined; });
+      refreshing = operation;
+    }
+    return refreshing;
   }
   async function command(action, input, success, complete) {
     if (disposed || writing || !dashboard) return;
@@ -223,6 +233,8 @@ export function mountTeacherWorkspace(root, {
       }
       input = { ...input, subjectId };
     }
+    refreshing = undefined;
+    readVersion++;
     const fingerprint = JSON.stringify([action, input]);
     const key = retries.get(fingerprint) ?? crypto.randomUUID();
     let data;
@@ -252,8 +264,9 @@ export function mountTeacherWorkspace(root, {
   }
 
   function renderGroup() {
+    if (currentPage !== 'guruhlar') { picker.show(null); return; }
     const group = dashboard.groups.find(row => row.id === el('member-group').value);
-    picker.show(currentPage === 'guruhlar' && group?.status === 'active' ? group.id : null);
+    picker.show(group?.status === 'active' ? group.id : null);
     el('group-content').hidden = !group;
     el('group-empty').hidden = Boolean(group);
     if (!group) return;
@@ -285,7 +298,8 @@ export function mountTeacherWorkspace(root, {
       el('tab-' + name).tabIndex = selected ? 0 : -1;
       el('tests-' + name).hidden = !selected;
     }
-    const libraryTab = tab === 'published' ? 'published' : 'drafts';
+    if (tab === 'new') return;
+    const libraryTab = tab;
     const pane = el('tests-' + libraryTab);
     if (el('test-library').parentNode !== pane) pane.prepend(el('test-library'));
     if (!dashboard) return;
@@ -334,25 +348,29 @@ export function mountTeacherWorkspace(root, {
     el('publish-button').hidden = published;
     el('edit-saved').hidden = published;
     el('view-saved').textContent = published ? 'O‘quvchi ko‘rinishi' : 'Saqlangan qoralamaning o‘quvchi ko‘rinishi';
+    if (!published) { el('assign-form').hidden = true; el('assignment-info').textContent = ''; return; }
     const assigned = dashboard.assignments.filter(row => row.testId === test.id);
     const groups = dashboard.groups.filter(group => group.status === 'active' && (!test.subjectId || group.subjectId === test.subjectId));
-    const available = groups.filter(group => !assigned.some(row => row.groupId === group.id));
+    const assignedGroups = new Set(assigned.map(row => row.groupId));
+    const available = groups.filter(group => !assignedGroups.has(group.id));
     const previousGroup = el('assignment-group').value;
     const selected = [preferredGroup, previousGroup, el('member-group').value].find(id => available.some(group => group.id === id));
     selectRows('assignment-group', available, selected, group => group.name);
     trackAssignment();
-    el('assign-form').hidden = !published || !available.length;
+    el('assign-form').hidden = !available.length;
+    const groupNames = new Map(groups.map(group => [group.id, group.name]));
     const names = assigned.flatMap(assignment => {
-      const group = groups.find(row => row.id === assignment.groupId);
+      const group = groupNames.get(assignment.groupId);
       if (!group) return [];
       const window = [assignment.opensAt, assignment.closesAt].filter(Number.isFinite).map(time => tashkent.format(time));
-      return [group.name + (window.length ? ' (' + window.join(' – ') + ', Toshkent vaqti)' : '')];
+      return [group + (window.length ? ' (' + window.join(' – ') + ', Toshkent vaqti)' : '')];
     });
     let message = names.length ? 'Tayinlangan guruhlar: ' + names.join(', ') : '';
-    if (published && !groups.length) message = 'Testni tayinlash uchun shu fandan faol guruh yarating.';
+    if (!groups.length) message = 'Testni tayinlash uchun shu fandan faol guruh yarating.';
     el('assignment-info').textContent = message;
   }
   function renderResults() {
+    selectRows('result-group', dashboard.groups, undefined, group => group.name);
     const groupId = el('result-group').value;
     const results = dashboard.results.filter(result => result.groupId === groupId);
     el('result-group').disabled = !dashboard.groups.length;
@@ -392,7 +410,7 @@ export function mountTeacherWorkspace(root, {
     await command('addMember', { groupId, univeracademy_id: id }, 'O‘quvchi guruhga qo‘shildi.', () => {
       if (el('member-group').value === groupId) el('student-number').value = '';
     });
-    if (!disposed && el('member-group').value === groupId) picker.refresh();
+    if (!disposed && el('member-group').value === groupId) picker.refresh(true);
   }
   el('invite-button').onclick = () => {
     const groupId = el('member-group').value;
@@ -530,7 +548,11 @@ export function mountTeacherWorkspace(root, {
   function showPage(page) {
     if (page !== currentPage) { savedSelection++; modal.dismiss(false); }
     if (['guruhlar', 'testlar', 'natijalar'].includes(page)) currentPage = page;
-    if (dashboard) renderGroup();
+    if (currentPage === 'testlar' && !editor) editor = createEditor();
+    if (dashboard) {
+      renderGroup();
+      if (currentPage === 'natijalar') renderResults();
+    }
     for (const section of root.querySelectorAll('.page')) section.hidden = section.id !== currentPage;
     for (const link of root.querySelectorAll('nav a')) {
       if (link.hash === '#' + currentPage) link.setAttribute('aria-current', 'page');
@@ -552,29 +574,31 @@ export function mountTeacherWorkspace(root, {
   };
   el('view-file').onclick = () => { if (preview) void modal.open(el('view-file'), () => preview); };
 
-  const editor = mountTeacherEditor(el('question-editor'), {
-    renderBlocks, mountVisualFormula, uploadImage: upload, notify: notice, previewStudent: modal.open,
-    onNewTest() { displayTab('new'); },
-    async readDraft(testId) {
-      const result = await request('commands/readDraft', {testId}, crypto.randomUUID());
-      if (result?.id !== testId || !Number.isSafeInteger(result.revision) || result.revision < 0) throw Error('Qoralamani ochib bo‘lmadi.');
-      return {...result, draft:filePreview(result.draft)};
-    },
-    saveDraft(draft, target) {
-      const action = target ? 'updateDraft' : 'importTest';
-      const input = target ? {testId: target.id, expectedRevision: target.revision, draft} : draft;
-      return command(action, input, 'Test qoralamasi saqlandi.', data => ({tab:'drafts', test:data.id}));
-    },
-    onTargetChange(id) {
-      if (editingId !== id) {
-        editingId = id;
-        el(id ? 'draft-editor-slot' : 'new-editor-slot').append(el('editor-card'));
-        el('start-new').hidden = !id;
-        el('editor-heading').textContent = id ? 'Qoralamani tahrirlash' : 'Test tuzish';
-        if (dashboard) renderTest();
-      }
-    },
-  });
+  function createEditor() {
+    return mountTeacherEditor(el('question-editor'), {
+      renderBlocks, mountVisualFormula, uploadImage: upload, notify: notice, previewStudent: modal.open,
+      onNewTest() { displayTab('new'); },
+      async readDraft(testId) {
+        const result = await request('commands/readDraft', {testId}, crypto.randomUUID());
+        if (result?.id !== testId || !Number.isSafeInteger(result.revision) || result.revision < 0) throw Error('Qoralamani ochib bo‘lmadi.');
+        return {...result, draft:filePreview(result.draft)};
+      },
+      saveDraft(draft, target) {
+        const action = target ? 'updateDraft' : 'importTest';
+        const input = target ? {testId: target.id, expectedRevision: target.revision, draft} : draft;
+        return command(action, input, 'Test qoralamasi saqlandi.', data => ({tab:'drafts', test:data.id}));
+      },
+      onTargetChange(id) {
+        if (editingId !== id) {
+          editingId = id;
+          el(id ? 'draft-editor-slot' : 'new-editor-slot').append(el('editor-card'));
+          el('start-new').hidden = !id;
+          el('editor-heading').textContent = id ? 'Qoralamani tahrirlash' : 'Test tuzish';
+          if (dashboard && activeTab !== 'new') renderTest();
+        }
+      },
+    });
+  }
   el('start-new').onclick = () => editor.newTest();
   el('edit-saved').onclick = () => {
     const id = el('saved-test').value;
@@ -587,7 +611,7 @@ export function mountTeacherWorkspace(root, {
   return () => {
     disposed = true;
     modal.dismiss(false);
-    editor.dispose();
+    editor?.dispose();
     picker.show(null);
     fileVersion++; readVersion++;
     window.removeEventListener('focus', focus);

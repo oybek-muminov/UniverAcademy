@@ -222,6 +222,8 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
     await post('student/commands/saveAnswer', {attemptId: attempt.id, questionId: question.id, optionId: selected.id, expectedRevision: 0});
   }
   const score = await post('student/commands/submitAttempt', {attemptId: attempt.id});
+  window.location.hash = 'natijalar';
+  await until(() => !el('natijalar').hidden, 'open results');
   el('refresh-results').click();
   await until(() => el('results-body').rows.length === 1, 'teacher score');
   assert.deepEqual([...el('results-body').rows[0].cells].slice(2).map(cell => cell.textContent),
@@ -229,6 +231,8 @@ test('teacher authors, previews, publishes, invites and reads an ordinary score 
   assert.equal(Number(score.percentage), 100);
 
   const options = ['A','B','C','D'].map(markdown => ({id: crypto.randomUUID(), blocks: [{type:'text', markdown}]}));
+  window.location.hash = 'testlar';
+  await until(() => !el('testlar').hidden, 'return to test library');
   el('tab-new').click();
   const canonical = {title:'Fayldan',duration_seconds:3701,grading_config:{individual_enabled:true},questions:[{id:crypto.randomUUID(), position:1, expected_revision:0,
     individual_points:'3.500', prompt_blocks:[{type:'formula',latex:'a^2',display:'inline'}], options, correct_option_id:options[1].id, explanation_blocks:[]}]};

@@ -8,7 +8,8 @@ import type { StudentSchema, StudentClient } from './owner-client/student-client
 import { createStudentTransport, StudentFailure } from './transport.ts';
 import type { FailureKind } from './transport.ts';
 import { createWireMap } from './wire-map.ts';
-import type { StudentPort } from './flow.ts';
+import type { Exam, StudentPort } from './flow.ts';
+import type { EntryGroupDashboard } from './staging-student-port.ts';
 
 // Shared UI adapter. Backend owns all operations, DTOs and constructor guards.
 // No server implementation, fixture identity or signing key is imported here.
@@ -101,7 +102,11 @@ export function createOwnerPort(options: OwnerPortOptions) {
   // Keep only this connection's last authorized membership hint. It can avoid
   // a pilot discovery request, and cannot authorize any group read or write.
   let ungroupedPerson:string|null = null;
+  // This response belongs only to the list load which needed the group fallback.
+  // A delayed first render reads the server again, as do all explicit group refreshes.
+  let entryDashboard: (EntryGroupDashboard & {exams:Exam[]; sessionVersion:number}) | undefined;
   function projectProfile(profile:StudentSchema['Profile']) {
+    entryDashboard = undefined;
     ungroupedPerson = transport.person() === profile.person_id && profile.active_group_id === null ? profile.person_id : null;
     // Only the authenticated app profile selects a landing page. Ustoz authorizes independently.
     const teacher = options.mode === 'production' && transport.person() === profile.person_id &&
@@ -116,8 +121,18 @@ export function createOwnerPort(options: OwnerPortOptions) {
     profile: () => transport.withAccess(async access => (await call(client => client.me(access))).data).then(projectProfile),
     register: (firstName, lastName) => transport.withAccess(async access =>
       (await call(client => client.updateProfile(access, { first_name: firstName, last_name: lastName }))).data, true).then(projectProfile),
+    takeEntryDashboard(exams, person) {
+      const entry = entryDashboard;
+      if (!entry || entry.exams !== exams) return;
+      entryDashboard = undefined;
+      if (entry.sessionVersion === transport.sessionVersion() && transport.person() === person &&
+          entry.dashboard.person_id === person && performance.now() - entry.receivedAt < 5000)
+        return {dashboard:entry.dashboard, receivedAt:entry.receivedAt};
+    },
     async exams() {
+      entryDashboard = undefined;
       const person = transport.person();
+      const sessionVersion = transport.sessionVersion();
       try {
         return await transport.withAccess(async access => (await call(client => client.exams(access))).data
           .map(meta => mapper.exam(meta, context(meta.assignment_id, meta))));
@@ -127,7 +142,11 @@ export function createOwnerPort(options: OwnerPortOptions) {
         if (!stagingPilot || !person || !(error instanceof StudentFailure) || error.kind !== 'missing' || error.code !== 'NOT_FOUND') throw error;
         if (ungroupedPerson === person && !readStagingInvite()) throw error;
         const dashboard = await stagingPilot(person).dashboard();
-        if (dashboard.group?.status === 'active' || readStagingInvite()) return [];
+        if (dashboard.group?.status === 'active' || readStagingInvite()) {
+          const exams:Exam[] = [];
+          entryDashboard = {exams, dashboard, sessionVersion, receivedAt:performance.now()};
+          return exams;
+        }
         throw error;
       }
     },

@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {readStagingInvite} from './staging-student-port.ts';
-import type {PilotAttempt, PilotCommands, PilotDashboard, PilotResult, QuestionBlock, StagingStudentPort} from './staging-student-port.ts';
+import type {EntryGroupDashboard, PilotAttempt, PilotCommands, PilotDashboard, PilotResult, QuestionBlock, StagingStudentPort} from './staging-student-port.ts';
 import {openingLabel,nextScheduleDelay} from './group-test-schedule.mjs';
 import {renderBlocks} from './rich-blocks.mjs';
 import {asFailure, createOperationJournal, failureMessage, StudentFailure} from './transport.ts';
@@ -17,7 +17,8 @@ function Rich({blocks,port}:{blocks:QuestionBlock[];port:StagingStudentPort}) {
   },[blocks,port]);
   return <span ref={host}/>;
 }
-export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ordinaryExams}:{
+export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ordinaryExams,takeEntryDashboard}:{
+  takeEntryDashboard?(): EntryGroupDashboard | undefined;
   port:StagingStudentPort;person:string;onAuthLost():void;onJoined():Promise<void>;ordinaryExams(groupAssignments?:ReadonlySet<string>):ReactNode;
 }) {
   const [dashboard,setDashboard] = useState<PilotDashboard|null>(null);
@@ -41,15 +42,15 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
     journal.clear(scope);
     return value;
   }
-  async function refresh() {
+  async function refresh(entry?:EntryGroupDashboard) {
     let next:PilotDashboard;
-    try { next = await port.dashboard(); }
+    try { next = entry?.dashboard ?? await port.dashboard(); }
     catch (error) {
       if (mounted.current) { setDashboard(null); setAttempt(null); setResult(null); setStartIntent(null); }
       throw error;
     }
     if (!mounted.current) return;
-    dashboardReceived.current = performance.now();
+    dashboardReceived.current = entry?.receivedAt ?? performance.now();
     setPreviouslyGrouped(next.group?.status === 'active');
     setStartIntent(null); setDashboard(next); setAttempt(null); setResult(null); setNeedsRead(false); setConfirm(false);
     return next;
@@ -71,7 +72,11 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
       setNotice(messages[failure.code] ?? failureMessage(failure,'clerk'));
     } finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
-  useEffect(() => { mounted.current = true; void run(refresh); return () => { mounted.current = false; }; },[port]);
+  useEffect(() => {
+    mounted.current = true;
+    void run(() => refresh(takeEntryDashboard?.()));
+    return () => { mounted.current = false; };
+  },[port]);
   useEffect(() => {
     if (!dashboard || busy || attempt || result || startIntent) return;
     const delay = nextScheduleDelay(dashboard, performance.now() - dashboardReceived.current);
@@ -101,6 +106,7 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
     const answered = new Set(attempt.answers.filter(a=>a.optionId !== null).map(a=>a.questionId));
     const saved = answered.size, count = attempt.questions.length;
     const index = Math.min(questionIndex,count-1), q = attempt.questions[index];
+    const currentAnswer = attempt.answers.find(answer => answer.questionId === q.id);
     return <section className="card">{feedback}<h2>{attemptTitle || 'Guruh testi'}</h2>
       <p>Saqlangan javoblar: {saved} / {attempt.questions.length} · Tugash vaqti: {new Date(attempt.deadlineAt).toLocaleTimeString('uz-UZ',{hour:'2-digit', minute:'2-digit', timeZone:'Asia/Tashkent'})} (Toshkent)</p>
       <p className="question-key"><span><i className="key-unanswered" aria-hidden="true"/>Javobsiz</span>
@@ -113,9 +119,9 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
       <fieldset key={q.id} disabled={busy || needsRead || confirm}>
         <legend>{index+1}. <Rich blocks={q.prompt_blocks} port={port}/></legend>
         {q.options.map(opt=><label className="option" key={opt.id}><input type="radio" name={q.id}
-          checked={attempt.answers.some(a=>a.questionId===q.id && a.optionId===opt.id)}
+          checked={currentAnswer?.optionId === opt.id}
           onChange={()=>void run(async()=>{
-            const revision=attempt.answers.find(a=>a.questionId===q.id)?.revision ?? 0;
+            const revision=currentAnswer?.revision ?? 0;
             const answer=await command('saveAnswer',{attemptId:attempt.id,questionId:q.id,optionId:opt.id,expectedRevision:revision});
             setAttempt({...attempt,answers:[...attempt.answers.filter(a=>a.questionId!==q.id),answer]});
             setNotice((index+1)+'-savolning javobi saqlandi.');
@@ -140,6 +146,12 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
     <button className="secondary" disabled={busy} onClick={()=>setStartIntent(null)}>Ortga</button></section>;
   const grouped = dashboard?.group?.status === 'active';
   if (!grouped && !invite && !previouslyGrouped) return ordinaryExams();
+  const assignedAttempts = new Set(dashboard?.assignments.map(exam => exam.attemptId));
+  const resultByAttempt = new Map<string,PilotResult>();
+  for (const row of dashboard?.results ?? []) {
+    const id = row.attemptId;
+    if (id !== undefined && !resultByAttempt.has(id)) resultByAttempt.set(id, row);
+  }
   return <><section className="card">{feedback}<h2>Guruhim</h2>
     {dashboard && <><p>{dashboard.group?.name ?? 'Hozircha guruhga biriktirilmagansiz.'}</p>
       {invite && <button disabled={busy} onClick={()=>void run(async()=>{
@@ -155,14 +167,17 @@ export default function StagingStudentPanel({port,person,onAuthLost,onJoined,ord
     </>}
     {dashboard && grouped && <><h2>Guruh testlari</h2>
       {!dashboard.assignments.length && <p>Hozircha sizga guruh testi tayinlanmagan.</p>}
-      {dashboard.assignments.map(exam=><section key={exam.id}><h3>{exam.title}</h3>
+      {dashboard.assignments.map(exam => {
+        const result = exam.attemptId === null ? undefined : resultByAttempt.get(exam.attemptId);
+        return <section key={exam.id}><h3>{exam.title}</h3>
         {exam.status==='scheduled' && exam.opensAt !== undefined ? <p>{openingLabel(exam.opensAt)}</p> :
           exam.status==='closed' ? <p>Testni boshlash muddati tugagan.</p> :
           exam.status==='available' ? <button disabled={busy} onClick={()=>setStartIntent(exam)}>Testni boshlash</button> :
           exam.status==='in_progress' && exam.attemptId ? <button disabled={busy} onClick={()=>void run(async()=>adopt(await command('resumeAttempt',{attemptId:exam.attemptId!}),exam.title))}>Testni davom ettirish</button> :
-          dashboard.results.some(r=>r.attemptId===exam.attemptId) ? <button disabled={busy} onClick={()=>setResult(dashboard.results.find(r=>r.attemptId===exam.attemptId)!)}>Natijani ko‘rish</button> :
-          <p>Test yakunlangan.</p>}</section>)}
-      {dashboard.results.filter(row=>!dashboard.assignments.some(exam=>exam.attemptId===row.attemptId)).map(row=>
+          result ? <button disabled={busy} onClick={()=>setResult(result)}>Natijani ko‘rish</button> :
+          <p>Test yakunlangan.</p>}</section>;
+      })}
+      {dashboard.results.filter(row => row.attemptId === undefined || !assignedAttempts.has(row.attemptId)).map(row=>
         <section key={row.attemptId}><h3>{row.title}</h3><button disabled={busy} onClick={()=>setResult(row)}>Natijani ko‘rish</button></section>)}</>}
     <button disabled={busy} onClick={()=>void run(refresh)}>Guruhni yangilash</button></section>
     {ordinaryExams(grouped ? new Set(dashboard!.assignments.map(exam => exam.id)) : undefined)}</>;

@@ -58,10 +58,14 @@ function StudentCabinet({ studentFlow: flow, state: s, mode, onEnter, onLogout, 
     if (s.screen !== 'attempt') setConfirmation(current => current === 'questions' ? null : current);
   }, [s.screen]);
   useEffect(() => {
+    if (s.screen !== 'attempt' || s.attempt?.status !== 'in_progress') {
+      setSeconds(0);
+      return;
+    }
     const tick = () => setSeconds(flow.remainingSeconds());
     tick(); const interval = window.setInterval(tick, 250);
     return () => window.clearInterval(interval);
-  }, [s.attempt]);
+  }, [flow, s.screen, s.attempt]);
   useEffect(() => {
     const read = () => {
       if (flow.state.screen === 'attempt' && flow.state.attempt?.active) void flow.reconcile();
@@ -129,6 +133,7 @@ function StudentCabinet({ studentFlow: flow, state: s, mode, onEnter, onLogout, 
 
     {s.screen === 'exams' && (pilot && s.student && (s.student.activeGroupId || readStagingInvite()) ?
       <Suspense fallback={ordinaryExams()}><StagingStudentPanel key={s.student.person} port={pilot} person={s.student.person}
+        takeEntryDashboard={() => flow.port.takeEntryDashboard?.(s.exams, s.student!.person)}
         ordinaryExams={ordinaryExams} onJoined={()=>flow.enter()} onAuthLost={()=>flow.fail(new StudentFailure('auth','FRESH_LAUNCH_REQUIRED'))}/>
       </Suspense> : ordinaryExams())}
 

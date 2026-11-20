@@ -7,6 +7,8 @@
   "preview_urls": false,
   "routes": [{ "pattern": "api.univeracademy.uz", "custom_domain": true }],
   "keep_vars": true,
+  // The three Hyperdrive bindings use the same Supabase project in Ireland.
+  "placement": { "region": "aws:eu-west-1" },
   "observability": {
     "enabled": true,
     "traces": {"enabled": true}

@@ -66,11 +66,17 @@ export async function saveDraft(tx,actor,loaded,input){
     [testId,w.revision,w,expectedRevision]));
   return summary(t,newTitle);
 }
+const ownerScope=` FROM ua_private.test_versions v JOIN ua_cabinet.test_owners t ON t.version_id=v.id JOIN ua_private.demos d ON d.id=v.demo_id
+  WHERE v.id=$1 AND t.teacher_id=$2 AND d.subject_id=ANY($3::text[])`;
+export async function requireOwnedTest(tx,actor,id){
+  need(await query(tx,'SELECT v.id'+ownerScope,[needId(id),actor.personId,actor.approvedSubjectIds]));
+}
 export async function ownedTest(tx,actor,id,lock=false){
-  const row=need(await query(tx,`SELECT v.wire,v.published_snapshot,d.subject_id,d.title
-    FROM ua_private.test_versions v JOIN ua_cabinet.test_owners t ON t.version_id=v.id JOIN ua_private.demos d ON d.id=v.demo_id
-    WHERE v.id=$1 AND t.teacher_id=$2 AND d.subject_id=ANY($3::text[])`+(lock?' FOR UPDATE OF v':''),[needId(id),actor.personId,actor.approvedSubjectIds]));
-  const qs=(await query(tx,'SELECT record FROM ua_private.draft_questions WHERE version_id=$1 ORDER BY position',[id])).map(q=>q.record);
+  const row=need(await query(tx,'SELECT v.wire,v.published_snapshot,d.subject_id,d.title'+ownerScope+(lock?' FOR UPDATE OF v':''),
+    [needId(id),actor.personId,actor.approvedSubjectIds]));
+  // Publication pins the validated authored questions. Reopening/assigning a published version
+  // can reuse that same snapshot; drafts still read the editable canonical rows.
+  const qs=row.published_snapshot?.questions??(await query(tx,'SELECT record FROM ua_private.draft_questions WHERE version_id=$1 ORDER BY position',[id])).map(q=>q.record);
   const s=context(),t={subjectId:row.subject_id,teacherPersonId:actor.personId,wire:row.wire,questionIds:qs.map(q=>q.id),questions:Object.fromEntries(qs.map(q=>[q.id,q]))};
   if(row.published_snapshot)t.publishedSnapshot={...row.published_snapshot,test:decodePublished(row.published_snapshot.test)};
   s.versions[id]=t;s.demos[t.wire.demo_id]={title:row.title,subjectId:t.subjectId};

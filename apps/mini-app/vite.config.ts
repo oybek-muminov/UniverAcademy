@@ -10,7 +10,7 @@ export default defineConfig(({ mode, command }) => {
     optimizeDeps: { rolldownOptions: { plugins: [clerkLoadPromiseFix()] } },
     plugins: [clerkLoadPromiseFix(), { name: 'telegram-sdk-entry', transformIndexHtml() {
       if (command === 'build' && mode === 'production' && env.VITE_TELEGRAM_SDK_ENABLED === 'true')
-        return [{ tag: 'script', attrs: { src: 'https://telegram.org/js/telegram-web-app.js?64', referrerpolicy: 'no-referrer' }, injectTo: 'head-prepend' as const }];
+        return [{ tag: 'script', attrs: { src: 'https://telegram.org/js/telegram-web-app.js?64', defer: true, referrerpolicy: 'no-referrer' }, injectTo: 'head-prepend' as const }];
       return [];
     } }],
     // Loopback fixture proxy only. Production cross-origin CORS belongs to Backend.

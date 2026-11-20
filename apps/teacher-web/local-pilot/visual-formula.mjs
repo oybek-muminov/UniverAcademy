@@ -20,11 +20,18 @@ export function mountVisualFormula(root, { value = '', display = 'block', onChan
   const preview = doc.createElement('div');
   preview.className = 'formula-live-preview';
   preview.setAttribute('aria-label','Formulaning jonli ko‘rinishi');
+  let timer;
   function update() {
+    clearTimeout(timer);
     preview.replaceChildren();
     if (source.value.trim()) renderBlocks(preview,[{type:'formula',latex:source.value,display:format.value}]);
   }
-  source.addEventListener('input',() => { onChange(source.value); update(); });
+  source.addEventListener('input',() => {
+    onChange(source.value);
+    clearTimeout(timer);
+    if (!source.value.trim()) { update(); return; }
+    timer = setTimeout(() => { if (root.isConnected) update(); }, 80);
+  });
   format.addEventListener('change',() => { onDisplayChange?.(format.value); update(); });
   root.replaceChildren(label,formatLabel,preview);
   update();
