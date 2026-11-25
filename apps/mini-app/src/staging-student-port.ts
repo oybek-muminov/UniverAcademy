@@ -4,7 +4,7 @@ import type {FailureKind} from './transport.ts';
 export type QuestionBlock = {type:'text'; markdown:string} | {type:'formula'; latex:string; display:'block'|'inline'} |
   {type:'image'; asset:{asset_id:string;url:string}; alt:string; caption?:string};
 export type PilotAttempt = {
-  id:string; status:string; deadlineAt:string;
+  id:string; status:string; deadlineAt:string; serverNow?:number;
   questions:{id:string;prompt_blocks:QuestionBlock[];options:{id:string;blocks:QuestionBlock[]}[]}[];
   answers:{questionId:string;optionId:string|null;revision:number}[];
 };

@@ -88,7 +88,9 @@ function StudentCabinet({ studentFlow: flow, state: s, mode, onEnter, onLogout, 
         <button className="primary" disabled={s.busy} onClick={() => void flow.openExam(exam)}>Testni ko‘rish →</button>
         <button className="text-button" disabled={s.busy} onClick={() => void flow.showHistory(exam)}>Shu testning tarixi →</button>
       </article>)}
-      {!s.exams.length && !groupAssignments && <section className="card"><h2>Hozircha test yo‘q</h2><p>Guruh testiga o‘qituvchi yoki administrator biriktiradi.</p></section>}
+      {!s.exams.length && !groupAssignments && (s.failure
+        ? <section className="card"><h2>Testlar ro‘yxati yangilanmadi</h2><p>Ulanish yoki ruxsat bilan muammo bo‘ldi, shuning uchun ro‘yxat ko‘rsatilmayapti. Pastdagi tugma bilan qayta yuklang.</p></section>
+        : <section className="card"><h2>Hozircha test yo‘q</h2><p>Guruh testiga o‘qituvchi yoki administrator biriktiradi.</p></section>)}
       <button className="text-button" disabled={s.busy} onClick={() => void (pilot ? flow.enter() : flow.showExams())}>Testlar ro‘yxatini yangilash</button>
     </>;
   }

@@ -161,15 +161,12 @@ export function createOwnerPort(options: OwnerPortOptions) {
       const attempt = (await call(client => client.startAttempt(access, assignmentId, { confirmed: true }, key))).data;
       return mapper.attempt(attempt, { ...context(assignmentId), attemptId: attempt.id });
     }, true),
-    save: intent => transport.withAccess(async access => {
-      const current = (await call(client => client.resumeAttempt(access, intent.attemptId))).data;
-      if (current.assignment_id !== intent.assignmentId || current.generation !== intent.generation) throw new StudentFailure('conflict', 'ATTEMPT_SUPERSEDED');
-      return mapper.answer((await call(client => client.saveAnswer(access, intent.attemptId, intent.questionId,
-        { selected_option_id: intent.optionId, expected_revision: intent.expectedRevision }))).data, intent.questionId);
-    }, true),
-    submit: (attemptId, generation, key) => transport.withAccess(async access => {
-      const current = (await call(client => client.resumeAttempt(access, attemptId))).data;
-      if (current.generation !== generation) throw new StudentFailure('conflict', 'ATTEMPT_SUPERSEDED');
+    // One request each. The server already requires the attempt to be this person's current attempt and
+    // generation (409 ATTEMPT_SUPERSEDED otherwise), so a client-side read first only added a round trip.
+    save: intent => transport.withAccess(async access =>
+      mapper.answer((await call(client => client.saveAnswer(access, intent.attemptId, intent.questionId,
+        { selected_option_id: intent.optionId, expected_revision: intent.expectedRevision }))).data, intent.questionId), true),
+    submit: (attemptId, _generation, key) => transport.withAccess(async access => {
       const result = mapper.result((await call(client => client.submitAttempt(access, attemptId, key))).data, attemptId);
       if (result === null) throw new StudentFailure('protocol', 'RESPONSE_INVARIANT_FAILED');
     }, true),

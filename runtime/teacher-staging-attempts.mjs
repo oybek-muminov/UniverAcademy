@@ -21,7 +21,7 @@ const ask = (tx,text,values=[]) => tx.client.query({text,values});
 function displayBlocks(blocks) {
   return blocks.filter(b=>b.type === 'text').map(b=>b.markdown).join(' ');
 }
-function projectAttempt(record, assignment) {
+function projectAttempt(record, assignment, now) {
   const images = asset_id => ({asset_id,url:'/api/v1/student/pilot/media/'+asset_id,
     content_type:'image/png',expires_at:new Date(record.deadlineAt).toISOString()});
   const version = assignment.published;
@@ -38,7 +38,8 @@ function projectAttempt(record, assignment) {
     });
     return {id:questionId,text:displayBlocks(prompt_blocks),prompt_blocks,options};
   }) : [];
-  return {id:record.id,status:record.status,deadlineAt:new Date(record.deadlineAt).toISOString(),questions,
+  // serverNow lets the phone show the remaining time without trusting its own clock.
+  return {id:record.id,status:record.status,deadlineAt:new Date(record.deadlineAt).toISOString(),serverNow:now,questions,
     answers:active ? record.answers.map(a=>({questionId:a.questionId,optionId:a.selectedOptionId,revision:a.revision})) : []};
 }
 export async function runStagingAttempt(tx,actor,action,input,key) {
@@ -126,5 +127,5 @@ export async function runStagingAttempt(tx,actor,action,input,key) {
   }
   if (!isRead && !prior) await ask(tx,'INSERT INTO ua_private.command_receipts(person_id,key,payload,attempt_id) VALUES($1,$2,$3,$4)',[
     person,receiptKey,JSON.stringify({signature,...(saving?{answer:value}:{})}),next.id]);
-  return value??projectAttempt(next,assignment);
+  return value??projectAttempt(next,assignment,now);
 }

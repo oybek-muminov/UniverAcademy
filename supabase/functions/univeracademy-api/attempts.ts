@@ -147,7 +147,9 @@ export function startAttempt(input: {
   return {
     id, personId: access.personId, assignmentId: admission.assignmentId,
     groupId: admission.groupId, generation: 1, status: "in_progress",
-    startedAt: now, deadlineAt: now + pinned.durationMs, completedAt: null,
+    // The test ends at the earlier of its duration and the admission window close.
+    // now < closesAt is checked above, so the deadline is always in the future.
+    startedAt: now, deadlineAt: Math.min(now + pinned.durationMs, admission.closesAt), completedAt: null,
     stateRevision: 1, seriesStateRevision: 1, published: pinned,
     questionOrder: shuffled(pinned.questions).map((question) => ({
       questionId: question.id, optionIds: shuffled(question.optionIds),

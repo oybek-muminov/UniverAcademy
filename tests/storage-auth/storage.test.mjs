@@ -19,7 +19,7 @@ const access = { proofKind:"student_session",personId:P,enabled:true,assignmentI
 async function setup(t) {
   const dir=mkdtempSync(join(tmpdir(),"ua-storage-"));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,"rows.json");
   const record=startAttempt({ access,id:A,confirmed:true,now:10000,existing:null,
-    admission:{ assignmentId:A,groupId:G,activeGroupId:G,rostered:true,profileComplete:true,membershipEpoch:1,grantEpoch:1,opensAt:9000,closesAt:20000 },
+    admission:{ assignmentId:A,groupId:G,activeGroupId:G,rostered:true,profileComplete:true,membershipEpoch:1,grantEpoch:1,opensAt:9000,closesAt:200000 },
     published:{ demoId:D,versionId:V,durationMs:60000,individualEnabled:true,
       questions:[{id:Q,optionIds:[id(200),id(201),id(202),id(203)],correctOptionId:id(200),individualPoints:ratio(1n,8n)}] } });
   const {published,questionOrder,answers,ordinary,...body}=record;

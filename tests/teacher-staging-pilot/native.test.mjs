@@ -458,7 +458,9 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     assert.equal(live.status,'in_progress');
     const times=(await db.query('SELECT body FROM ua_private.attempts WHERE id=$1',[live.id])).rows[0].body;
     assert.ok(times.startedAt>=startsAt);
-    assert.equal(times.deadlineAt,times.startedAt+300000);
+    assert.equal(times.deadlineAt,Math.min(times.startedAt+300000,scheduled.closesAt));
+    // The phone shows the remaining time from the server's clock, so the start reply carries it.
+    assert.equal(live.serverNow,times.startedAt);
     assert.deepEqual(await good(teacher.command('assignTest',spec,key)),scheduled);
     await rejected(teacher.command('assignTest',{...spec,startsAt:startsAt+60000},key),409);
 

@@ -106,23 +106,26 @@ test('scheduled admission opens at the selected instant and ends at Tashkent mid
   app.advance(1);
   assert.equal(await getStatus(first,assigned.id),'available');
   const firstAttempt=success(await start(first,assigned.id));
-  assert.equal(Date.parse(firstAttempt.deadlineAt),startsAt+source.duration_seconds*1000);
+  // The test ends at the earlier of its duration and the window close (Tashkent midnight).
+  assert.equal(Date.parse(firstAttempt.deadlineAt),Math.min(startsAt+source.duration_seconds*1000,midnight));
   // Successful receipt replay remains valid even after its startsAt has passed.
   assert.deepEqual(success(await teacher.command('assignTest',spec,key)),assigned);
   const conflict=await teacher.command('assignTest',{...spec,startsAt:startsAt+1000},key);
   assert.equal(conflict.payload.error.code,'IDEMPOTENCY_CONFLICT');
   app.advance(500);
   const secondAttempt=success(await start(second,assigned.id));
-  assert.equal(Date.parse(secondAttempt.deadlineAt),Date.parse(firstAttempt.deadlineAt)+500);
+  assert.equal(Date.parse(secondAttempt.deadlineAt),Math.min(startsAt+500+source.duration_seconds*1000,midnight));
   app.advance(250);
   assert.equal((await second.dashboard()).serverNow,midnight);
   assert.equal(await getStatus(first,unopened.id),'closed');
   assert.equal((await start(first,unopened.id)).payload.error.code,'ADMISSION_CLOSED');
-  assert.equal(await getStatus(first,assigned.id),'in_progress');
+  // Both attempts began before midnight, so the window close ended them at the same instant.
+  assert.equal(new Date(firstAttempt.deadlineAt).getTime(),midnight);
+  assert.equal(secondAttempt.deadlineAt,firstAttempt.deadlineAt);
+  assert.equal(await getStatus(first,assigned.id),'expired');
+  assert.equal(await getStatus(second,assigned.id),'expired');
   const resumed=success(await first.command('resumeAttempt',{attemptId:firstAttempt.id}));
-  assert.equal(resumed.deadlineAt,firstAttempt.deadlineAt);
-  success(await first.command('submitAttempt',{attemptId:firstAttempt.id}));
-  assert.equal(await getStatus(first,assigned.id),'submitted');
+  assert.equal(resumed.status,'expired');
 });
 
 function noAnswerKey(value) {

@@ -1,0 +1,60 @@
+{
+  "format_version": 1,
+  "base_commit": "4678b90da62eb22baf451466cc13b34c3552acf2",
+  "files": [
+    {
+      "path": "apps/mini-app/src/owner-port.ts",
+      "previous_sha256": "ca130e4bb784ecb5dc1cb3d09cd7dca012a05274c1c43c0f24357009f758000b",
+      "bytes": 14945,
+      "sha256": "943e48a417d0f8c1e47866cd00a3fe4ed4ce2ed29f796f2ad9a2e7f4e9c9d0de"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-panel.tsx",
+      "previous_sha256": "a7fabdacc124d34b4b4f345eb46b5b3a9392f4d285167e5caa99fb0151f2f3fb",
+      "bytes": 16887,
+      "sha256": "b9b31e11df37dea7b3fdb057f1062fa98f4a3701e09de79316a6c333b0fe1cb3"
+    },
+    {
+      "path": "apps/mini-app/src/staging-student-port.ts",
+      "previous_sha256": "b8c7bd940cec2556d5aba9c6717b08fc159cff0c4792a00bb57399bed6b87db8",
+      "bytes": 6971,
+      "sha256": "737e9a69c41c374a1a09afe4e49b0e61cc0d912e1f05c90f9b912ff121e9b005"
+    },
+    {
+      "path": "apps/mini-app/src/student-app.tsx",
+      "previous_sha256": "dbc04408b9c79316ae2a90486a9a1bde4081bebc693307ad7a430a62d90f2b79",
+      "bytes": 18528,
+      "sha256": "eb41bddbc640c3038906e54ec5be22ee4ee6e778432527abd14aa78e1ff795c5"
+    },
+    {
+      "path": "runtime/teacher-staging-attempts.mjs",
+      "previous_sha256": "9b1dddfc5f0012d83fc1401286ac1b79815da886d9eee022449ceb7443c8e6a1",
+      "bytes": 8731,
+      "sha256": "e69cf9fe897ce9296396e9b179875c6188287c811e28e082930ed9e5cea06d96"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/attempts.ts",
+      "previous_sha256": "b95d33d535d37ee1beeef6123985771b5c05e921ed3a4f9e0694eafaea381721",
+      "bytes": 9922,
+      "sha256": "05aecbaa2a7b231aecc94aced49c61e7743db3d4d6cf5245660a8169b5d573ec"
+    },
+    {
+      "path": "tests/storage-auth/storage.test.mjs",
+      "previous_sha256": "9f2729b65a61ab0f3b3a0436e8df6620474da009427651e092b65d2b9491bc22",
+      "bytes": 12571,
+      "sha256": "a829b05e3274810b0e85f9bf000be39e43f51b188afb6bcbc02da0a4f1ed5d2d"
+    },
+    {
+      "path": "tests/teacher-local-pilot/http.test.mjs",
+      "previous_sha256": "d3b3968887bdd155ae5f27c9e4b068a24799ddc01f3d9c196de52b5e930411ed",
+      "bytes": 29976,
+      "sha256": "f767f32c22cef95094b5cd60493fa36fd46625288e8e8a020b71b96e1ef78acd"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/native.test.mjs",
+      "previous_sha256": "f9bcd9dd299a78b56163f86442fa68257d196b563edb0b5516e8f7d3522aab7f",
+      "bytes": 40116,
+      "sha256": "798db1e9688b1fdb7ac1461b3722b3bb363bb95ae526f2ecd3e53cdebc48c79c"
+    }
+  ]
+}
