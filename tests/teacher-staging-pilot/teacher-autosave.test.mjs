@@ -185,7 +185,7 @@ test('a closed or crashed page offers its browser copy back; the teacher can con
   page.dispose();
 });
 
-test('another window editing the same test is reported, and Chiqish asks before keeping or erasing browser copies', async t => {
+test('another window editing the same test is reported, and signing out asks before keeping or erasing browser copies', async t => {
   const dom = new JSDOM('<!doctype html><div id="host"></div>', {url:origin+'/',pretendToBeVisual:true});
   context(dom,t);
   const asked = [], signOuts = [];
@@ -198,7 +198,7 @@ test('another window editing the same test is reported, and Chiqish asks before 
   window.dispatchEvent(new window.StorageEvent('storage',{key:name,newValue:'{}'}));
   assert.match(page.el('autosave-status').textContent,/boshqa oynada/);
 
-  const leave = () => [...page.host.querySelectorAll('#workspace-actions button')].find(b => b.textContent === 'Chiqish').click();
+  const leave = () => page.el('profile-signout').click();
   type(page.el('editor-title'),'Umumiy kompyuter 2');
   leave(); // keep copies
   await page.until(()=>signOuts.length === 1, 'sign out');

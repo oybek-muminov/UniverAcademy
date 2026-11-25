@@ -77,7 +77,8 @@ test('cabinet data paths bound queries and avoid fetching authored content for a
   // Driver-command ceilings also cover auth and transaction setup/commit. Compare bytes
   // separately so a single SELECT cannot silently reintroduce all rich question text.
   assert.ok(metrics.textPreview.queries<metrics.emptyStaff.queries);
-  assert.ok(metrics.emptyStaff.queries<=22);
+  // +1: the first teacher read per process checks whether the test archive table exists (then remembered).
+  assert.ok(metrics.emptyStaff.queries<=23);
   assert.ok(metrics.staffDashboard.queries<=26);
   assert.ok(metrics.studentDashboard.queries<=22);
   for(const action of ['save','submit']){

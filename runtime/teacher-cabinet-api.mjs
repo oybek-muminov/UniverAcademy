@@ -17,7 +17,7 @@ import { CommittedAttemptError } from './teacher-staging-attempts.mjs';
 import { runStagingPilot } from './teacher-staging-store.mjs';
 
 const actions={
-  teacher:new Set(['createGroup','addMember','removeMember','requestAccountDeletion','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest']),
+  teacher:new Set(['createGroup','addMember','removeMember','deleteGroup','deleteTest','requestAccountDeletion','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest']),
   student:new Set(['acceptInvite','startAttempt','resumeAttempt','saveAnswer','submitAttempt']),
   admin:new Set(['approveGroup']),
 };

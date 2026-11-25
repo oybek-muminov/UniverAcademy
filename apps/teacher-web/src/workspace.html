@@ -52,6 +52,14 @@
           <div id="group-content" hidden>
             <label>Guruh<select id="member-group"></select></label>
             <p id="group-status" class="hint"></p>
+            <div id="group-delete-box" class="actions">
+              <button id="group-delete" type="button" class="danger">Guruhni o‘chirish</button>
+              <div id="group-delete-confirm" hidden>
+                <p id="group-delete-text" class="hint" role="alert"></p>
+                <button id="group-delete-yes" type="button" class="danger">Ha, o‘chirish</button>
+                <button id="group-delete-no" type="button">Bekor</button>
+              </div>
+            </div>
             <form id="member-form" class="line-form">
               <label>O‘quvchining UniverAcademy ID raqami<input id="student-number" name="student_id" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" required autocomplete="off" placeholder="10 xonali raqam"></label>
               <div class="actions"><button type="submit">O‘quvchi qo‘shish</button><button type="submit" name="intent" value="send">Bot orqali yuborish</button></div>
@@ -124,6 +132,12 @@
               <button id="edit-saved" type="button" hidden>Qoralamani tahrirlash</button>
               <button id="view-saved" type="button">O‘quvchi ko‘rinishi</button>
               <button id="publish-button" type="button">Testni nashr qilish</button>
+              <button id="test-delete" type="button" class="danger">Testni o‘chirish</button>
+              <div id="test-delete-confirm" hidden>
+                <p id="test-delete-text" class="hint" role="alert"></p>
+                <button id="test-delete-yes" type="button" class="danger">Ha, o‘chirish</button>
+                <button id="test-delete-no" type="button">Bekor</button>
+              </div>
               <form id="assign-form" class="line-form" hidden>
                 <label>Test beriladigan guruh<select id="assignment-group" required></select></label>
                 <fieldset class="schedule-choice">

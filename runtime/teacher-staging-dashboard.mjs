@@ -2,7 +2,7 @@ import {studentAssignmentStatus} from './teacher-assignment-schedule.mjs';
 import {AttemptRows,decodeRatio} from '../supabase/functions/univeracademy-api/storage/attempt-rows.ts';
 import {candidateHalfUp2,studentPointsHalfUp1} from '../supabase/functions/univeracademy-api/student-wire.ts';
 import {expireForMembershipGuard} from '../supabase/functions/univeracademy-api/attempts.ts';
-import {query,groupView} from './teacher-staging-content.mjs';
+import {query,groupView,archivedFilter} from './teacher-staging-content.mjs';
 
 const profileNameSql="concat_ws(' ',nullif(p.profile->>'first_name',''),nullif(p.profile->>'last_name',''))";
 export function displayName(profile){return [profile.first_name,profile.last_name].filter(Boolean).join(' ');}
@@ -44,7 +44,7 @@ export async function dashboard(tx,actor){
   const tests=teacher?await query(tx,`SELECT v.id,d.title,v.status,d.subject_id "subjectId",(v.wire->>'duration_seconds')::int duration_seconds,
     (SELECT count(*)::int FROM ua_private.draft_questions q WHERE q.version_id=v.id) "questionCount"
     FROM ua_cabinet.test_owners o JOIN ua_private.test_versions v ON v.id=o.version_id JOIN ua_private.demos d ON d.id=v.demo_id
-    WHERE o.teacher_id=$1 AND d.subject_id=ANY($2::text[]) ORDER BY v.id`,[person,actor.approvedSubjectIds]):[];
+    WHERE o.teacher_id=$1 AND d.subject_id=ANY($2::text[]) ${await archivedFilter(tx,'v')} ORDER BY v.id`,[person,actor.approvedSubjectIds]):[];
   const subjects=teacher?actor.approvedSubjectIds.map(id=>({id,title:id})):[];
   if(teacher&&!groups.length)return {...base,subjects,groups:[],tests,assignments:[],results:[]};
   const ids=groups.map(g=>g.id);

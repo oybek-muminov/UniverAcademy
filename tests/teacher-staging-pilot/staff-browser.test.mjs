@@ -118,6 +118,14 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
           assert.deepEqual(data,{});
           deletionRequested = true;
           return located(success({id:person,requested:true}),url);
+        case 'deleteGroup':
+          assert.deepEqual(data,{groupId:newId});
+          newGroup.status='archived';
+          return located(success({id:newId,status:'archived',outcome:'archived'}),url);
+        case 'deleteTest':
+          assert.deepEqual(data,{testId});
+          tests.splice(tests.findIndex(row=>row.id===testId),1);
+          return located(success({id:testId,outcome:'archived'}),url);
         case 'createInvite':
           assert.deepEqual(data,{groupId:newId});
           return located(success({telegramUrl}),url);
@@ -237,6 +245,29 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   assert(!calls.some(([path])=>path.includes('/admin/')));
 
   assert.equal(host.querySelector('a[href="/admin"]'),null,'an ordinary teacher sees no admin link');
+  // Removing a test or a group asks first, and what students already used is archived rather than erased.
+  assert.equal(host.querySelector('#workspace-actions button'),null,'the side menu keeps the name only; signing out lives on the profile page');
+  el('tab-published').click();
+  assert(!el('test-delete').hidden && el('test-delete-confirm').hidden);
+  el('test-delete').click();
+  assert(!el('test-delete-confirm').hidden && el('test-delete').hidden && /arxivga olinadi/.test(el('test-delete-text').textContent));
+  el('test-delete-no').click();
+  assert(el('test-delete-confirm').hidden && !el('test-delete').hidden && !calls.some(([path]) => path.endsWith('/deleteTest')));
+  el('test-delete').click();
+  el('test-delete-yes').click();
+  await until(() => settled() && el('notice').textContent === 'Test arxivga olindi, natijalar saqlandi.');
+  assert.equal(tests.length,0);
+  host.querySelector('.bottom-nav a[href="#guruhlar"]').click();
+  assert(!el('group-delete').hidden && el('group-delete-confirm').hidden);
+  el('group-delete').click();
+  assert(!el('group-delete-confirm').hidden && /arxivga olinadi/.test(el('group-delete-text').textContent));
+  el('group-delete-no').click();
+  assert(el('group-delete-confirm').hidden && !calls.some(([path]) => path.endsWith('/deleteGroup')));
+  el('group-delete').click();
+  el('group-delete-yes').click();
+  await until(() => settled() && el('notice').textContent === 'Guruh arxivga olindi, natijalar saqlandi.');
+  assert.equal(el('group-status').textContent,'Arxivlangan guruh');
+  assert(el('group-delete').hidden && el('group-delete-confirm').hidden);
   // The profile page shows who the teacher is and asks twice before a deletion request is sent.
   host.querySelector('.bottom-nav a[href="#profil"]').click();
   assert(!el('profil').hidden && el('testlar').hidden);

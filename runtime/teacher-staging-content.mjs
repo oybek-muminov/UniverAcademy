@@ -66,13 +66,27 @@ export async function saveDraft(tx,actor,loaded,input){
     [testId,w.revision,w,expectedRevision]));
   return summary(t,newTitle);
 }
-const ownerScope=` FROM ua_private.test_versions v JOIN ua_cabinet.test_owners t ON t.version_id=v.id JOIN ua_private.demos d ON d.id=v.demo_id
-  WHERE v.id=$1 AND t.teacher_id=$2 AND d.subject_id=ANY($3::text[])`;
+// Archived tests are hidden from every teacher action. A database installed before the archive existed has no
+// archive table yet, so the filter is only added once the table is there. The answer is remembered per database:
+// "yes" for good, "not yet" for half a minute (so a freshly applied migration is picked up without a restart).
+const archiveKnown=new Map();
+const notArchived=async(tx,alias)=>{
+  const where=[tx.client.host,tx.client.port,tx.client.database].join('/'),known=archiveKnown.get(where),at=Date.now();
+  let ready=known?.ready===true||known!==undefined&&at-known.at<30000?known.ready:undefined;
+  if(ready===undefined){
+    ready=(await query(tx,"SELECT to_regclass('ua_cabinet.test_archive') IS NOT NULL AS ready"))[0].ready;
+    archiveKnown.set(where,{ready,at});
+  }
+  return ready?' AND NOT EXISTS(SELECT 1 FROM ua_cabinet.test_archive x WHERE x.version_id='+alias+'.id)':'';
+};
+export const archivedFilter=notArchived;
+const ownerScope=async tx=>` FROM ua_private.test_versions v JOIN ua_cabinet.test_owners t ON t.version_id=v.id JOIN ua_private.demos d ON d.id=v.demo_id
+  WHERE v.id=$1 AND t.teacher_id=$2 AND d.subject_id=ANY($3::text[])`+await notArchived(tx,'v');
 export async function requireOwnedTest(tx,actor,id){
-  need(await query(tx,'SELECT v.id'+ownerScope,[needId(id),actor.personId,actor.approvedSubjectIds]));
+  need(await query(tx,'SELECT v.id'+await ownerScope(tx),[needId(id),actor.personId,actor.approvedSubjectIds]));
 }
 export async function ownedTest(tx,actor,id,lock=false){
-  const row=need(await query(tx,'SELECT v.wire,v.published_snapshot,d.subject_id,d.title'+ownerScope+(lock?' FOR UPDATE OF v':''),
+  const row=need(await query(tx,'SELECT v.wire,v.published_snapshot,d.subject_id,d.title'+await ownerScope(tx)+(lock?' FOR UPDATE OF v':''),
     [needId(id),actor.personId,actor.approvedSubjectIds]));
   // Publication pins the validated authored questions. Reopening/assigning a published version
   // can reuse that same snapshot; drafts still read the editable canonical rows.

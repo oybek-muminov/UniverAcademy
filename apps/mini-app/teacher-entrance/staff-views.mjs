@@ -34,8 +34,6 @@ export function teacherView(host, port, first, lifecycle) {
     if (drafts.hasAny() && doc.defaultView.confirm('Brauzerda serverga yuborilmagan test nusxalari bor.\n\nOK — ularni o‘chirib chiqish (umumiy kompyuter uchun).\nBekor qilish — saqlab chiqish.')) drafts.wipe();
     return lifecycle.signout();
   }
-  const actionBar = host.querySelector('#workspace-actions');
-  actionBar.append(button(doc, 'Chiqish', leave));
   for (const [ext, url] of [['txt',sampleText], ['json',sampleJson]]) host.querySelector('a[href="./sample.' + ext + '"]').href = url;
   host.querySelector('.skip').onclick = event => {event.preventDefault(); host.querySelector('#main').focus();};
   const loading = new Map();

@@ -3,10 +3,10 @@ import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
 import {parseTeacherTestText} from './teacher-pilot-text-import.mjs';
 import {cleanText,editableDraft,requireEditable} from './teacher-pilot-import.mjs';
-import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest,requireOwnedTest} from './teacher-staging-content.mjs';
+import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest,requireOwnedTest,archivedFilter} from './teacher-staging-content.mjs';
 import {dashboard,expireVisible} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
-const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','removeMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia','requestAccountDeletion']),
+const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','removeMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','deleteGroup','deleteTest','readMedia','putMedia','requestAccountDeletion']),
  student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup']),owner:new Set(['dashboard'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
@@ -150,6 +150,61 @@ async function unenroll(tx,g,cabinetId){
   await query(tx,'UPDATE ua_private.groups SET revision=revision+1 WHERE id=$1',[g.id]);
   return groupView(g);
 }
+// Deleting a group: an empty group (no test was ever given to it) disappears completely. A group whose
+// students already took or were given a test is archived, so every result stays visible to the teacher.
+// Either way the students are released first, and never while one of them is in the middle of a test.
+async function retireGroup(tx,g){
+  await expireVisible(tx,null,[g.id],true);
+  const running=await query(tx,`SELECT 1 FROM ua_private.attempts t JOIN ua_private.assignments a ON a.id=t.assignment_id
+    JOIN ua_private.exam_series es ON es.current_attempt_id=t.id AND es.person_id=t.person_id
+    WHERE a.group_id=$1 AND t.body->>'status'='in_progress' AND (t.body->>'deadlineAt')::numeric>extract(epoch FROM clock_timestamp())*1000 LIMIT 1`,[g.id]);
+  if(running.length)fail('ACTIVE_EXAM_OR_RECOVERY',409);
+  let members;
+  try {
+    members=await query(tx,`SELECT m.person_id FROM ua_private.memberships m JOIN ua_private.people p ON p.id=m.person_id
+      WHERE m.affinity_group_id=$1 ORDER BY m.person_id FOR UPDATE OF m,p NOWAIT`,[g.id]);
+  }catch(error){
+    if(error.code==='55P03')fail('MEMBERSHIP_BUSY',409);
+    throw error;
+  }
+  const ids=members.map(m=>m.person_id);
+  if(ids.length){
+    await query(tx,`UPDATE ua_private.memberships SET active=false,affinity_group_id=NULL,revision=revision+1,epoch=epoch+1
+      WHERE person_id=ANY($1::uuid[]) AND affinity_group_id=$2`,[ids,g.id]);
+    await query(tx,"UPDATE ua_private.people SET profile=jsonb_set(profile,'{active_group_id}','null'::jsonb) WHERE id=ANY($1::uuid[])",[ids]);
+  }
+  await query(tx,'DELETE FROM ua_cabinet.invites WHERE group_id=$1',[g.id]);
+  const used=(await query(tx,'SELECT count(*)::int n FROM ua_private.assignments WHERE group_id=$1',[g.id]))[0].n;
+  if(!used){
+    // One statement: the foreign keys are checked once the request, scope and group are all gone.
+    need(await query(tx,`WITH request AS (DELETE FROM ua_cabinet.group_requests WHERE id=$1 AND active_group_id=$1 RETURNING id),
+      scope AS (DELETE FROM ua_private.staff_group_scope WHERE group_id=$1 RETURNING group_id)
+      DELETE FROM ua_private.groups WHERE id=$1 RETURNING id`,[g.id]));
+    return {...groupView({...g,status:'deleted'}),outcome:'deleted'};
+  }
+  await query(tx,"UPDATE ua_private.groups SET status='archived',revision=revision+1 WHERE id=$1",[g.id]);
+  return {...groupView({...g,status:'archived'}),outcome:'archived'};
+}
+// Deleting a test: never given to a group → gone for good. Already given to a group → archived, so students'
+// results and the finished assignments stay intact; the teacher just stops seeing and editing it.
+async function retireTest(tx,actor,id){
+  const row=need(await query(tx,`SELECT v.demo_id FROM ua_private.test_versions v JOIN ua_cabinet.test_owners t ON t.version_id=v.id
+    JOIN ua_private.demos d ON d.id=v.demo_id WHERE v.id=$1 AND t.teacher_id=$2 AND d.subject_id=ANY($3::text[]) FOR UPDATE OF v`,
+    [needId(id),actor.personId,actor.approvedSubjectIds]));
+  const used=(await query(tx,'SELECT count(*)::int n FROM ua_private.assignments WHERE version_id=$1',[id]))[0].n;
+  if(used){
+    if(!await archivedFilter(tx,'v'))fail('SERVICE_UNAVAILABLE',503);
+    await query(tx,'INSERT INTO ua_cabinet.test_archive(version_id,archived_by) VALUES($1,$2) ON CONFLICT DO NOTHING',[id,actor.personId]);
+    return {id,outcome:'archived'};
+  }
+  const siblings=(await query(tx,'SELECT count(*)::int n FROM ua_private.test_versions WHERE demo_id=$1 AND id<>$2',[row.demo_id,id]))[0].n;
+  // One statement again, so the questions, ownership, version and (when alone) its title row go together.
+  need(await query(tx,`WITH questions AS (DELETE FROM ua_private.draft_questions WHERE version_id=$1 RETURNING id),
+    owner AS (DELETE FROM ua_cabinet.test_owners WHERE version_id=$1 RETURNING version_id),
+    version AS (DELETE FROM ua_private.test_versions WHERE id=$1 RETURNING id)
+    ${siblings?'SELECT id FROM version':'DELETE FROM ua_private.demos WHERE id=$2 RETURNING id'}`,siblings?[id]:[id,row.demo_id]));
+  return {id,outcome:'deleted'};
+}
 async function invite(tx,actor,g,recipient,send){
   let tg=null;
   if(send){
@@ -199,8 +254,8 @@ async function media(tx,actor,action,input){
   return {bytes:need(rows).png,contentType:'image/png'};
 }
 async function authorizeResource(tx,actor,action,input){
-  if(['approveGroup','addMember','removeMember','createInvite','sendInvite','assignTest'].includes(action)){
-    const g=await group(tx,input.groupId,actor,{requireActive:!['approveGroup','removeMember'].includes(action),recoverPending:actor.role==='teacher'});
+  if(['approveGroup','addMember','removeMember','deleteGroup','createInvite','sendInvite','assignTest'].includes(action)){
+    const g=await group(tx,input.groupId,actor,{requireActive:!['approveGroup','removeMember','deleteGroup'].includes(action),recoverPending:actor.role==='teacher'});
     return g;
   }
   if(action==='updateDraft'){
@@ -230,6 +285,8 @@ async function effect(tx,actor,action,input,subjectId,g){
       return enroll(tx,g,student.id);
     }
     case 'removeMember':return unenroll(tx,g,input.univeracademy_id);
+    case 'deleteGroup':return retireGroup(tx,g);
+    case 'deleteTest':return retireTest(tx,actor,input.testId);
     case 'requestAccountDeletion':{
       return {id:actor.personId,requested:true,repeated:actor.deletionRequested};
     }
@@ -266,8 +323,13 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   if(typeof key!=='string'||key.length>128||!key.length)fail('IDEMPOTENCY_KEY_REQUIRED',400);
   if(action==='acceptInvite')return accept(tx,actor,input,key);
   const importSubject=action==='importTest'?subjectFor(actor,input.subjectId):null;
-  const g=await authorizeResource(tx,actor,action,input);
   const receiptKey=actor.personId+'/staging/'+action+'/'+hash(key),payload=hash(canonical(input));
+  if(action==='deleteGroup'||action==='deleteTest'){
+    // A repeated request must still answer after the group or test is already gone.
+    const done=(await query(tx,'SELECT payload,response FROM ua_private.staff_receipts WHERE actor_id=$1 AND key=$2',[actor.personId,receiptKey]))[0];
+    if(done){if(done.payload!==payload)fail('IDEMPOTENCY_CONFLICT',409);return done.response;}
+  }
+  const g=await authorizeResource(tx,actor,action,input);
   const prior=(await query(tx,'SELECT payload,response FROM ua_private.staff_receipts WHERE actor_id=$1 AND key=$2',[actor.personId,receiptKey]))[0];
   if(prior){
     if(action==='publishTest'||action==='assignTest')await requireOwnedTest(tx,actor,input.testId);

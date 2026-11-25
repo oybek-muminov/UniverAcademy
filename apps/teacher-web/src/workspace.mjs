@@ -181,7 +181,7 @@ export function mountTeacherWorkspace(root, {
   const unfold = () => { if (!onPhone()) for (const fold of folds) fold.open = true; };
   phone?.addEventListener?.('change', unfold);
   for (const fold of folds) fold.querySelector('summary').addEventListener('click', event => { if (!onPhone()) event.preventDefault(); });
-  let removing = '', deletionSent = false;
+  let removing = '', deletionSent = false, deletingGroup = '', deletingTest = '';
   const subjectNames = {physics: 'Fizika', math: 'Matematika', mathematics: 'Matematika'};
 
   function node(tag, text) {
@@ -271,10 +271,10 @@ export function mountTeacherWorkspace(root, {
     retries.delete(fingerprint);
     try {
       const selection = complete?.(data) ?? {};
-      notice(success);
+      notice(typeof success === 'function' ? success(data) : success);
       await load(selection);
     } catch (error) {
-      notice(success, error.message);
+      notice(typeof success === 'function' ? success(data) : success, error.message);
     } finally {
       writing = false;
       el('main').removeAttribute('aria-busy');
@@ -294,6 +294,11 @@ export function mountTeacherWorkspace(root, {
     el('group-status').textContent = groupStatusLabel(group.status);
     el('member-form').hidden = !active;
     el('invite-section').hidden = !active;
+    el('group-delete').hidden = !active || deletingGroup === group.id;
+    el('group-delete-confirm').hidden = !active || deletingGroup !== group.id;
+    el('group-delete-text').textContent = dashboard.assignments.some(row => row.groupId === group.id)
+      ? 'Bu guruhga test berilgan. Guruh arxivga olinadi: natijalar saqlanadi, o‘quvchilar guruhdan chiqariladi. Davom etasizmi?'
+      : 'Guruh butunlay o‘chiriladi, o‘quvchilar guruhdan chiqariladi. Davom etasizmi?';
     const rows = group.members.map(member => {
       const li = node('li', member.name);
       const key = group.id + '/' + member.univeracademy_id;
@@ -384,6 +389,12 @@ export function mountTeacherWorkspace(root, {
     el('test-meta').textContent = [published ? 'Nashr qilingan' : 'Qoralama', test.questionCount + ' ta savol',
       hoursFromSeconds(test.duration_seconds) + ' soat'].join(' · ');
     el('publish-button').hidden = published;
+    const assignedAny = dashboard.assignments.some(row => row.testId === test.id);
+    el('test-delete').hidden = deletingTest === test.id;
+    el('test-delete-confirm').hidden = deletingTest !== test.id;
+    el('test-delete-text').textContent = assignedAny
+      ? 'Bu testni o‘quvchilar ishlagan. Test arxivga olinadi: natijalar saqlanadi, lekin test ro‘yxatdan yo‘qoladi. Davom etasizmi?'
+      : 'Test butunlay o‘chiriladi. Davom etasizmi?';
     el('edit-saved').hidden = published;
     el('view-saved').textContent = published ? 'O‘quvchi ko‘rinishi' : 'Saqlangan qoralamaning o‘quvchi ko‘rinishi';
     if (!published) { el('assign-form').hidden = true; el('assignment-info').textContent = ''; return; }
@@ -496,6 +507,24 @@ export function mountTeacherWorkspace(root, {
     await command('removeMember', { groupId, univeracademy_id: id }, 'O‘quvchi guruhdan chiqarildi.', () => { removing = ''; });
     if (!disposed) { removing = ''; renderGroup(); if (el('member-group').value === groupId) picker.refresh(true); }
   }
+  el('group-delete').onclick = () => { deletingGroup = el('member-group').value; renderGroup(); el('group-delete-no').focus(); };
+  el('group-delete-no').onclick = () => { deletingGroup = ''; renderGroup(); el('group-delete').focus(); };
+  el('group-delete-yes').onclick = () => {
+    const groupId = deletingGroup;
+    deletingGroup = '';
+    if (!groupId) return;
+    void command('deleteGroup', { groupId },
+      data => data.outcome === 'archived' ? 'Guruh arxivga olindi, natijalar saqlandi.' : 'Guruh o‘chirildi.');
+  };
+  el('test-delete').onclick = () => { deletingTest = el('saved-test').value; renderTest(); el('test-delete-no').focus(); };
+  el('test-delete-no').onclick = () => { deletingTest = ''; renderTest(); el('test-delete').focus(); };
+  el('test-delete-yes').onclick = () => {
+    const testId = deletingTest;
+    deletingTest = '';
+    if (!testId) return;
+    void command('deleteTest', { testId },
+      data => data.outcome === 'archived' ? 'Test arxivga olindi, natijalar saqlandi.' : 'Test o‘chirildi.');
+  };
   el('invite-button').onclick = () => {
     const groupId = el('member-group').value;
     command('createInvite', { groupId }, 'Guruh uchun yangi taklif havolasi yaratildi.', data => {
