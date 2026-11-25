@@ -1,5 +1,5 @@
 import { hasTelegramLaunchContext } from './telegram-bridge.ts';
-import { openStaffBrowser, staffCabinets } from './staff-cabinets.ts';
+import { autoOpenStaffBrowser, openStaffBrowser, staffCabinets } from './staff-cabinets.ts';
 import type { StaffRole } from './staff-cabinets.ts';
 
 // The public bot menu links only to a sign-in page. It does not need React, Clerk or a Mini App session.
@@ -28,4 +28,10 @@ export function mountStaffHandoff(element: HTMLElement, role: StaffRole) {
   recheck.href = '/';
   recheck.textContent = 'Kabinetimni qayta aniqlash';
   status.replaceWith(link, recheck);
+  if (autoOpenStaffBrowser(role, window) === 'opened') {
+    const note = document.createElement('p');
+    note.setAttribute('role', 'status');
+    note.textContent = 'Kabinet brauzerda ochilmoqda. Ochilmasa, tugmani bosing.';
+    link.after(note);
+  }
 }

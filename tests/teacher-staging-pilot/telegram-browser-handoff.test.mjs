@@ -8,7 +8,7 @@ const {JSDOM} = createRequire(new URL('../teacher-local-pilot/tooling/package.js
 const {build} = createRequire(new URL('../../apps/teacher-web/ustoz-pages/package.json', import.meta.url))('esbuild');
 const appDirectory = fileURLToPath(new URL('../../apps/mini-app/', import.meta.url));
 
-test('staff handoff opens only the selected public HTTPS route on tap and keeps the Mini App in place', async () => {
+test('staff handoff opens the selected public HTTPS route by itself once, keeps the tap fallback and the Mini App in place', async () => {
   const artifact = await build({
     stdin:{contents:`
       import {createRoot} from 'react-dom/client';
@@ -30,11 +30,16 @@ test('staff handoff opens only the selected public HTTPS route on tap and keeps 
       const previous = launched.length;
       window.show(role);
       await pause(0);
-      assert.equal(launched.length, previous);
+      assert.deepEqual(launched.slice(previous),[url]);
+      assert.match(window.document.querySelector('[role="status"]').textContent,/brauzerda ochilmoqda/);
       const link = window.document.querySelector('a');
       assert.equal(link.href,url);
       link.click();
-      assert.deepEqual(launched.slice(previous),[url]);
+      assert.deepEqual(launched.slice(previous),[url,url]);
+      window.show(null);
+      window.show(role);
+      await pause(0);
+      assert.deepEqual(launched.slice(previous),[url,url]);
     }
     window.show(null);
     const links = [...window.document.querySelectorAll('details a')];
@@ -91,12 +96,53 @@ test('the actual Mini menu route launches staff without loading the sign-in stac
         assert.equal(link,null);
         assert.match(window.document.body.textContent,/topilmadi/);
       } else {
-        assert.equal(opened.length,0);
+        const destination='https://ustoz.univeracademy.uz/'+(role==='teacher'?'':role);
+        assert.deepEqual(opened,[destination]);
+        assert.match(window.document.querySelector('[role="status"]').textContent,/brauzerda ochilmoqda/);
         link.click();
-        assert.deepEqual(opened,['https://ustoz.univeracademy.uz/'+(role==='teacher'?'':role)]);
+        assert.deepEqual(opened,[destination,destination]);
         assert.equal(window.document.querySelector('a.cabinet-recheck').pathname,'/');
       }
       assert.equal(requests.length,0);
     } finally { dom.window.close(); }
   }
+});
+
+test('automatic staff launch falls back to the visible link when the bridge cannot open it, and never runs outside Telegram', async () => {
+  const artifact = await build({
+    stdin:{contents:`
+      import {createRoot} from 'react-dom/client';
+      import {flushSync} from 'react-dom';
+      import {createElement} from 'react';
+      import {StaffBrowserEntry} from './src/staff-browser-entry.tsx';
+      const root = createRoot(document.querySelector('main'));
+      window.show = role => flushSync(() => root.render(role ? createElement(StaffBrowserEntry, {role}) : null));
+    `,resolveDir:appDirectory},tsconfig:appDirectory+'tsconfig.json',bundle:true,write:false,format:'iife',define:{'process.env.NODE_ENV':'"production"'}
+  });
+  const failing = new JSDOM('<main></main>',{url:'https://mini.univeracademy.uz/',runScripts:'outside-only'});
+  try {
+    const {window} = failing;
+    let attempts = 0;
+    window.Telegram = {WebApp:{platform:'android',initData:'private',openLink(){attempts++;throw Error('Unavailable');}}};
+    window.eval(artifact.outputFiles[0].text);
+    window.show('teacher');
+    await pause(0);
+    assert.equal(attempts,1);
+    assert.equal(window.document.querySelector('[role="status"]'),null);
+    assert.equal(window.document.querySelector('a.cabinet-browser-button').href,'https://ustoz.univeracademy.uz/');
+    window.show(null);
+    window.show('teacher');
+    await pause(0);
+    assert.equal(attempts,1);
+  } finally { failing.window.close(); }
+  const plain = new JSDOM('<main></main>',{url:'https://mini.univeracademy.uz/',runScripts:'outside-only'});
+  try {
+    const {window} = plain;
+    let launched = 0;
+    window.Telegram = {WebApp:{platform:'unknown',initData:'',openLink(){launched++;}}};
+    window.eval(artifact.outputFiles[0].text);
+    window.show('owner');
+    await pause(0);
+    assert.equal(launched,0);
+  } finally { plain.window.close(); }
 });

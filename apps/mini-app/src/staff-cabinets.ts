@@ -24,3 +24,13 @@ export function openStaffBrowser(role: StaffRole, scope: Window) {
     return false;
   }
 }
+
+// The first launch of a role in this document opens the browser by itself; later
+// mounts (a remount, or coming back to the Mini App) never reopen it. The visible
+// link stays available whenever the automatic launch was unavailable or not enough.
+const autoOpened = new Set<StaffRole>();
+export function autoOpenStaffBrowser(role: StaffRole, scope: Window): 'opened' | 'already' | 'unavailable' {
+  if (autoOpened.has(role)) return 'already';
+  autoOpened.add(role);
+  return openStaffBrowser(role, scope) ? 'opened' : 'unavailable';
+}

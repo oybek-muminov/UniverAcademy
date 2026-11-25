@@ -1,0 +1,36 @@
+{
+  "format_version": 1,
+  "base_commit": "e52c54b20139fe857c8a5ead4e2ad7e699683dad",
+  "files": [
+    {
+      "path": "apps/mini-app/src/staff-browser-entry.tsx",
+      "previous_sha256": "7a7bd6504e7cab85a716f4cc7219ed946f41a8c393b9245c195b33494903891b",
+      "bytes": 1716,
+      "sha256": "3166aa565eec4fb91978a2b028a7d716e669c4fe4f70f3c6cb1d7fa54db022c4"
+    },
+    {
+      "path": "apps/mini-app/src/staff-cabinets.ts",
+      "previous_sha256": "05aaab1aeb8dcc83d908e5576c5955f21044d005fd9132a37a5894003362a7c9",
+      "bytes": 1504,
+      "sha256": "e9d903b065289ad9ee66ed927b6f3c44736de4bb831aa4974c6771e3c2769115"
+    },
+    {
+      "path": "apps/mini-app/src/staff-menu-handoff.ts",
+      "previous_sha256": "34e91318f23be78469f52e8718cb1e5b98628389b6c92ccf0b2fa4da9fde9178",
+      "bytes": 1535,
+      "sha256": "66b40e4e650c3a0d4ee6aad3ffda1247fd6a0dd02257d6f04935f58146e4b757"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/telegram-browser-handoff.test.mjs",
+      "previous_sha256": "304b0ff91055fdf1fbc3604e2f3c1164616824255d0e7a1a51dd27da37993654",
+      "bytes": 8141,
+      "sha256": "76948cb902b7d8f4b6257d1f8c8d75e24df34a937dbf070b559efc6d3b5ab8f8"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "bffade6fda4f3e36f2ace408a2a4902ab5c99095d5f3f4c4a6a3bd571d4ced6d",
+      "bytes": 5537,
+      "sha256": "c20fbce2c150514c46b1069eb9416e25e535ea0f2033f34ada514bdd323a5be0"
+    }
+  ]
+}
