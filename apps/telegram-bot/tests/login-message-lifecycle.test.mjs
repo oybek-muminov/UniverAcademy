@@ -184,7 +184,7 @@ test('diagnostics emit only fixed enums and cannot break persisted work', async 
 });
 
 test('/start gives a linked teacher, admin or owner a direct browser button and leaves students and failed hints quiet', async () => {
-  for (const [role, url] of [['teacher', 'https://ustoz.univeracademy.uz/'], ['admin', 'https://ustoz.univeracademy.uz/admin'], ['owner', 'https://ustoz.univeracademy.uz/owner']]) {
+  for (const [role, url] of [['teacher', 'https://ustoz.univeracademy.uz/'], ['admin', 'https://ustoz.univeracademy.uz/admin'], ['owner', 'https://ega.univeracademy.uz/']]) {
     const h = harness();
     h.setStatus('linked');
     h.env.TELEGRAM_TEACHER_PILOT_ENABLED = 'true';

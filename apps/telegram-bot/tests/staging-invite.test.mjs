@@ -45,9 +45,9 @@ test('private start sends one fixed browser link only to linked staff and preser
     assert.equal(response.status,200);
     return (await response.json()).reply_markup.inline_keyboard;
   }
-  for (const [hint,path] of [['teacher','/'],['admin','/admin'],['owner','/owner']]) {
+  for (const [hint,site] of [['teacher','https://ustoz.univeracademy.uz/'],['admin','https://ustoz.univeracademy.uz/admin'],['owner','https://ega.univeracademy.uz/']]) {
     role=hint;
-    assert.deepEqual(await buttons('/start'), [[{text:'Kabinet',url:'https://ustoz.univeracademy.uz'+path}]]);
+    assert.deepEqual(await buttons('/start'), [[{text:'Kabinet',url:site}]]);
   }
   const beforeInvite = reads;
   assert.equal((await buttons('/start '+token))[0][0].web_app.url, urls.cabinet+'?invite='+token);

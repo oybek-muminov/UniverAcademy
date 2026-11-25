@@ -5,12 +5,13 @@ import { addProfile } from './cluster.mjs';
 
 export const issuer = 'https://clerk.stage-classroom.example.com';
 export const party = 'https://teacher.stage-classroom.example.com';
+export const ownerParty = 'https://ega.stage-classroom.example.com';
 
 export async function testClerk() {
   const { publicKey, privateKey } = await generateKeyPair('RS256');
   const jwk = { ...await exportJWK(publicKey), kid: 'fixture-clerk-signer', alg:'RS256', use:'sig' };
   const sessions = new Map();
-  const verifier = { issuer, authorizedParties:[party], audience:{kind:'clerk_default_no_audience'},
+  const verifier = { issuer, authorizedParties:[party,ownerParty], audience:{kind:'clerk_default_no_audience'},
     trustedKeys:createLocalJWKSet({keys:[jwk]}), now:Date.now };
   async function sign(subject,claims={}) {
     const now = Math.floor(Date.now()/1000);

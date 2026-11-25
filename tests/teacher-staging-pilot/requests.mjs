@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { party } from './credentials.mjs';
+import { party, ownerParty } from './credentials.mjs';
 
 export const studentOrigin='https://mini.stage-classroom.example.com';
 export const apiOrigin='https://api.stage-classroom.example.com';
 export function routes(api,role,token) {
-  const origin=role==='student'?studentOrigin:party;
+  const origin=role==='student'?studentOrigin:role==='owner'?ownerParty:party;
   function call(tail,method='GET',body,headers={}) {
     const destination=role==='student'?apiOrigin:origin;
     return api.fetch(new Request(destination+'/api/v1/'+role+'/pilot/'+tail,{

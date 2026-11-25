@@ -9,10 +9,11 @@ import pg from 'pg';
 import { forwardTeacherStaging } from '../../runtime/teacher-staging-proxy.mjs';
 import { createTeacherStageNode } from '../../runtime/teacher-staging-node.mjs';
 import { createTeacherStagingApi } from '../../runtime/teacher-staging-api.mjs';
+import { createCabinetApi } from '../../runtime/teacher-cabinet-api.mjs';
 import { createStagingInviteDeliveryStore } from '../../runtime/teacher-staging-delivery.mjs';
 import { addProfile, createCluster, createServiceLogin } from './cluster.mjs';
 import { proofHash } from '../../supabase/functions/univeracademy-api/student-state.ts';
-import { issuer,party,testClerk,provisionStaff,provisionStudent } from './credentials.mjs';
+import { issuer,party,ownerParty,testClerk,provisionStaff,provisionStudent } from './credentials.mjs';
 import { apiOrigin,routes,studentOrigin,good,rejected,graphSvg,richDocument } from './requests.mjs';
 import { testBot } from './bot.mjs';
 
@@ -114,23 +115,38 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     await rejected(teacher.call('session','POST',JSON.stringify({actor:'admin'}),{'content-type':'application/json'}));
   });
 
-  await t.test('Owner browser reads only its own identity and immediately loses access on revocation',async()=>{
-    const row=await provisionStaff(db,'Loyiha egasi','owner'),jwt=await clerk.sign(row.subject);
-    const owner=routes(router,'owner',jwt);
+  await t.test('Owner has its own origin: it reads only its own identity, loses access on revocation and is absent from the Ustoz origin',async()=>{
+    const row=await provisionStaff(db,'Loyiha egasi','owner');
+    // The Owner site has its own Worker entry; the Ustoz proxy and legacy host never carry Owner routes.
+    const ownerApi=createCabinetApi({enabled:true,pool,teacherOrigin:party,studentOrigin,apiOrigin,ownerOrigin:ownerParty,
+      verifier:clerk.verifier,liveness:clerk.liveness,allowLegacyTelegram:false},async()=>{throw new Error('no media on the Owner site');});
+    const ownerRouter={fetch:req=>ownerApi.fetch(req)};
+    const sign=(subject,claims={})=>clerk.sign(subject,{azp:ownerParty,...claims});
+    const jwt=await sign(row.subject);
+    const owner=routes(ownerRouter,'owner',jwt);
     const reply=await owner.dashboard();
     assert.equal(reply.headers.get('cache-control'),'no-store');
+    assert.equal(reply.headers.get('access-control-allow-origin'),ownerParty);
     assert.deepEqual(await good(reply),{role:'owner',person_id:row.id,name:'Loyiha egasi Sinov'});
-    await rejected(routes(router,'owner',teacherJWT).dashboard(),403);
-    const adminClaim=await clerk.sign(adminRow.subject,{role:'owner'});
-    await rejected(routes(router,'owner',adminClaim).dashboard(),403);
-    await rejected(routes(router,'owner',await clerk.sign(byId.subject)).dashboard(),403);
-    await rejected(routes(router,'owner',byId.token).dashboard(),401);
-    await rejected(routes(router,'teacher',jwt).dashboard(),403);
-    await rejected(routes(router,'admin',jwt).dashboard(),403);
+    // Not a staff or student identity, nothing from a claim, wrong audience or another surface.
+    await rejected(routes(ownerRouter,'owner',await sign(teacherRow.subject)).dashboard(),403);
+    await rejected(routes(ownerRouter,'owner',await sign(adminRow.subject,{role:'owner'})).dashboard(),403);
+    await rejected(routes(ownerRouter,'owner',await sign(byId.subject)).dashboard(),403);
+    await rejected(routes(ownerRouter,'owner',byId.token).dashboard(),401);
+    await rejected(routes(ownerRouter,'owner',await clerk.sign(row.subject)).dashboard(),401); // token minted for the Ustoz site
+    await rejected(routes(ownerRouter,'teacher',jwt).dashboard(),401); // an Owner-site token is not valid for the Ustoz site
+    await rejected(routes(ownerRouter,'admin',jwt).dashboard(),401);
     await rejected(owner.call('dashboard','POST'),404);
     await rejected(owner.command('approveGroup',{}),404);
     await rejected(owner.call('dashboard?person_id='+teacherRow.id),404);
-    await rejected(router.fetch(new Request(party+'/api/v1/owner/pilot/dashboard')),401);
+    await rejected(ownerRouter.fetch(new Request(ownerParty+'/api/v1/owner/pilot/dashboard')),401);
+    await rejected(ownerRouter.fetch(new Request(ownerParty+'/api/v1/owner/pilot/dashboard',{headers:{origin:party}})),403);
+    // The Ustoz site and the legacy host have no Owner route at all, not even for the real Owner.
+    await rejected(router.fetch(new Request(party+'/api/v1/owner/pilot/dashboard',{headers:{authorization:'Bearer '+jwt,origin:party}})),404);
+    await rejected(ownerRouter.fetch(new Request(party+'/api/v1/owner/pilot/dashboard',{headers:{authorization:'Bearer '+await clerk.sign(row.subject),origin:party}})),404);
+    // Without an Owner origin configured the routes simply do not exist.
+    const closed=createCabinetApi({enabled:true,pool,teacherOrigin:party,studentOrigin,apiOrigin,verifier:clerk.verifier,liveness:clerk.liveness,allowLegacyTelegram:false},async()=>{});
+    await rejected(closed.fetch(new Request(ownerParty+'/api/v1/owner/pilot/dashboard',{headers:{authorization:'Bearer '+jwt,origin:ownerParty}})),404);
     await db.query('UPDATE ua_private.staff_access SET approved=false WHERE person_id=$1',[row.id]);
     await rejected(owner.dashboard(),403);
     await db.query('UPDATE ua_private.staff_access SET approved=true WHERE person_id=$1',[row.id]);

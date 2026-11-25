@@ -80,7 +80,7 @@ export function mountAuthenticatedWorkspace(host, options) {
       if (signal.aborted) return;
       clear();
       const actions = [button(doc, 'Qayta tekshirish', open), button(doc,'Chiqish',signout)];
-      if (status === 403 && role !== 'owner') actions.unshift(alternateCabinet(doc, role));
+      if (status === 403) actions.unshift(alternateCabinet(doc, role));
       panel(status === 403 ? 'Bu bo‘lim uchun ruxsat berilmagan.' : 'Kirish sessiyasini tekshiring.', actions);
     }
     const port = createStaffTransport({...options, role, signal, expected, onDenied:denied});
@@ -88,8 +88,7 @@ export function mountAuthenticatedWorkspace(host, options) {
       const data = await port.request('dashboard');
       if (signal.aborted || !sameIdentity()) throw Error('Sessiya o‘zgardi.');
       if (data?.role !== role || !uuid(data.person_id) || boundPerson && data.person_id !== boundPerson ||
-          role === 'owner' && (typeof data.name !== 'string' || !data.name.trim()) ||
-          role !== 'owner' && !Array.isArray(data.groups) || role === 'teacher' && !['subjects','tests','assignments','results'].every(key => Array.isArray(data[key]))) {
+          !Array.isArray(data.groups) || role === 'teacher' && !['subjects','tests','assignments','results'].every(key => Array.isArray(data[key]))) {
         denied(403); throw Error('Kabinetni tasdiqlab bo‘lmadi.');
       }
       boundPerson = data.person_id;
@@ -97,20 +96,11 @@ export function mountAuthenticatedWorkspace(host, options) {
     }
     const verify = async () => { await dashboard(); };
     try {
-      const [data, views] = await Promise.all([dashboard(), role === 'owner' ? null : import('./staff-views.mjs')]);
+      const [data, views] = await Promise.all([dashboard(), import('./staff-views.mjs')]);
       if (signal.aborted || !sameIdentity()) return;
       check = verify;
-      if (role === 'owner') {
-        const section = doc.createElement('section');
-        section.className = 'status-card';
-        const title = doc.createElement('h1'); title.textContent = destination.title;
-        const name = doc.createElement('p'); name.textContent = data.name;
-        section.append(title, name, button(doc, 'Chiqish', signout));
-        host.replaceChildren(section);
-      } else {
-        const lifecycle = {signal, dashboard, signout};
-        cleanup = role === 'teacher' ? views.teacherView(host, port, data, lifecycle) : views.adminView(host, data, lifecycle);
-      }
+      const lifecycle = {signal, dashboard, signout};
+      cleanup = role === 'teacher' ? views.teacherView(host, port, data, lifecycle) : views.adminView(host, data, lifecycle);
     } catch {
       if (!signal.aborted) { clear(); panel('Kabinetni yuklab bo‘lmadi.', [button(doc, 'Qayta urinish', open)]); }
     }

@@ -538,12 +538,8 @@ test('formula input updates the saved source on every edit and typesets only the
 
 for (const scenario of [
   {path:'/admin',role:'admin',heading:'Admin kabineti'},
-  {path:'/owner',role:'owner',heading:'Ega kabineti'},
   {path:'/',role:'teacher',denied:403},
   {path:'/admin',role:'admin',denied:403},
-  {path:'/owner',role:'owner',denied:403},
-  {path:'/owner',role:'owner',denied:401},
-  {path:'/owner',role:'owner',replyRole:'teacher'},
   {path:'/admin',role:'admin',replyRole:'owner'},
 ]) test('staff destination '+scenario.path+' accepts only its authorized dashboard ('+(scenario.denied??scenario.replyRole??'approved')+')', async t => {
   const {path,role,denied,replyRole,heading}=scenario;
@@ -568,14 +564,8 @@ for (const scenario of [
   assert.deepEqual(reads,[origin+'/api/v1/'+role+'/pilot/dashboard']);
   if(heading) {
     assert.equal(host.querySelector('h1').textContent,heading);
-    if(role==='owner') {
-      assert(host.textContent.includes('Ega <b>Ism</b>'));
-      assert.equal(host.querySelector('b,form,a'),null);
-      assert.deepEqual([...host.querySelectorAll('button')].map(b=>b.textContent),['Chiqish']);
-    } else {
-      assert.equal(host.querySelector('li').textContent,'8-A · Ustoz · Faol guruh');
-      assert.equal(host.querySelector('a').href,origin+'/');
-    }
+    assert.equal(host.querySelector('li').textContent,'8-A · Ustoz · Faol guruh');
+    assert.equal(host.querySelector('a').href,origin+'/');
     identity={...identityValue,generation:'another-session'};notify();
     assert.equal(host.childNodes.length,0);
   } else {
@@ -584,24 +574,20 @@ for (const scenario of [
   }
 });
 
-test('staff entrance accepts three canonical URLs and never treats role or session hints as a destination', async () => {
+test('staff entrance accepts two canonical URLs (Teacher and Admin) and never treats role or session hints as a destination', async () => {
   const {staffDestination}=await import('../../apps/mini-app/teacher-entrance/staff-route.mjs');
-  for(const [path,role] of [['/','teacher'],['/admin','admin'],['/owner','owner']]) assert.equal(staffDestination(new URL(origin+path)).role,role);
-  for(const url of [origin+'/student',origin+'/admin/',origin+'/?role=owner',origin+'/owner#session',origin+'/teacher','https://example.test/owner']) {
+  for(const [path,role] of [['/','teacher'],['/admin','admin']]) assert.equal(staffDestination(new URL(origin+path)).role,role);
+  // The Owner has its own site (ega.univeracademy.uz); the Ustoz site has no Owner destination at all.
+  for(const url of [origin+'/student',origin+'/admin/',origin+'/?role=owner',origin+'/owner',origin+'/owner#session',origin+'/teacher','https://example.test/owner','https://ega.univeracademy.uz/']) {
     assert.equal(staffDestination(new URL(url)),null);
   }
 });
 
-test('owner transport exposes a single dashboard read and refuses commands, imports and private teacher assets', async t => {
-  const dom=new JSDOM('',{url:origin+'/owner'});context(dom,t);
+test('the Ustoz transport has no Owner role: the Owner is served only by its own site', async t => {
+  const dom=new JSDOM('',{url:origin+'/'});context(dom,t);
   let calls=0;
-  const port=createStaffTransport({origin,role:'owner',expected:identityValue,identity:{current:()=>identityValue},
-    signal:new AbortController().signal,getCurrentClerkToken:async ()=>'token',fetch:()=>{calls++;}});
-  assert.throws(()=>port.request('commands/createGroup',{name:'x'}));
-  assert.throws(()=>port.request('import-preview',{text:'x'}));
-  assert.throws(()=>port.availableStudents(person,null,new AbortController().signal));
-  assert.throws(()=>port.image(person));
-  await assert.rejects(port.upload(new Blob()));
+  assert.throws(()=>createStaffTransport({origin,role:'owner',expected:identityValue,identity:{current:()=>identityValue},
+    signal:new AbortController().signal,getCurrentClerkToken:async ()=>'token',fetch:()=>{calls++;}}));
   assert.equal(calls,0);
 });
 

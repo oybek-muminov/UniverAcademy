@@ -114,7 +114,11 @@ export function createCabinetApi(options, normalizeImage) {
       if((!match&&!groupId)||!cabinetQueryAllowed(url,req.method)||url.hash||url.username||url.password) fail('NOT_FOUND',404);
       const path=match?.[1],mediaId=match?.[2],command=match?.[3];
       const origin=req.headers.get('origin');
-      const publicOrigin=role==='student'?options.studentOrigin:options.teacherOrigin;
+      // Owner and staff never share an origin: the Owner cabinet is reachable only from its own site.
+      if (role==='owner'&&!httpsOrigin(options.ownerOrigin)) fail('NOT_FOUND',404);
+      const publicOrigin=role==='student'?options.studentOrigin:role==='owner'?options.ownerOrigin:options.teacherOrigin;
+      const staffParty=role==='owner'?options.ownerOrigin:options.teacherOrigin;
+      if (role==='owner'&&!options.verifier.authorizedParties.includes(staffParty)) fail('SERVICE_UNAVAILABLE',503);
       if (url.origin!==publicOrigin && !(role==='student'&&url.origin===options.apiOrigin)) fail('NOT_FOUND',404);
       if (origin!==null && origin!==publicOrigin) fail('FORBIDDEN',403);
       if (origin) {responseHeaders.set('access-control-allow-origin',origin);responseHeaders.set('vary','Origin');}
@@ -152,7 +156,7 @@ export function createCabinetApi(options, normalizeImage) {
       if (role==='student') result=await studentTransaction(options,pool,req,operation);
       else {
         const verifier=options.verifier;
-        const proof=await createClerkVerifier({...verifier,authorizedParties:[options.teacherOrigin]})(authorization.slice(7));
+        const proof=await createClerkVerifier({...verifier,authorizedParties:[staffParty]})(authorization.slice(7));
         result=await createClerkPersonTransactions({pool,verifier}).run(proof,req.signal,async scope=>{
           const {tx}=scope;
           const validUntil=await requireLiveClerk(proof,await scope.clock(),(identity,now)=>options.liveness(identity,now,{signal:req.signal}));

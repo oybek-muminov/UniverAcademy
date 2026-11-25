@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-teacher-entrance/
+dist-owner-entrance/
 coverage/
 *.tsbuildinfo
 .env

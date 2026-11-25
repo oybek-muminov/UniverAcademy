@@ -52,7 +52,7 @@ function cabinetPool(pool){
     },release:discard=>lease.release(discard)};
   }};
 }
-function clerkConfiguration(env,teacherOrigin){
+function clerkConfiguration(env,teacherOrigin,ownerOrigin){
   const json=value(env,'UA_CLERK_PROVIDER_SETTINGS');
   if(typeof json!=='string'||json.length>65536)throw unavailable();
   const settings=JSON.parse(json);
@@ -60,7 +60,7 @@ function clerkConfiguration(env,teacherOrigin){
       new Set(settings.authorizedParties).size!==settings.authorizedParties.length)throw unavailable();
   // The registration service keeps its original parties. This request's staff
   // verifier is also narrowed to the configured teacher origin by the shared API.
-  return {...settings,authorizedParties:[...new Set([...settings.authorizedParties,teacherOrigin])]};
+  return {...settings,authorizedParties:[...new Set([...settings.authorizedParties,teacherOrigin,...(ownerOrigin?[ownerOrigin]:[])])]};
 }
 async function closeOwned(clerk,db,ms){
   let timer;
@@ -85,11 +85,14 @@ export function createWorkerCabinetHandler({createApi,loadClient=async()=>(await
       if(env?.UA_CABINET_RUNTIME!=='worker'||env?.UA_CABINET_STAGING_ENABLED!=='true')return failure('NOT_FOUND',404);
       const teacherOrigin=publicHttpsOrigin(value(env,'UA_CABINET_TEACHER_ORIGIN'));
       const studentOrigin=publicHttpsOrigin(value(env,'UA_CABINET_STUDENT_ORIGIN'));
+      // Optional and independent: without it the Owner routes simply do not exist.
+      const ownerOrigin=Object.hasOwn(env,'UA_CABINET_OWNER_ORIGIN')?publicHttpsOrigin(value(env,'UA_CABINET_OWNER_ORIGIN')):undefined;
       const apiOrigin=publicHttpsOrigin(value(env,'UA_API_ORIGIN'));
       const url=new URL(request.url),role=cabinetRole(url.pathname,request.method);
-      if(!role||!cabinetQueryAllowed(url,request.method)||url.hash||url.username||url.password||
-        (role==='student'?url.origin!==studentOrigin&&url.origin!==apiOrigin:url.origin!==teacherOrigin))return failure('NOT_FOUND',404);
-      const expected=role==='student'?studentOrigin:teacherOrigin;
+      const ownerRole=role==='owner';
+      if(!role||!cabinetQueryAllowed(url,request.method)||url.hash||url.username||url.password||(ownerRole&&!ownerOrigin)||
+        (role==='student'?url.origin!==studentOrigin&&url.origin!==apiOrigin:url.origin!==(ownerRole?ownerOrigin:teacherOrigin)))return failure('NOT_FOUND',404);
+      const expected=role==='student'?studentOrigin:ownerRole?ownerOrigin:teacherOrigin;
       if(request.headers.has('origin')&&request.headers.get('origin')!==expected)return failure('FORBIDDEN',403);
       if(request.headers.get('origin')===expected)origin=expected;
       if(request.signal.aborted)throw unavailable();
@@ -97,7 +100,7 @@ export function createWorkerCabinetHandler({createApi,loadClient=async()=>(await
       timer=setTimeout(abort,timeoutMs);
       const binding=value(env,'CABINET_HYPERDRIVE'),connectionString=binding?.connectionString;
       if(!isHyperdriveConnectionString(connectionString))throw unavailable();
-      const settings=clerkConfiguration(env,teacherOrigin);
+      const settings=clerkConfiguration(env,teacherOrigin,ownerOrigin);
       const secretKey=value(env,'UA_CLERK_SECRET_KEY');
       if(typeof secretKey!=='string'||!secretKey||/[\r\n\0]/.test(secretKey))throw unavailable();
       const mode=env.UA_CABINET_ALLOW_LEGACY_TELEGRAM;
@@ -118,7 +121,7 @@ export function createWorkerCabinetHandler({createApi,loadClient=async()=>(await
       const Client=await untilAborted(loadClient,controller.signal);
       if(controller.signal.aborted)throw unavailable();
       db=createCloudflarePostgres(Client,{connectionString},{signal:controller.signal});
-      const options={enabled:true,teacherOrigin,studentOrigin,apiOrigin,pool:cabinetPool(db.pool),
+      const options={enabled:true,teacherOrigin,studentOrigin,apiOrigin,...(ownerOrigin?{ownerOrigin}:{}),pool:cabinetPool(db.pool),
         verifier:clerk.verifier,liveness:clerk.liveness,allowLegacyTelegram:mode==='true'};
       const result=await untilAborted(()=>createApi(options).fetch(body.request),controller.signal);
       if(!(result instanceof Response))throw unavailable();

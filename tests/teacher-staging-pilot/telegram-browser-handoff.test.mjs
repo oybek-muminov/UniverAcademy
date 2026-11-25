@@ -25,7 +25,7 @@ test('staff handoff opens the selected public HTTPS route by itself once, keeps 
     const launched = [];
     window.Telegram = {WebApp:{platform:'android',initData:'private',openLink(url){launched.push(url);}}};
     window.eval(artifact.outputFiles[0].text);
-    const destinations = {teacher:'https://ustoz.univeracademy.uz/',admin:'https://ustoz.univeracademy.uz/admin',owner:'https://ustoz.univeracademy.uz/owner'};
+    const destinations = {teacher:'https://ustoz.univeracademy.uz/',admin:'https://ustoz.univeracademy.uz/admin',owner:'https://ega.univeracademy.uz/'};
     for (const [role,url] of Object.entries(destinations)) {
       const previous = launched.length;
       window.show(role);
@@ -96,7 +96,7 @@ test('the actual Mini menu route launches staff without loading the sign-in stac
         assert.equal(link,null);
         assert.match(window.document.body.textContent,/topilmadi/);
       } else {
-        const destination='https://ustoz.univeracademy.uz/'+(role==='teacher'?'':role);
+        const destination=role==='owner'?'https://ega.univeracademy.uz/':'https://ustoz.univeracademy.uz/'+(role==='teacher'?'':role);
         assert.deepEqual(opened,[destination]);
         assert.match(window.document.querySelector('[role="status"]').textContent,/brauzerda ochilmoqda/);
         link.click();

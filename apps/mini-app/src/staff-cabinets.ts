@@ -1,7 +1,7 @@
 import { hasTelegramLaunchContext, readTelegramBridge } from './telegram-bridge.ts';
 
 export const staffCabinets = {
-  owner: { title: 'Ega kabineti', url: 'https://ustoz.univeracademy.uz/owner' },
+  owner: { title: 'Ega kabineti', url: 'https://ega.univeracademy.uz/' },
   admin: { title: 'Admin kabineti', url: 'https://ustoz.univeracademy.uz/admin' },
   teacher: { title: 'O‘qituvchi kabineti', url: 'https://ustoz.univeracademy.uz/' },
 } as const;

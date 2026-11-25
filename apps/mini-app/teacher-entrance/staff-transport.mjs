@@ -3,7 +3,6 @@ const limits = { json: 1024 * 1024, media: 2 * 1024 * 1024 };
 const permitted = {
   teacher: new Set(['createGroup','addMember','removeMember','deleteGroup','deleteTest','requestAccountDeletion','createInvite','sendInvite','importTest','previewTest','readDraft','updateDraft','publishTest','assignTest']),
   admin: new Set(),
-  owner: new Set(),
 };
 const messages = {
   INVALID_TIME_WINDOW: 'Boshlanish vaqtini tekshiring. Toshkent vaqti bo‘yicha kelajakdagi sana va vaqtni tanlang.',

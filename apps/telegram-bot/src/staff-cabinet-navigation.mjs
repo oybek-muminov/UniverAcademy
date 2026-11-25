@@ -3,7 +3,7 @@
 const destinations = new Map([
   ['teacher', {browser:'https://ustoz.univeracademy.uz/', handoff:'open-staff/teacher'}],
   ['admin', {browser:'https://ustoz.univeracademy.uz/admin', handoff:'open-staff/admin'}],
-  ['owner', {browser:'https://ustoz.univeracademy.uz/owner', handoff:'open-staff/owner'}],
+  ['owner', {browser:'https://ega.univeracademy.uz/', handoff:'open-staff/owner'}],
 ]);
 
 export async function staffCabinetNavigation(env, telegramUserId) {

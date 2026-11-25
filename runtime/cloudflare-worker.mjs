@@ -26,6 +26,10 @@ export class TelegramPilotDirectory extends WorkerEntrypoint {
   }
   async fetch() { return new Response(null, {status:404}); }
 }
+// The Owner cabinet (its own site) binds only to this entry point. It admits the Owner routes and nothing else.
+export class OwnerCabinetGateway extends WorkerEntrypoint {
+  async fetch(request) { return fetchNativeCabinet(request,this.env,'owner'); }
+}
 // Ustoz Pages binds directly to this staff-only entry point.
 export class TeacherCabinetGateway extends WorkerEntrypoint {
   async fetch(request) { return fetchNativeCabinet(request,this.env,'staff'); }
