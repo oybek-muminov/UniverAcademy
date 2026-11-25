@@ -9,7 +9,7 @@ import type {StaffAccessRecord,StaffState,VerifiedStaffProof} from "./staff-stat
 import {reconcileMembershipEffects} from "./membership-effects.ts";
 import {checkSessionPolicy,issueProofs,newUniverAcademyId,proofHash,revokeFamily} from "./student-state.ts";
 import type {SessionPolicy,NumericPresentation,Person} from "./student-state.ts";
-import {telegramRequestBody} from "./telegram-return.ts";
+import {telegramRequestBody,telegramLoginBody} from "./telegram-return.ts";
 import type {TelegramReturnPort} from "./telegram-return.ts";
 import {profileWire,utc} from "./student-wire.ts";
 
@@ -193,6 +193,13 @@ export function createClerkCandidateHandler(configuration:ClerkCandidateDependen
         const raw=await telegramRequestBody(request),proof=await createClerkVerifier(deps.verifier)(bearer(request));
         const operation=deps.transactions.telegramReturn;if(!operation)fail("SERVICE_UNAVAILABLE",503);
         const result=await operation.link(proof,raw);
+        return studentResponse(request,result);
+      }
+      if(path==="/api/v1/auth/telegram/browser-link"&&request.method==="POST"){
+        // Browser sign-in: Clerk proof + "Log In With Telegram" proof together. Disabled unless the composition supplies the login configuration.
+        const login=await telegramLoginBody(request),proof=await createClerkVerifier(deps.verifier)(bearer(request));
+        const operation=deps.transactions.telegramReturn;if(!operation?.linkLogin)fail("SERVICE_UNAVAILABLE",503);
+        const result=await operation.linkLogin(proof,login);
         return studentResponse(request,result);
       }
       if(path==="/api/v1/auth/telegram/resume"&&request.method==="POST"){

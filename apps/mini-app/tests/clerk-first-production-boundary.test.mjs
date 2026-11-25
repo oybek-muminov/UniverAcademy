@@ -13,10 +13,12 @@ test('production selection fails closed instead of importing Telegram-only auth'
   assert.match(source, /Kabinetga ulanish hali tayyor emas/);
 });
 
-test('Clerk entry has no legacy Telegram dispatch and admits only its three routes', () => {
+test('Clerk entry has no legacy Telegram dispatch and admits only its four routes', () => {
   const source = read('../src/common-production-entry.tsx');
   assert.doesNotMatch(source, /mountTelegramEntry|createProductionConnection/);
-  assert.match(source, /\['\/', '\/sign-in', '\/auth\/callback'\]\.includes\(location\.pathname\)/);
+  assert.match(source, /\['\/', '\/sign-in', '\/auth\/callback', '\/telegram-link'\]\.includes\(location\.pathname\)/);
+  // The fourth route is the normal-browser Telegram confirmation page; it stays closed unless explicitly configured.
+  assert.match(source, /pathname === '\/telegram-link'\) return <TelegramLinkEntry config=\{config\} \/>/);
   assert.match(source, /VITE_CLERK_SDK_ENABLED !== 'true'/);
   assert.match(source, /publishableKey=\{config\.publishableKey\}/);
 });

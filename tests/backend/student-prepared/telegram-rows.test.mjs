@@ -410,3 +410,66 @@ test('same missing-jti signed JWT can link after exchange without bypassing Tele
  const before=structuredClone(f.pool.data);assert.equal((await send()).status,200);assert.deepEqual(f.pool.data,before);
  const resumed=await f.resume(raw);assert.equal(resumed.status,409);assert.equal(resumed.error.code,'INIT_DATA_REPLAY');
 });
+
+// ---- "Log In With Telegram" browser link: Clerk proof + a signed Telegram confirmation, no Mini App init data ----
+const loginSecret='synthetic-client-secret-value',loginClient='1234567890',loginRedirect='https://mini.profile.invalid/telegram-link';
+async function loginFixture(options){
+ const f=await returnFixture(options),pair=await jose.generateKeyPair('RS256',{modulusLength:2048}),tgKey=await jose.generateKeyPair('RS256');
+ f.verifier.trustedKeys=()=>pair.publicKey;
+ f.tokenRequests=[];f.telegramUser=tg;
+ f.idToken=async(id=f.telegramUser,iat=Math.floor(clock/1000)-3)=>new jose.SignJWT({sub:'opaque',id}).setProtectedHeader({alg:'RS256',kid:'tg'}).setIssuer('https://oauth.telegram.org').setAudience(loginClient).setIssuedAt(iat).setExpirationTime(iat+3600).sign(tgKey.privateKey);
+ f.loginConfig={clientId:loginClient,clientSecret:loginSecret,redirectUri:loginRedirect,
+  transport:async request=>{f.tokenRequests.push(await request.text());return new Response(JSON.stringify({token_type:'Bearer',id_token:await f.idToken()}));},
+  trustedKeys:jose.createLocalJWKSet({keys:[{...await jose.exportJWK(tgKey.publicKey),kid:'tg',alg:'RS256',use:'sig'}]})};
+ f.loginService=(config=f.loginConfig)=>new TelegramReturnRows({pool:f.pool,botToken:botKey,telegramLogin:config,sessionPolicy:testPolicy,now:()=>f.serverNow?.()??f.pool.now,verifier:f.verifier,liveness:f.liveness});
+ f.handlerWithLogin=config=>createConfiguredHttpHandler({mode:'local_contract',storage:{kind:'postgres_contract_double',pool:f.pool},botToken:botKey,...(config?{telegramLogin:config}:{}),sessionPolicy:testPolicy,numericPresentation:testNumbers,now:()=>f.pool.now,clerk:{verifier:f.verifier,liveness:f.liveness}});
+ f.clerkToken=await new jose.SignJWT({sid:who.sessionId,azp:'https://mini.profile.invalid',jti:'browser-exchanged-jti',v:2}).setProtectedHeader({alg:'RS256',kid:'synthetic'}).setIssuer(who.issuer).setSubject(who.userId).setIssuedAt(Math.floor(clock/1000)).setNotBefore(Math.floor(clock/1000)).setExpirationTime(Math.floor(clock/1000)+20).sign(pair.privateKey);
+ f.body={code:'one-time-authorization-code',code_verifier:'v'.repeat(43)};
+ f.post=(handler,body=f.body,token=f.clerkToken)=>handler(new Request('https://api.profile.invalid/api/v1/auth/telegram/browser-link',{method:'POST',headers:{...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(body)}));
+ return f;
+}
+test('browser link binds the confirmed Telegram account once, issues no session and records one replay',{skip:!jose},async()=>{
+ const f=await loginFixture(),before=structuredClone(f.pool.data);
+ assert.deepEqual(await f.loginService().linkLogin(f.proof,f.body),{ok:true});
+ assert.equal(f.pool.data.people[ids.person].telegramId,tg);assert.deepEqual(f.pool.data.people[ids.person].profile,before.people[ids.person].profile);
+ for(const map of ['families','access','refresh','identities','members','fences','bindings','replays'])assert.deepEqual(f.pool.data[map],before[map]);
+ assert.equal(Object.keys(f.pool.data.initReplays).length,1);assert.equal(f.pool.events.some(forbidden),false);order(f);assert.deepEqual(f.pool.local,{});
+ assert.equal(f.tokenRequests.length,1);
+});
+test('browser link: the same confirmation code cannot link again, even for the same pair',{skip:!jose},async()=>{
+ const f=await loginFixture();await f.loginService().linkLogin(f.proof,f.body);
+ const again=await f.loginService().linkLogin(f.proof,f.body).then(()=>null,e=>e);
+ // The pair is already linked, so the repeat is an idempotent ACK without a second replay record or any write.
+ assert.equal(again,null);assert.equal(Object.keys(f.pool.data.initReplays).length,1);
+ const other=await loginFixture();other.pool.data.people[ids.person].telegramId=null;await other.loginService().linkLogin(other.proof,other.body);
+ other.pool.data.people[ids.person].telegramId=null;
+ await assert.rejects(other.loginService().linkLogin(other.proof,other.body),failCode('INIT_DATA_REPLAY'));
+});
+test('browser link refuses a Telegram account that conflicts with an existing link and changes nothing',{skip:!jose},async()=>{
+ const f=await loginFixture();f.pool.data.people[ids.person].telegramId=secondTg;const before=structuredClone(f.pool.data);
+ await assert.rejects(f.loginService().linkLogin(f.proof,f.body),failCode('IDENTITY_LINK_CONFLICT'));
+ assert.deepEqual(f.pool.data,before);
+});
+test('browser link needs its Telegram configuration and a login code; it can never resume or use Mini App init data',{skip:!jose},async()=>{
+ const f=await loginFixture();
+ await assert.rejects(f.loginService(null).linkLogin(f.proof,f.body),e=>e instanceof Error);
+ const rows=new TelegramReturnRows({pool:f.pool,botToken:botKey,sessionPolicy:testPolicy,now:()=>f.pool.now,verifier:f.verifier,liveness:f.liveness});
+ await assert.rejects(rows.linkLogin(f.proof,f.body),e=>e instanceof Error);
+ assert.equal(f.pool.data.people[ids.person].telegramId,null);
+ const resume=await f.post(f.handlerWithLogin(f.loginConfig),f.body,null).then(r=>r.status);assert.equal(resume,401);
+ const resumeRoute=await f.handlerWithLogin(f.loginConfig)(new Request('https://api.profile.invalid/api/v1/auth/telegram/resume',{method:'POST',body:JSON.stringify(f.body)}));
+ assert.equal(resumeRoute.status,422);
+});
+test('HTTP route: absent configuration is unavailable, valid Clerk token plus login links, bad token or body never reaches Telegram',{skip:!jose},async()=>{
+ const f=await loginFixture();
+ assert.equal((await f.post(f.handlerWithLogin(undefined))).status,503);assert.equal(f.tokenRequests.length,0);
+ const handler=f.handlerWithLogin(f.loginConfig);
+ assert.equal((await f.post(handler,f.body,'not-a-jwt')).status,401);assert.equal((await f.post(handler,{code:'x'})).status,422);assert.equal(f.tokenRequests.length,0);
+ const ok=await f.post(handler);assert.equal(ok.status,200);assert.deepEqual(await ok.json(),{data:{ok:true}});
+ assert.equal(f.pool.data.people[ids.person].telegramId,tg);assert.equal(f.tokenRequests.length,1);
+});
+test('HTTP route: Telegram refusing the code leaves the link and the replay table untouched',{skip:!jose},async()=>{
+ const f=await loginFixture();f.loginConfig=({...f.loginConfig,transport:async()=>new Response('{"error":"invalid_grant"}',{status:400})});
+ const response=await f.post(f.handlerWithLogin(f.loginConfig));assert.equal(response.status,401);assert.equal((await response.json()).error.code,'INIT_DATA_INVALID');
+ assert.equal(f.pool.data.people[ids.person].telegramId,null);assert.equal(Object.keys(f.pool.data.initReplays).length,0);
+});

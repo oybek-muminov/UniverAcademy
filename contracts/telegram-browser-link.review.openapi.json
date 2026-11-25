@@ -1,0 +1,44 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UniverAcademy Telegram browser link (review fragment)",
+    "version": "0.1.0-browser-link.1",
+    "description": "Links the Telegram account confirmed by Log In With Telegram (OpenID Connect, authorization code with PKCE) to the Clerk-verified person. Additive; it changes no student operation. Off unless UA_TELEGRAM_LOGIN_ENABLED is true."
+  },
+  "paths": {
+    "/api/v1/auth/telegram/browser-link": {
+      "post": {
+        "operationId": "linkTelegramByLogin",
+        "summary": "Link Telegram from a browser",
+        "description": "Requires a fresh Clerk bearer token and the one-time Telegram authorization code with its PKCE verifier. The server exchanges the code with the client secret, verifies Telegram's signed id_token and links exactly the confirmed Telegram account to the verified person. A code works once. An already linked identical pair is acknowledged without effect. A different existing link is a conflict. No session is issued.",
+        "security": [{ "clerkBearer": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["code", "code_verifier"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 8, "maxLength": 2048, "pattern": "^[\\x21-\\x7e]+$" },
+                  "code_verifier": { "type": "string", "minLength": 43, "maxLength": 128, "pattern": "^[A-Za-z0-9\\-._~]+$" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Linked or already linked.", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "additionalProperties": false, "required": ["ok"], "properties": { "ok": { "const": true } } } } } } } },
+          "401": { "description": "CLERK_TOKEN_INVALID, CLERK_SESSION_REVOKED, INIT_DATA_INVALID (Telegram refused or did not sign the confirmation), INIT_DATA_EXPIRED." },
+          "403": { "description": "FORBIDDEN: not a student account." },
+          "404": { "description": "Route disabled." },
+          "409": { "description": "IDENTITY_LINK_CONFLICT or INIT_DATA_REPLAY." },
+          "422": { "description": "VALIDATION_ERROR." },
+          "503": { "description": "SERVICE_UNAVAILABLE: Telegram, the key set or the database is unavailable; nothing was linked." }
+        }
+      }
+    }
+  },
+  "components": { "securitySchemes": { "clerkBearer": { "type": "http", "scheme": "bearer" } } }
+}

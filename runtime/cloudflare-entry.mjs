@@ -31,6 +31,7 @@ const pilotEnvironmentKeys=[
 const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
   "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS","UA_TELEGRAM_START_MODE",
   "UA_CHANNEL_GATE_ENABLED","UA_REQUIRED_CHANNEL","UA_REQUIRED_CHANNEL_URL",
+  "UA_TELEGRAM_LOGIN_ENABLED","UA_TELEGRAM_LOGIN_CLIENT_ID","UA_TELEGRAM_LOGIN_CLIENT_SECRET","UA_TELEGRAM_LOGIN_REDIRECT_URI",
   ...pilotEnvironmentKeys,...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys];
 const policyKeys=["initDataMaxAgeSeconds","futureSkewSeconds","accessTtlMs",
   "familyTtlMs","logoutTombstoneMs","identityCollisionAttempts","newLogin"];
@@ -76,6 +77,24 @@ function response(code="SERVICE_UNAVAILABLE",status=503){
     headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",
       "cdn-cache-control":"no-store","cloudflare-cdn-cache-control":"no-store"}});
 }
+const TELEGRAM_JWKS="https://oauth.telegram.org/.well-known/jwks.json";
+async function defaultTelegramKeys(){
+  const {createRemoteJWKSet}=await import("jose");
+  return createRemoteJWKSet(new URL(TELEGRAM_JWKS),{timeoutDuration:3000,cooldownDuration:30000,cacheMaxAge:600000});
+}
+function telegramLoginEnabled(env){
+  const d=env&&Object.getOwnPropertyDescriptor(env,"UA_TELEGRAM_LOGIN_ENABLED");
+  if(!d)return false;
+  if(!Object.hasOwn(d,"value")||!["true","false"].includes(d.value))throw unavailable();
+  return d.value==="true";
+}
+async function telegramLoginConfig(env,transport,telegramKeys){
+  const clientId=own(env,"UA_TELEGRAM_LOGIN_CLIENT_ID"),clientSecret=own(env,"UA_TELEGRAM_LOGIN_CLIENT_SECRET"),redirectUri=own(env,"UA_TELEGRAM_LOGIN_REDIRECT_URI");
+  if(typeof clientId!=="string"||typeof clientSecret!=="string"||typeof redirectUri!=="string")throw unavailable();
+  const trustedKeys=await telegramKeys();
+  if(typeof trustedKeys!=="function")throw unavailable();
+  return Object.freeze({clientId,clientSecret,redirectUri,transport,trustedKeys});
+}
 // Kanal a'zoligi shart: 403 + kanal havolasi. Mini App shu kod bo'yicha "Kanalga o'tish" ekranini ochadi.
 function channelRequired(gate){
   return new Response(JSON.stringify({error:{code:CHANNEL_REQUIRED_CODE,message:CHANNEL_REQUIRED_CODE,request_id:crypto.randomUUID(),channel_url:gate.url}}),{status:403,
@@ -84,7 +103,7 @@ function channelRequired(gate){
 }
 function registrationRoute(request){
   const p=new URL(request.url).pathname;
-  return (request.method==="POST"&&/^\/api\/v1\/auth\/(clerk|refresh|logout|telegram\/(?:link|resume))\/?$/.test(p))||
+  return (request.method==="POST"&&/^\/api\/v1\/auth\/(clerk|refresh|logout|telegram\/(?:link|resume|browser-link))\/?$/.test(p))||
     (["GET","PATCH"].includes(request.method)&&/^\/api\/v1\/me\/?$/.test(p))||
     (request.method==="GET"&&/^\/api\/v1\/exams\/?$/.test(p));
 }
@@ -96,8 +115,8 @@ function registrationRoute(request){
  * deployment gates; a syntactically valid binding does not establish them.
  */
 export function createCloudflareEntrypoint({loadClient=async()=>(await import("pg")).Client,
-  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now,readStaff=readStagingStaffCabinet}={}){
-  if([loadClient,makeClerk,transport,now,readStaff].some(v=>typeof v!=="function"))throw unavailable();
+  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now,readStaff=readStagingStaffCabinet,telegramKeys=defaultTelegramKeys}={}){
+  if([loadClient,makeClerk,transport,now,readStaff,telegramKeys].some(v=>typeof v!=="function"))throw unavailable();
   return Object.freeze({async fetch(request,env){
     let publics;
     try{
@@ -123,10 +142,16 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
         let clerk,result;
         try{
           if(scopedRequest.signal.aborted)throw unavailable();
-          const telegram=/^\/api\/v1\/auth\/telegram\/(link|resume)\/?$/.test(new URL(scopedRequest.url).pathname);
+          const telegram=/^\/api\/v1\/auth\/telegram\/(link|resume|browser-link)\/?$/.test(new URL(scopedRequest.url).pathname);
           const path=new URL(scopedRequest.url).pathname.replace(/\/$/,"");
           const atomic=(path==="/api/v1/auth/clerk"||path==="/api/v1/auth/telegram/link")&&atomicEntryEnabled(env);
           if(atomic&&path==="/api/v1/auth/telegram/link")return response("NOT_FOUND",404);
+          // "Log In With Telegram" browser link: absent unless explicitly enabled, then fully configured or unavailable.
+          let telegramLogin;
+          if(path==="/api/v1/auth/telegram/browser-link"){
+            if(!telegramLoginEnabled(env))return response("NOT_FOUND",404);
+            telegramLogin=await telegramLoginConfig(env,transport,telegramKeys);
+          }
           const bindings=privateBindings(env,telegram);
           if(atomic&&path==="/api/v1/auth/clerk"){
             const parties=atomicAuthorizedParties(env,bindings.settings);
@@ -151,7 +176,7 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
           const Client=await loadClient();
           if(scopedRequest.signal.aborted||typeof Client!=="function")throw unavailable();
           const configuration={mode:"production",sessionPolicy:bindings.sessionPolicy,
-            numericPresentation:unavailableNumbers,now,...(telegram?{botToken:bindings.botToken}:{}),clerk:{verifier:clerk.verifier,liveness:clerk.liveness}};
+            numericPresentation:unavailableNumbers,now,...(telegram?{botToken:bindings.botToken}:{}),...(telegramLogin?{telegramLogin}:{}),clerk:{verifier:clerk.verifier,liveness:clerk.liveness}};
           // fetch awaits the accepted resource's end() before returning any ACK.
           result=await createCloudflareApi({...publics,Client,postgres:bindings.postgres,configuration}).fetch(scopedRequest);
         }catch{result=response();}

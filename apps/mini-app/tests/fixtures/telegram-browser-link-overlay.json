@@ -1,0 +1,78 @@
+{
+  "format_version": 1,
+  "base_commit": "0e06fbd3c2138240b430204cc146ab20c7a2ab58",
+  "files": [
+    {
+      "path": "apps/mini-app/src/common-production-runtime.ts",
+      "previous_sha256": "f6158d042b704914b376b019e22bd52d23b34292cdd062cef509c1a0450e47c0",
+      "bytes": 5464,
+      "sha256": "004db1a9152d44764a5abe579dc72d4e8ddf271e3b139e14ed3b46ec1bc9b7b4"
+    },
+    {
+      "path": "apps/mini-app/tests/clerk-first-production-boundary.test.mjs",
+      "previous_sha256": "8228ac3ced22e4ca87127fadb2d6bc668dabc9ab7a7db5b624382e70616bc4bc",
+      "bytes": 3342,
+      "sha256": "8c7c5aa1f39dfb3cdb8f5a2e3b4028717e5c05b92c883b5adc6f2d70a30707da"
+    },
+    {
+      "path": "apps/telegram-bot/src/login-message-lifecycle.mjs",
+      "previous_sha256": "2e62c1a14490b63b7997044f7b80f9105bb99b51c0e4decb42d1800b50ce4922",
+      "bytes": 10486,
+      "sha256": "dc76a531e8ee1756f239d4d70265c02e7bebb283515c100f1ddca4f26fb1e55d"
+    },
+    {
+      "path": "apps/telegram-bot/src/returning-worker.mjs",
+      "previous_sha256": "2c82840910b23355da080ee914ea335b114c59cefd8e324211a84b814650120b",
+      "bytes": 9086,
+      "sha256": "6dedba7eacfb80f00659130558fbbc0996e34ec49e079a14e2a218125cd926b9"
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "previous_sha256": "f2d126f4f802be353b564b7d3c918e21132c728ad8bdaa513bb6b408febd53ca",
+      "bytes": 13571,
+      "sha256": "ff865e1a12ca7da4ae4ea75ee016378ecc04a2513d52074198ab8d9bf910cbff"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "previous_sha256": "bc092db33ccc5c71c30d2e64dda26b042714ad07898adc7ef4dabb185ad1f9f3",
+      "bytes": 18036,
+      "sha256": "b4867e90d20d4a18bd409ce6c71e289227dc08c31e536651a16847cb67ae7332"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/configured-http.ts",
+      "previous_sha256": "582819b9a2218d804b8015861405e19b60fe08d440201cf245f266befc6f2c8f",
+      "bytes": 9460,
+      "sha256": "5a08a09e8183ee206217c94bfa65cdb9019672c905de738060f19c8bd8b6ae53"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-domain.ts",
+      "previous_sha256": "5f071ff3f288a5e1ae69d0e29ac7f9d6a05c77d356aa7cb7f9e4551da94339f3",
+      "bytes": 23036,
+      "sha256": "599880e782602624831ea44e94e2727f1ab4c891bf6604c4b450f93fbc641656"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-return-rows.ts",
+      "previous_sha256": "17fd30a02e4764992b09d2ecc722e2921c04a1bc0bc42063a90419f0ff117587",
+      "bytes": 17585,
+      "sha256": "0f75691aa83a01252bdb59202feb65057de9789dfbe5dbb1e2457a9094bea609"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/telegram-return.ts",
+      "previous_sha256": "91ccc1a4b1ab92ea2e116670a4b3849958f4d40994ec654efd91f47c5da492d9",
+      "bytes": 8792,
+      "sha256": "a0b382e0c7a9876fa24e5e94ad0d9ab729330b35e9388063d4fa4e7324ea4320"
+    },
+    {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "previous_sha256": "efe117926e4e9c808ff11bf5a4ad217ec8d818a46baec5a8581fa61874a01824",
+      "bytes": 50094,
+      "sha256": "128022cda9d08fcc96399f73b9d98643e31449e470b6e36d510f504e10d185d2"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "b8b44671960af4b498c226ec12e8516d67bae85c5c5d362142e3306fed55f3e2",
+      "bytes": 6234,
+      "sha256": "76f4dc417bc96e64788874ab5113dfbdd9ab4797aa77f3379521be519d2502d2"
+    }
+  ]
+}

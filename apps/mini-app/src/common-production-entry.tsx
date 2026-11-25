@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, ClerkFailed, HandleSSOCallback, useSession, useSignIn, useSignUp } from '@clerk/react';
 import { PrebuiltReadyEntry } from './clerk-prebuilt-entry.tsx';
+import { TelegramLinkEntry, browserLinkPending } from './telegram-link-page.tsx';
+import { hasTelegramLaunchContext } from './telegram-bootstrap.ts';
 import { readCommonEntryConfig } from './common-production-runtime.ts';
 import type { CommonEntryConfig } from './common-production-runtime.ts';
 
@@ -60,8 +62,14 @@ export function CallbackNotice({ config }: { config: CommonEntryConfig }) {
 // Exported content lets a host use the real public ClerkProvider. Tests supply
 // their synthetic SDK client only in a separate test entry, never production.
 export function CommonClerkEntry({ config, scope }: { config: CommonEntryConfig; scope: unknown }) {
-  const { signIn } = useSignIn(), { signUp } = useSignUp();
+  const { signIn } = useSignIn(), { signUp } = useSignUp(), { session } = useSession();
+  // A browser sign-in that began on /telegram-link returns here after Google: send it back to finish the Telegram step.
+  const returning = config.telegramBrowserLink !== null && !hasTelegramLaunchContext(scope) && browserLinkPending()
+    && ['/sign-in', '/auth/callback'].includes(location.pathname) && session?.status === 'active' && !session.currentTask;
+  useEffect(() => { if (returning) location.replace('/telegram-link'); }, [returning]);
   if (!signIn || !signUp) return <Status text="Kirish oynasi tayyorlanmoqda…" />;
+  if (location.pathname === '/telegram-link') return <TelegramLinkEntry config={config} />;
+  if (returning) return <Status text="Telegram tasdig‘iga o‘tilmoqda…" />;
   if (location.pathname === '/auth/callback') return <CallbackNotice config={config} />;
   return <PrebuiltReadyEntry config={config} scope={scope} signIn={signIn} signUp={signUp} />;
 }
@@ -78,7 +86,7 @@ export function mountCommonProductionEntry(element: HTMLElement, options: {
     return { unmount: () => root.unmount() };
   }
   const root = createRoot(element);
-  if (!['/', '/sign-in', '/auth/callback'].includes(location.pathname)) {
+  if (!['/', '/sign-in', '/auth/callback', '/telegram-link'].includes(location.pathname)) {
     root.render(<Status text="Kirish sahifasini yangidan oching." />); return { unmount: () => root.unmount() };
   }
   // Empty socket until the real Clerk integration is explicitly enabled.

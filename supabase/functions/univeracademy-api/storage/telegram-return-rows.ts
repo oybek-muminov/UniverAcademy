@@ -5,15 +5,15 @@ import type {ClerkIdentity,ClerkProof,ClerkLiveness,ClerkVerifierConfiguration} 
 import {checkSessionPolicy,issueProofs} from "../student-state.ts";
 import type {SessionPolicy,StudentState} from "../student-state.ts";
 import {profileWire,utc} from "../student-wire.ts";
-import {checkTelegramLaunch,createTelegramStartLookup,verifyTelegramLaunch} from "../telegram-return.ts";
-import type {TelegramLaunch,TelegramReturnPort,TelegramSession} from "../telegram-return.ts";
+import {checkTelegramLaunch,createTelegramStartLookup,verifyTelegramLaunch,verifyTelegramLoginLaunch} from "../telegram-return.ts";
+import type {TelegramLaunch,TelegramLoginConfig,TelegramLoginInput,TelegramReturnPort,TelegramSession} from "../telegram-return.ts";
 import {ClerkAuthRows} from "./clerk-auth-rows.ts";
 import type {ClerkAuthSnapshot,ClerkAuthScope} from "./clerk-auth-rows.ts";
 import {integer,StorageUnavailable} from "./postgres-transaction.ts";
 import type {PgClient,PgPool} from "./postgres-transaction.ts";
 import {canonicalPersonId,resetTrustedServerContext,setTrustedPhase,setTrustedPeople,setTrustedClerk,closeTrustedServerContext} from "./trusted-server-context.ts";
 
-type Options={pool:PgPool;botToken?:string;sessionPolicy:SessionPolicy;now:()=>number;verifier?:ClerkVerifierConfiguration;liveness:ClerkLiveness;signal?:AbortSignal};
+type Options={pool:PgPool;botToken?:string;telegramLogin?:TelegramLoginConfig;sessionPolicy:SessionPolicy;now:()=>number;verifier?:ClerkVerifierConfiguration;liveness:ClerkLiveness;signal?:AbortSignal};
 type Hint={personId:string;enabled:boolean;identity:Pick<ClerkIdentity,"issuer"|"userId">|null;identityEnabled:boolean|null};
 function unavailable():never{throw new StorageUnavailable("not_committed");}
 const validSubject=(v:unknown):v is string=>typeof v==="string"&&/^user_[A-Za-z0-9]+(?![\s\S])/.test(v);
@@ -92,10 +92,14 @@ export class TelegramReturnRows implements TelegramReturnPort{
   }
   async link(proof:ClerkProof,raw:string):Promise<{ok:true}>{return this.run("link",raw,proof) as Promise<{ok:true}>;}
   async resume(raw:string):Promise<TelegramSession>{return this.run("resume",raw) as Promise<TelegramSession>;}
-  private async run(kind:"link"|"resume",raw:string,proof?:ClerkProof):Promise<{ok:true}|TelegramSession>{
-    const o=this.o,policy=checkSessionPolicy(o.sessionPolicy);if(!o.botToken||!o.verifier||typeof o.liveness!=="function")unavailable();
+  /** Browser link: the Telegram account is proven by "Log In With Telegram" instead of Mini App init data. Link only; never resume. */
+  async linkLogin(proof:ClerkProof,login:TelegramLoginInput):Promise<{ok:true}>{return this.run("link",login,proof) as Promise<{ok:true}>;}
+  private async run(kind:"link"|"resume",raw:string|TelegramLoginInput,proof?:ClerkProof):Promise<{ok:true}|TelegramSession>{
+    const o=this.o,policy=checkSessionPolicy(o.sessionPolicy);if(!o.verifier||typeof o.liveness!=="function")unavailable();
     const timestamps=telegramRequestClock(o.now);
-    const launch=await verifyTelegramLaunch(raw,o.botToken,policy,timestamps.worker());
+    let launch:TelegramLaunch;
+    if(typeof raw==="string"){if(!o.botToken)unavailable();launch=await verifyTelegramLaunch(raw,o.botToken,policy,timestamps.worker());}
+    else{if(kind!=="link"||!o.telegramLogin)unavailable();launch=await verifyTelegramLoginLaunch(raw,o.telegramLogin,policy,timestamps.worker());}
     if(kind==="link"){
       if(!proof||proof.issuer!==o.verifier.issuer)fail("CLERK_TOKEN_INVALID",401);
       checkClerkProof(proof,timestamps.worker());

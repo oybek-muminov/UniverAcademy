@@ -25,7 +25,7 @@ type StaffPorts={jwt:Parameters<typeof import("./staff-jwt.ts").createStaffJwtVe
    {domain?:undefined;load:(tx:LockedTransaction,proof:StaffJwtProof)=>Promise<StaffState>;
     flush:(tx:LockedTransaction,before:StaffState,after:StaffState)=>Promise<void>});
 export type HttpConfiguration={mode:"production"|"local_contract";
-  storage:{kind:"postgres"|"postgres_contract_double";pool:PgPool};botToken?:string;
+  storage:{kind:"postgres"|"postgres_contract_double";pool:PgPool};botToken?:string;telegramLogin?:import("./telegram-return.ts").TelegramLoginConfig;
   clerk?:Pick<ClerkCandidateDependencies,"verifier"|"liveness"|"staff">;
   sessionPolicy:SessionPolicy;numericPresentation:NumericPresentation;now:()=>number;staff?:StaffPorts};
 function ready(config:HttpConfiguration):void{
@@ -61,7 +61,7 @@ export function createConfiguredHttpHandler(config:HttpConfiguration){
         return await createClerkCandidateHandler({mode:"local_candidate",...config.clerk,
           sessionPolicy:config.sessionPolicy,numericPresentation:config.numericPresentation,
           ...(config.botToken?{legacyTelegram:{botToken:config.botToken}}:{}),
-          transactions:new ClerkDomainTransactions({pool:config.storage.pool,request,botToken:config.botToken,
+          transactions:new ClerkDomainTransactions({pool:config.storage.pool,request,botToken:config.botToken,telegramLogin:config.telegramLogin,
             sessionPolicy:config.sessionPolicy,now:config.now,liveness:config.clerk.liveness,verifier:config.clerk.verifier,staff:config.clerk.staff})})(request);
       }
       const runner=new PostgresTransactions(config.storage.pool);

@@ -6,6 +6,7 @@ import { createClerkSdkAdapter } from './clerk-sdk-adapter.ts';
 import type { ClerkSdkBindings } from './clerk-sdk-adapter.ts';
 import { StudentFailure } from './transport.ts';
 import { isChannelRequired, CHANNEL_REQUIRED_CODE } from './channel-required.ts';
+import { readTelegramLoginConfig } from './telegram-link-flow.ts';
 import { EntryFailure } from './sign-in-controller.ts';
 import type { TelegramReturnLaunch } from './telegram-return-launch.ts';
 
@@ -24,7 +25,8 @@ export function readCommonEntryConfig(env: Readonly<Record<string, unknown>>, pa
   return Object.freeze({ ...config, publishableKey: key, clerkFrontendOrigin: url.origin,
     callbackUrl: config.appOrigin + '/auth/callback', signInUrl: config.appOrigin + '/sign-in',
     stagingPilotEnabled: env.VITE_TEACHER_PILOT_ENABLED === 'true',
-    telegramEnabled: env.VITE_TELEGRAM_SDK_ENABLED === 'true', telegramAtomicEnabled: env.VITE_TELEGRAM_ATOMIC_ENTRY === 'true', deletionEnabled: env.VITE_ACCOUNT_DELETION_ENABLED === 'true' });
+    telegramEnabled: env.VITE_TELEGRAM_SDK_ENABLED === 'true', telegramAtomicEnabled: env.VITE_TELEGRAM_ATOMIC_ENTRY === 'true', deletionEnabled: env.VITE_ACCOUNT_DELETION_ENABLED === 'true',
+    telegramBrowserLink: readTelegramLoginConfig(env, config.appOrigin) });
 }
 export type CommonEntryConfig = ReturnType<typeof readCommonEntryConfig>;
 

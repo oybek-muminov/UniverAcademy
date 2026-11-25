@@ -50,6 +50,7 @@ const transitions = [
   readPinned(manifests+'student-cabinet-fixes-overlay.json', /const TEACHER_CABINET_FIXES_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'single-role-overlay.json', /const TEACHER_SINGLE_ROLE_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'telegram-sign-in-overlay.json', /const TEACHER_TELEGRAM_SIGN_IN_SHA256 = '([a-f0-9]{64})';/),
+  readPinned(manifests+'telegram-browser-link-overlay.json', /const TEACHER_BROWSER_LINK_SHA256 = '([a-f0-9]{64})';/),
 ].map(release => new Map(release.files.map(file => [file.path,file])));
 const previousFiles = new Map(previous.files.map(file => [file.path, file]));
 const rows = [];

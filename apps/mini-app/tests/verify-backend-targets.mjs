@@ -737,6 +737,7 @@ const TEACHER_CABINET_MENU_SHA256 = '4d02fe0367298d11b88a112c59192c287910e697762
 const TEACHER_CABINET_COMFORT_SHA256 = 'ead074b678b6d2c796902ebe647c05a373e060659bc843afba502a8179ec0ec4';
 const TEACHER_CABINET_MEMBERS_SHA256 = '86630bf8820412054a2b2e9f4d25b3a79400a9a67518073c637e49c0071bc4ea';
 const TEACHER_CABINET_PROFILE_SHA256 = '8faa75909fb1ff86a42f5050b631d1a7b1085aa5e4e4fb3135907bf28c8c6f25';
+const TEACHER_BROWSER_LINK_SHA256 = '9d316d88db40610a3faaad30449a3e7b51a0a6a67721c13ad3c43ad8bb389733';
 const TEACHER_TELEGRAM_SIGN_IN_SHA256 = '3195b733cc0b94f5ed733ab9e1a8384870b6dcdfc1b81d83ab0da27967a6966c';
 const TEACHER_SINGLE_ROLE_SHA256 = 'f6cb99a5452b433ea78b289c330ae5e9b9417275839f36a181538f073ab44586';
 const TEACHER_CABINET_FIXES_SHA256 = '1abc2c3daf493237231d7bb978379904f4ea6d1021fa55fc498e4bcf46fc2888';
@@ -781,6 +782,7 @@ applySourceTransition('teacher-channel-gate-overlay.json', TEACHER_CHANNEL_GATE_
 applySourceTransition('student-cabinet-fixes-overlay.json', TEACHER_CABINET_FIXES_SHA256, '4678b90da62eb22baf451466cc13b34c3552acf2', 'TEACHER_CABINET_FIXES');
 applySourceTransition('single-role-overlay.json', TEACHER_SINGLE_ROLE_SHA256, 'f2e2bd64d33af47c5fb0e339e6f82d3df4e5da28', 'TEACHER_SINGLE_ROLE');
 applySourceTransition('telegram-sign-in-overlay.json', TEACHER_TELEGRAM_SIGN_IN_SHA256, 'd6a476036fea2de41ca4437f8db842e398aae076', 'TEACHER_TELEGRAM_SIGN_IN');
+applySourceTransition('telegram-browser-link-overlay.json', TEACHER_BROWSER_LINK_SHA256, '0e06fbd3c2138240b430204cc146ab20c7a2ab58', 'TEACHER_BROWSER_LINK');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

@@ -40,7 +40,7 @@ async function fresh(tx:LockedTransaction){
   if(r.rows.length!==1)fail("SERVICE_UNAVAILABLE",503);const now=integer(r.rows[0].now_ms);
   if(now<tx.now)fail("SERVICE_UNAVAILABLE",503);tx.now=now;return now;
 }
-type Options={pool:PgPool;request:Request;botToken?:string;sessionPolicy:SessionPolicy;now:()=>number;liveness:ClerkLiveness;verifier?:ClerkVerifierConfiguration;
+type Options={pool:PgPool;request:Request;botToken?:string;telegramLogin?:import("../telegram-return.ts").TelegramLoginConfig;sessionPolicy:SessionPolicy;now:()=>number;liveness:ClerkLiveness;verifier?:ClerkVerifierConfiguration;
   staff?:{validate:(name:string,value:unknown)=>boolean;newAssignmentId:()=>string}};
 
 // Request-scoped bridge for the existing handlers and relational row ports.

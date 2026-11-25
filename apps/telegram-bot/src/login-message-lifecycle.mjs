@@ -2,6 +2,7 @@ import { lookupValidatedStart } from './private-start-lookup.mjs';
 import { readMiniDestinations } from './returning-worker.mjs';
 import { staffCabinetNavigation } from './staff-cabinet-navigation.mjs';
 import { channelBlock, CHANNEL_PROMPT_TEXT, channelPromptMarkup } from './channel-gate.mjs';
+import { browserLoginUrl, browserLoginKeyboard, BROWSER_LOGIN_TEXT } from './browser-login.mjs';
 const RETRY = 60000, POLL = 30000, DAY = 86400000;
 const positive = n => Number.isSafeInteger(n) && n > 0;
 // Injectable durable engine; all public operations are serialized by the DO wrapper.
@@ -76,7 +77,9 @@ export class LoginMessageLifecycle {
     // Clear scheduled retry BEFORE the external call. A crash/unknown result
     // must not replay a send Telegram might already have accepted.
     s.sendRetry = null; s.lastSend = 'pending'; await this.save(s);
-    const sent = await this.deliver('sendMessage', staff ? { chat_id: s.chatId,
+    const browser = staff ? null : browserLoginUrl(this.env);
+    const sent = await this.deliver('sendMessage', browser ? { chat_id: s.chatId, text: BROWSER_LOGIN_TEXT, reply_markup: browserLoginKeyboard(browser) }
+      : staff ? { chat_id: s.chatId,
       text: 'Ustoz kabinetini ochish uchun tugmani bosing. Tugma yo‘qolsa, /start yuboring.',
       reply_markup: { inline_keyboard: [[{ text: 'Ustoz kabinetini ochish', url: staff.browser }]] } } : { chat_id: s.chatId,
       text: 'Kirish yoki ro‘yxatdan o‘tish uchun tugmani bosing. Tugma yo‘qolsa, /start yuboring.',
