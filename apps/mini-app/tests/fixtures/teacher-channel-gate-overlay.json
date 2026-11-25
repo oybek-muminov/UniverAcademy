@@ -1,0 +1,60 @@
+{
+  "format_version": 1,
+  "base_commit": "d93fd02f5e10a172708966f32d507f2a3903f7ae",
+  "files": [
+    {
+      "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+      "previous_sha256": "baceb2ccb20c9cf8fba0214609939733c8b9040381753ceed06a49362ff92eac",
+      "bytes": 5662,
+      "sha256": "5c991fe5c147195cbb5f002bac529ac4f5c207eb262a4e9d387308fe32e567b3"
+    },
+    {
+      "path": "apps/mini-app/src/common-production-runtime.ts",
+      "previous_sha256": "29531dc5a4255b2005054bfae4171b0ba4c8d8378cdcc20a9122e8c9c0599e66",
+      "bytes": 5324,
+      "sha256": "f6158d042b704914b376b019e22bd52d23b34292cdd062cef509c1a0450e47c0"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
+      "previous_sha256": "a485b0771a7c84a01fccbc7d7c3f61822a4fc361c0ad7b10b362474b835ad88e",
+      "bytes": 4671,
+      "sha256": "351e249827a2419fc1cbd0e9dc4a9b255e9a871b6c1b4653c3249ed17ed96905"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-runtime.ts",
+      "previous_sha256": "dc7b958468aeab5ccb3064ee953d4bc7b51106bf8486a45ab60f0a65180047fe",
+      "bytes": 5374,
+      "sha256": "61fda5fb42923f80466e6cda5d7fca9e8b9467264220d1956589169b8fa10851"
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-return-flow.test.mjs",
+      "previous_sha256": "4c6206d5de4a213bd7d1ad82359d263f802b49ee2dd47cb98ce02abf39704003",
+      "bytes": 27324,
+      "sha256": "8412b1f93e9ea502199cea45dcc98159b86b44c33214a85a0f0009f253eafb54"
+    },
+    {
+      "path": "apps/telegram-bot/src/login-message-lifecycle.mjs",
+      "previous_sha256": "1b32325dec02673cc57ab82e26dd6e3d6b4dc3b3ad2868a0acf18bbd9fad7b23",
+      "bytes": 10216,
+      "sha256": "2e62c1a14490b63b7997044f7b80f9105bb99b51c0e4decb42d1800b50ce4922"
+    },
+    {
+      "path": "apps/telegram-bot/src/returning-worker.mjs",
+      "previous_sha256": "71508f56dda8f158894727659275a3f8550d9b7bd86b171ac38d434c23e4f517",
+      "bytes": 8349,
+      "sha256": "2c82840910b23355da080ee914ea335b114c59cefd8e324211a84b814650120b"
+    },
+    {
+      "path": "apps/telegram-bot/src/telegram-delivery.mjs",
+      "previous_sha256": "7cbe7c353fa56e015eb0d208250497d7e8bbc1e52703ed01a3431387a707f77a",
+      "bytes": 2689,
+      "sha256": "b7dd9644e2f7ce3b81174ff56700907a872a982c8c0f47b345ee1656b9a49782"
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "previous_sha256": "504fd1f0b2354a1b09fa25a452c03303fb1dfad6f978066e09b39ffa4e82d618",
+      "bytes": 11884,
+      "sha256": "f2d126f4f802be353b564b7d3c918e21132c728ad8bdaa513bb6b408febd53ca"
+    }
+  ]
+}

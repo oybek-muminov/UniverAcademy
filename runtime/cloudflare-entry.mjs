@@ -11,6 +11,9 @@ import {createCloudflareApi} from "./cloudflare-api.mjs";
 import {createClerkWorkerAdapter} from "./clerk-worker-bindings.mjs";
 import {publicEnvironmentOptions} from "./vercel-node.mjs";
 import {withPublicCors} from "./local-cors.mjs";
+import {channelGateBlocks,CHANNEL_REQUIRED_CODE} from "./channel-gate-api.mjs";
+import {createTelegramDirectory} from "./cloudflare-telegram-directory.mjs";
+import {readStagingStaffCabinet} from "./staging-private-start.mjs";
 
 const unavailable=()=>new ApiFault("SERVICE_UNAVAILABLE",503);
 const deny=()=>{throw unavailable();};
@@ -27,6 +30,7 @@ const pilotEnvironmentKeys=[
 ];
 const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
   "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS","UA_TELEGRAM_START_MODE",
+  "UA_CHANNEL_GATE_ENABLED","UA_REQUIRED_CHANNEL","UA_REQUIRED_CHANNEL_URL",
   ...pilotEnvironmentKeys,...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys];
 const policyKeys=["initDataMaxAgeSeconds","futureSkewSeconds","accessTtlMs",
   "familyTtlMs","logoutTombstoneMs","identityCollisionAttempts","newLogin"];
@@ -72,6 +76,12 @@ function response(code="SERVICE_UNAVAILABLE",status=503){
     headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",
       "cdn-cache-control":"no-store","cloudflare-cdn-cache-control":"no-store"}});
 }
+// Kanal a'zoligi shart: 403 + kanal havolasi. Mini App shu kod bo'yicha "Kanalga o'tish" ekranini ochadi.
+function channelRequired(gate){
+  return new Response(JSON.stringify({error:{code:CHANNEL_REQUIRED_CODE,message:CHANNEL_REQUIRED_CODE,request_id:crypto.randomUUID(),channel_url:gate.url}}),{status:403,
+    headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",
+      "cdn-cache-control":"no-store","cloudflare-cdn-cache-control":"no-store"}});
+}
 function registrationRoute(request){
   const p=new URL(request.url).pathname;
   return (request.method==="POST"&&/^\/api\/v1\/auth\/(clerk|refresh|logout|telegram\/(?:link|resume))\/?$/.test(p))||
@@ -86,8 +96,8 @@ function registrationRoute(request){
  * deployment gates; a syntactically valid binding does not establish them.
  */
 export function createCloudflareEntrypoint({loadClient=async()=>(await import("pg")).Client,
-  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now}={}){
-  if([loadClient,makeClerk,transport,now].some(v=>typeof v!=="function"))throw unavailable();
+  makeClerk=createClerkWorkerAdapter,transport=request=>globalThis.fetch(request),now=Date.now,readStaff=readStagingStaffCabinet}={}){
+  if([loadClient,makeClerk,transport,now,readStaff].some(v=>typeof v!=="function"))throw unavailable();
   return Object.freeze({async fetch(request,env){
     let publics;
     try{
@@ -123,6 +133,16 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
             const webParties=bindings.settings.authorizedParties.filter(p=>!parties.includes(p));
             if(!webParties.length)return response("NOT_FOUND",404);
             bindings.settings={...bindings.settings,authorizedParties:webParties};
+          }
+          if(path==="/api/v1/auth/telegram/resume"){
+            // Faqat kabineti bor o'quvchi; yangi o'quvchi /link yo'lidan o'tadi va bu yerga kirmaydi.
+            const directory=createTelegramDirectory({loadClient});
+            const lookupEnv={...env};delete lookupEnv.UA_TELEGRAM_START_MODE; // "faqat ro'yxatdan o'tish" rejimi haqiqiy holatni yashiradi
+            const blocked=await channelGateBlocks({request:scopedRequest,env,bindings,now,
+              fetcher:(url,init)=>transport(new Request(url,init)),
+              isLinked:async id=>(await directory.lookupTelegramStart({update_id:0,telegram_user_id:id},lookupEnv)).status==="linked",
+              isStaff:async id=>(await readStaff({telegramUserId:id},env))!==null});
+            if(blocked){result=channelRequired(blocked);return result;}
           }
           clerk=await makeClerk(bindings.settings,{secretKey:bindings.secretKey,transport,now,
             timeoutMs:bindings.settings?.timeoutMs,maxResponseBytes:65536,signal:scopedRequest.signal});

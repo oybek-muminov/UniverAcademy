@@ -2,6 +2,9 @@ import { readPrivateStartContext, readAuthUrl } from './worker.mjs';
 import { teacherPilotStartToken } from './teacher-pilot-invite.mjs';
 import { lookupValidatedStart } from './private-start-lookup.mjs';
 import { staffCabinetNavigation } from './staff-cabinet-navigation.mjs';
+import { channelBlock, CHANNEL_PROMPT_TEXT, channelPromptMarkup } from './channel-gate.mjs';
+import { createTelegramDelivery } from './telegram-delivery.mjs';
+import { readChannelGate } from '../../../runtime/channel-membership.mjs';
 
 // Lookup-first navigation only. Never authenticates, links accounts, mints a
 // session or proves the selected frontend can open a cabinet. Deployment is
@@ -58,14 +61,38 @@ async function recordPilotPrivateStart(directory, telegramUserId) {
   } finally { clearTimeout(timer); }
 }
 
+// "Tekshirish" tugmasi. Bir javobda bitta usul qaytadi: a'zo emas -> ogohlantirish oynasi;
+// a'zo (yoki Telegram xatosi) -> kabinet tugmasi. Yangi/yopilgan odamga hech narsa ochilmaydi.
+async function handleChannelCheck(env, check) {
+  const context = { update_id: check.update_id, telegram_user_id: check.telegram_user_id };
+  const nav = await lookupValidatedStart(context, env.TELEGRAM_START_LOOKUP);
+  if (nav.status === 'disabled') return json({ method: 'answerCallbackQuery', callback_query_id: check.callback_query_id });
+  const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
+  if (nav.status === 'needs_clerk') return json({ method: 'sendMessage', chat_id: check.telegram_user_id,
+    text: GREETINGS.needs_clerk, reply_markup: { inline_keyboard: [[{ text: 'Kirish / Ro‘yxatdan o‘tish', web_app: { url: urls.signIn } }]] } });
+  const staff = await staffCabinetNavigation(env, check.telegram_user_id);
+  const gate = staff ? null : await channelBlock(env, check.telegram_user_id);
+  if (gate) return json({ method: 'answerCallbackQuery', callback_query_id: check.callback_query_id, show_alert: true,
+    text: 'Siz hali kanalga a‘zo emassiz. Avval “Kanalga o‘tish” tugmasini bosib a‘zo bo‘ling.' });
+  try { // Yuklanish belgisini o'chirish; muvaffaqiyatsiz bo'lsa ham xabar yuboriladi.
+    if (typeof env.TELEGRAM_BOT_TOKEN === 'string') await createTelegramDelivery(env.TELEGRAM_BOT_TOKEN)('answerCallbackQuery', { callback_query_id: check.callback_query_id });
+  } catch { /* ixtiyoriy */ }
+  return json({ method: 'sendMessage', chat_id: check.telegram_user_id,
+    text: readChannelGate(env) ? 'Rahmat! Endi kabinetni ochishingiz mumkin.' : GREETINGS.linked,
+    reply_markup: { inline_keyboard: [[{ text: staff ? 'Ustoz kabineti' : 'Kabinet',
+      ...(staff ? { url: staff.browser } : { web_app: { url: urls.cabinet } }) }]] } });
+}
+
 export function createReturningBotWorker() {
   return { async fetch(request, env = {}) {
     try {
       let pilotEnabled = false, invite;
+      let channelCheck = null;
       const context = await readPrivateStartContext(request, env, text => {
         pilotEnabled = Object.hasOwn(env,'TELEGRAM_TEACHER_PILOT_ENABLED') && env.TELEGRAM_TEACHER_PILOT_ENABLED === 'true';
         if (pilotEnabled) invite = teacherPilotStartToken(text);
-      });
+      }, check => { channelCheck = check; });
+      if (channelCheck) return await handleChannelCheck(env, channelCheck);
       if (context === null) return ack(); // Unsupported authenticated update.
       if (pilotEnabled) {
         await recordPilotPrivateStart(env.TELEGRAM_PILOT_DIRECTORY, context.telegram_user_id);
@@ -95,6 +122,9 @@ export function createReturningBotWorker() {
       const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
       const linked = navigation.status === 'linked';
       const staff = linked ? await staffCabinetNavigation(env, context.telegram_user_id) : null;
+      const gate = linked && !staff ? await channelBlock(env, context.telegram_user_id) : null;
+      if (gate) return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
+        text: CHANNEL_PROMPT_TEXT, reply_markup: channelPromptMarkup(gate) });
       return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
         text: GREETINGS[navigation.status], reply_markup: { inline_keyboard: [[{
           text: linked ? 'Kabinet' : 'Kirish / Ro‘yxatdan o‘tish',

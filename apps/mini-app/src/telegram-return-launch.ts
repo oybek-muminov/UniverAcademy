@@ -6,7 +6,7 @@ import type { TelegramBridge } from './telegram-bootstrap.ts';
 // to Backend. Keep the exact SDK string in RAM; never inspect initDataUnsafe.
 export function createTelegramReturnLaunch(readBridge: () => TelegramBridge | undefined) {
   let captured: { bridge: TelegramBridge; raw: string } | null = null;
-  let phase: 'new' | 'resuming' | 'needs_clerk' | 'linking' | 'linked' | 'resumed' | 'failed' = 'new';
+  let phase: 'new' | 'resuming' | 'needs_clerk' | 'linking' | 'linked' | 'resumed' | 'channel_required' | 'failed' = 'new';
   let disposed = false;
   function read() {
     if (disposed) throw new EntryFailure('FRESH_LAUNCH_REQUIRED');
@@ -33,6 +33,7 @@ export function createTelegramReturnLaunch(readBridge: () => TelegramBridge | un
     },
     resumed() { read(); phase = 'resumed'; },
     requireClerk() { read(); phase = 'needs_clerk'; },
+    channelRequired() { phase = 'channel_required'; },
     fail() { phase = 'failed'; },
     dispose() { disposed = true; captured = null; phase = 'failed'; },
   };

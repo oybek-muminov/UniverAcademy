@@ -5,6 +5,7 @@ import { createClerkAppSession } from './clerk-app-session.ts';
 import { createClerkSdkAdapter } from './clerk-sdk-adapter.ts';
 import type { ClerkSdkBindings } from './clerk-sdk-adapter.ts';
 import { StudentFailure } from './transport.ts';
+import { isChannelRequired, CHANNEL_REQUIRED_CODE } from './channel-required.ts';
 import { EntryFailure } from './sign-in-controller.ts';
 import type { TelegramReturnLaunch } from './telegram-return-launch.ts';
 
@@ -70,6 +71,7 @@ export function createCommonProductionRuntime(config: CommonEntryConfig, sdk: Cl
           try { launch.requireClerk(); } catch (changed) { launch.fail(); throw changed; }
           throw new EntryFailure(error.code);
         }
+        if (isChannelRequired(error)) { launch.channelRequired(); throw new EntryFailure(CHANNEL_REQUIRED_CODE); }
         launch.fail(); throw error;
       }
     } : undefined,

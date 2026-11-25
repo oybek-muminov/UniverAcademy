@@ -158,6 +158,11 @@ test('unknown-link409 is the sole new-user navigation branch; original launch ca
   await h.runtime.continueSession(); assert.equal(h.runtime.snapshot().flow.state.student.person, A);
   assert.equal(calls(h, '/auth/telegram/resume').length, 1); assert.equal(calls(h, '/auth/telegram/link').length, 1);
 });
+test('channel membership required403 stops entry on the channel screen; no cabinet, no Clerk form, no further requests', async () => {
+  const h = harness({ resumeError: ['CHANNEL_MEMBERSHIP_REQUIRED', 403] }); await h.runtime.resumeSession();
+  assert.equal(h.runtime.snapshot().flow, null); assert.equal(h.launch.phase(), 'channel_required'); assert.equal(h.runtime.telegramOutcome(), 'channel_required');
+  assert.deepEqual(paths(h), ['/api/v1/auth/telegram/resume']); assert.equal(h.sdkProofs.length, 0);
+});
 test('revoked401 requires renewed Clerk authentication rather than a Telegram-only grant', async () => {
   const h = harness({ resumeError: ['CLERK_SESSION_REVOKED', 401] }); await h.runtime.resumeSession();
   assert.equal(h.runtime.snapshot().flow, null); assert.equal(h.launch.phase(), 'needs_clerk');

@@ -114,6 +114,17 @@ function recipient(update) {
   return m.chat.id;
 }
 
+// "Tekshirish" tugmasi: faqat shaxsiy chatdagi, bot bo'lmagan odamning bosishi.
+export const CHANNEL_CHECK_DATA = 'channel_check';
+function channelCheck(update) {
+  const q = update.callback_query;
+  if (!object(q) || typeof q.id !== 'string' || !q.id || q.id.length > 128 || q.data !== CHANNEL_CHECK_DATA) return null;
+  if (!object(q.from) || !integer(q.from.id, 1) || q.from.is_bot !== false) return null;
+  if (own(q, 'message') && (!object(q.message) || !object(q.message.chat)
+      || q.message.chat.type !== 'private' || q.message.chat.id !== q.from.id)) return null;
+  return Object.freeze({ update_id: update.update_id, telegram_user_id: q.from.id, callback_query_id: q.id });
+}
+
 function sendBody(chatId, url) {
   return { method: 'sendMessage', chat_id: chatId, text: GREETING, reply_markup: { inline_keyboard: [[{
     text: 'Kirish / Ro‘yxatdan o‘tish', web_app: { url },
@@ -122,7 +133,7 @@ function sendBody(chatId, url) {
 
 // Internal composition seam: authenticates and validates the private-human start
 // before returning its two numeric lookup fields. No public endpoint is added.
-export async function readPrivateStartContext(request, env = {}, onPrivateStart) {
+export async function readPrivateStartContext(request, env = {}, onPrivateStart, onChannelCheck) {
   const url = new URL(request.url);
   if (url.pathname !== PATH || url.search || url.hash) throw new Failure(404, 'NOT_FOUND');
   if (request.method !== 'POST') throw new Failure(405, 'METHOD_NOT_ALLOWED');
@@ -137,6 +148,11 @@ export async function readPrivateStartContext(request, env = {}, onPrivateStart)
     throw new Failure(413, 'BODY_TOO_LARGE');
   const update = await readJson(request.body);
   validateUpdate(update);
+  if (onChannelCheck && own(update, 'callback_query')) {
+    const check = channelCheck(update);
+    if (check) onChannelCheck(check);
+    return null;
+  }
   const id = recipient(update);
   if (id !== null && onPrivateStart) onPrivateStart(update.message.text);
   return id === null ? null : Object.freeze({ update_id: update.update_id, telegram_user_id: id });

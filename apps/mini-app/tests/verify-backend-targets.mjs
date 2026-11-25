@@ -737,6 +737,7 @@ const TEACHER_CABINET_MENU_SHA256 = '4d02fe0367298d11b88a112c59192c287910e697762
 const TEACHER_CABINET_COMFORT_SHA256 = 'ead074b678b6d2c796902ebe647c05a373e060659bc843afba502a8179ec0ec4';
 const TEACHER_CABINET_MEMBERS_SHA256 = '86630bf8820412054a2b2e9f4d25b3a79400a9a67518073c637e49c0071bc4ea';
 const TEACHER_CABINET_PROFILE_SHA256 = '8faa75909fb1ff86a42f5050b631d1a7b1085aa5e4e4fb3135907bf28c8c6f25';
+const TEACHER_CHANNEL_GATE_SHA256 = '0f155ef3ce4b2e85008099fa0a1aba49b223c749faf4d7ec661f7bbe341d8b05';
 const TEACHER_ARCHIVE_HIDDEN_SHA256 = 'a3c5d3e8da69a8d0e1380ebe09e1cfbfdcb7e3f4cf934a1c82cb5629d0bf65ea';
 const TEACHER_DELETE_ARCHIVE_SHA256 = 'efffa95463c9099119ca73ab45240ff3383cb17c9e25b73a6a155a2a6c652f68';
 function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
@@ -773,6 +774,7 @@ applySourceTransition('teacher-cabinet-members-overlay.json', TEACHER_CABINET_ME
 applySourceTransition('teacher-cabinet-profile-overlay.json', TEACHER_CABINET_PROFILE_SHA256, '29c531b0e23afd1062c981469bb19eba7e1c58a6', 'TEACHER_CABINET_PROFILE');
 applySourceTransition('teacher-delete-archive-overlay.json', TEACHER_DELETE_ARCHIVE_SHA256, 'b921d99d38bd1f422e115486552f466bd9181d16', 'TEACHER_DELETE_ARCHIVE');
 applySourceTransition('teacher-archive-hidden-overlay.json', TEACHER_ARCHIVE_HIDDEN_SHA256, 'cd813f54e0aa75751f9afb867cd66ddf45f4736d', 'TEACHER_ARCHIVE_HIDDEN');
+applySourceTransition('teacher-channel-gate-overlay.json', TEACHER_CHANNEL_GATE_SHA256, 'd93fd02f5e10a172708966f32d507f2a3903f7ae', 'TEACHER_CHANNEL_GATE');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

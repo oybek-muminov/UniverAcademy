@@ -1,6 +1,7 @@
 import { lookupValidatedStart } from './private-start-lookup.mjs';
 import { readMiniDestinations } from './returning-worker.mjs';
 import { staffCabinetNavigation } from './staff-cabinet-navigation.mjs';
+import { channelBlock, CHANNEL_PROMPT_TEXT, channelPromptMarkup } from './channel-gate.mjs';
 const RETRY = 60000, POLL = 30000, DAY = 86400000;
 const positive = n => Number.isSafeInteger(n) && n > 0;
 // Injectable durable engine; all public operations are serialized by the DO wrapper.
@@ -40,18 +41,30 @@ export class LoginMessageLifecycle {
     const nav = await lookupValidatedStart(context, this.env.TELEGRAM_START_LOOKUP);
     // A linked teacher/admin/owner gets a direct browser button; students keep the existing quiet menu.
     const staff = nav.status === 'linked' ? await staffCabinetNavigation(this.env, chatId) : null;
+    // Kabineti bor, xodim emas, kanalga a'zo emas -> faqat kanal xabari. Yangi o'quvchiga tegilmaydi.
+    const gate = nav.status === 'linked' && !staff ? await channelBlock(this.env, chatId) : null;
     s.chatId = chatId; s.updateId = updateId;
     s.seen.push({ id: updateId, at: now });
     for (const receipt of s.receipts) { receipt.expires = now; receipt.next = Math.max(now, receipt.notBefore || 0); }
     s.menuDue = Math.max(now, s.menuNotBefore || 0); s.menuDeadline = now + 47 * 3600000;
     // Persist before external send. Crash/unknown send must NOT blindly resend.
     s.sendRetry = null; // A fresh /start supersedes any unsent older button.
-    s.lastSend = nav.status === 'needs_clerk' || staff ? 'pending' : 'not_needed';
+    s.lastSend = nav.status === 'needs_clerk' || staff || gate ? 'pending' : 'not_needed';
     await this.save(s);
     if (nav.status === 'needs_clerk') await this.sendLogin(s, ttl, now + 47 * 3600000);
     else if (staff) await this.sendLogin(s, ttl, now + 47 * 3600000, staff);
+    else if (gate) await this.sendChannelPrompt(s, gate);
     await this.drain();
     return { status: s.lastSend };
+  }
+  // Bir marta yuboriladi, qayta urinish yo'q; keyingi /start yangisini yuboradi. Xabar o'chirilmaydi:
+  // "Tekshirish" tugmasi u orqali ishlaydi.
+  async sendChannelPrompt(s, gate) {
+    s.sendRetry = null; await this.save(s);
+    const sent = await this.deliver('sendMessage', { chat_id: s.chatId, text: CHANNEL_PROMPT_TEXT, reply_markup: channelPromptMarkup(gate) });
+    s.lastSend = sent.kind === 'ok' ? 'confirmed' : sent.kind === 'retry' ? 'rate_limited'
+      : ['rejected', 'blocked'].includes(sent.kind) ? 'rejected' : 'unconfirmed';
+    await this.save(s);
   }
   async sendLogin(s, ttl, retryDeadline, staff) {
     if (s.sendNotBefore > this.now()) {

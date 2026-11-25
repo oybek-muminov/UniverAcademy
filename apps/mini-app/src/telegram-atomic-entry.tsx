@@ -8,6 +8,7 @@ import {createProductionOwnerConnection} from './production-connection.ts';
 import {readTelegramBridge} from './telegram-bootstrap.ts';
 import {createAtomicTelegramRuntime} from './telegram-atomic-runtime.ts';
 import {StudentApp} from './student-app.tsx';
+import {ChannelRequiredCard} from './channel-required.tsx';
 const policy={level:'first_factor',afterMinutes:4} as const;
 export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;scope:unknown}){
   const clerk=useClerk(),{session}=useSession();
@@ -35,6 +36,7 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
   useEffect(()=>runtime.observe(),[runtime,session?.id,session?.status,session?.currentTask,session?.user.id]);
   const active=session?.status==='active'&&!session.currentTask;
   if(state.phase==='ready'&&state.flow)return <AccountDeletionHost binding={runtime.deletionBinding()} enabled={config.deletionEnabled} cabinetDisplayId={state.flow?.snapshot().student?.displayId}>{actions=><StudentApp {...actions} stagingPilot={config.stagingPilotEnabled} studentFlow={state.flow!} mode="telegram" onEnter={async()=>runtime.cancel()} onLogout={()=>runtime.logout()}/>}</AccountDeletionHost>;
+  if(state.phase==='channel_required')return <main className="shell"><ChannelRequiredCard/></main>;
   return <main className="shell"><section className="card"><h1>Kabinetga kirish</h1>
     {state.notice&&<p role="status">{state.notice}</p>}
     {state.phase==='choose'?(active?<>

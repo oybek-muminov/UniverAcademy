@@ -10,6 +10,7 @@ import { createPrebuiltSessionGate } from './clerk-prebuilt-session.ts';
 import { hasTelegramLaunchContext, readTelegramBridge } from './telegram-bootstrap.ts';
 import { StudentApp } from './student-app.tsx';
 import { createTelegramReturnLaunch } from './telegram-return-launch.ts';
+import { ChannelRequiredCard } from './channel-required.tsx';
 
 // Clerk supplies the form/design. No appearance overrides, custom credential
 // fields, synthetic provider or roles are installed. Telegram links use only
@@ -54,6 +55,7 @@ function LegacyPrebuiltReadyEntry({ config, scope, signIn, signUp }: {
       onLogout={() => act(() => gate.logout())} />}</AccountDeletionHost>;
   const canContinue = session?.status === 'active' && !session.currentTask;
   const blockedReturn = runtime.telegramOutcome() === 'failed';
+  if (runtime.telegramOutcome() === 'channel_required') return <main className="shell"><ChannelRequiredCard /></main>;
   return <main className="shell">
     {state.notice && !blockedReturn && <p className="notice" role="alert">{state.notice}</p>}
     {state.busy || authBusy || resumePending || blockedReturn || (state.flow && !gate.matches()) ? <section className="card"><h1>Kabinetga kirish</h1>

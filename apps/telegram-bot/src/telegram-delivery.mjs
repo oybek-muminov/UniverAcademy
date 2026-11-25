@@ -1,5 +1,5 @@
 // No caller-controlled host or method. Errors never include the token or URL.
-const methods = new Set(['sendMessage', 'deleteMessage', 'editMessageReplyMarkup', 'setChatMenuButton']);
+const methods = new Set(['sendMessage', 'deleteMessage', 'editMessageReplyMarkup', 'setChatMenuButton', 'answerCallbackQuery']);
 export function createTelegramDelivery(token, fetcher = fetch) {
   if (typeof token !== 'string' || !/^\d+:[A-Za-z0-9_-]{20,}$/.test(token)) throw new Error('BOT_NOT_CONFIGURED');
   return async (method, body) => {

@@ -1,5 +1,6 @@
 import {StudentFlow} from './flow.ts';
 import {StudentFailure} from './transport.ts';
+import {isChannelRequired} from './channel-required.ts';
 import type {createProductionOwnerConnection} from './production-connection.ts';
 type Identity={userId:string;sessionId:string};
 type Connection=ReturnType<typeof createProductionOwnerConnection>;
@@ -9,7 +10,7 @@ export function createAtomicTelegramRuntime(options:{
   reverify(identity:Identity):Promise<{token:string;userId:string;sessionId:string}|null>;
   connect(method:'telegram_resume'|'telegram_atomic',signal:AbortSignal,raw:string):Connection;
 }){
-  type State={phase:'new'|'resuming'|'choose'|'verifying'|'linking'|'ready'|'blocked';notice:string;flow:StudentFlow|null};
+  type State={phase:'new'|'resuming'|'choose'|'verifying'|'linking'|'ready'|'blocked'|'channel_required';notice:string;flow:StudentFlow|null};
   let state:State={phase:'new',notice:'',flow:null},epoch=0,disposed=false,connection:Connection|null=null,abort:AbortController|null=null;
   let raw:string|null=null,anchor:Identity|null=null,pendingIdentity:Identity|null=null;
   const listeners=new Set<()=>void>();
@@ -38,7 +39,8 @@ export function createAtomicTelegramRuntime(options:{
     snapshot:()=>state,subscribe(fn:()=>void){listeners.add(fn);return()=>{listeners.delete(fn)}},
     async resume(){if(state.phase!=='new'||disposed)return;const n=++epoch;set({phase:'resuming'});
       try{await open('telegram_resume',launch(),n)}catch(error){if(disposed||n!==epoch)return;const established=!!connection?.auth.person();connection?.auth.clear();connection=null;
-        if(!established&&error instanceof StudentFailure&&((error.kind==='conflict'&&error.code==='TELEGRAM_LINK_REQUIRED')||(error.kind==='auth'&&error.code==='CLERK_SESSION_REVOKED')))set({phase:'choose',notice:''});
+        if(!established&&isChannelRequired(error))set({phase:'channel_required',notice:'',flow:null});
+        else if(!established&&error instanceof StudentFailure&&((error.kind==='conflict'&&error.code==='TELEGRAM_LINK_REQUIRED')||(error.kind==='auth'&&error.code==='CLERK_SESSION_REVOKED')))set({phase:'choose',notice:''});
         else clear();
       }
     },
