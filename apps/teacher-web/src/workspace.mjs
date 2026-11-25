@@ -155,7 +155,7 @@ function scheduledStart(value) {
 // Sessions, authorization, media transport and invitation destinations belong to each host.
 export function mountTeacherWorkspace(root, {
   readDashboard, readAvailableStudents, request, upload, renderBlocks, mountTeacherEditor, showStudentView,
-  mountVisualFormula, inviteLink, sentMessage, hashNavigation = false, drafts = null,
+  mountVisualFormula, inviteLink, sentMessage, hashNavigation = false, drafts = null, signOut = null,
 }) {
   const controls = new Map([...root.querySelectorAll('[id]')].map(item => [item.id, item]));
   const el = id => controls.get(id);
@@ -173,10 +173,16 @@ export function mountTeacherWorkspace(root, {
   const retries = new Map();
   const invites = new Map();
   const picker = mountStudentPicker(el, readAvailableStudents, addStudent);
-  // On a phone the two long lists start folded; the teacher opens the one they need.
-  if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 860px)').matches) {
-    el('members-card').open = el('available-students').open = false;
-  }
+  // Only on a phone the two long lists fold (they start folded). On a computer they always stay open.
+  const phone = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 860px)') : null;
+  const folds = [el('members-card'), el('available-students')];
+  const onPhone = () => Boolean(phone?.matches);
+  if (onPhone()) for (const fold of folds) fold.open = false;
+  const unfold = () => { if (!onPhone()) for (const fold of folds) fold.open = true; };
+  phone?.addEventListener?.('change', unfold);
+  for (const fold of folds) fold.querySelector('summary').addEventListener('click', event => { if (!onPhone()) event.preventDefault(); });
+  let removing = '', deletionSent = false;
+  const subjectNames = {physics: 'Fizika', math: 'Matematika', mathematics: 'Matematika'};
 
   function node(tag, text) {
     const item = document.createElement(tag);
@@ -219,6 +225,7 @@ export function mountTeacherWorkspace(root, {
     renderGroup();
     displayTab(selection.tab ?? activeTab, selection.test, selection.group);
     renderHome();
+    renderProfile();
     if (currentPage === 'natijalar') renderResults();
   }
   function refresh() {
@@ -289,7 +296,24 @@ export function mountTeacherWorkspace(root, {
     el('invite-section').hidden = !active;
     const rows = group.members.map(member => {
       const li = node('li', member.name);
-      li.append(node('span', member.univeracademy_id));
+      const key = group.id + '/' + member.univeracademy_id;
+      const tools = document.createElement('span');
+      tools.className = 'member-tools';
+      tools.append(node('span', member.univeracademy_id));
+      const ask = node('button', 'Chiqarish');
+      ask.type = 'button';
+      ask.className = 'member-remove';
+      ask.setAttribute('aria-label', member.name + ' ni guruhdan chiqarish');
+      ask.onclick = () => { removing = key; renderGroup(); };
+      if (removing === key) {
+        const yes = node('button', 'Ha, chiqarish'), no = node('button', 'Bekor');
+        yes.type = no.type = 'button';
+        yes.className = 'member-remove danger';
+        yes.onclick = () => void removeStudent(group.id, member.univeracademy_id);
+        no.onclick = () => { removing = ''; renderGroup(); };
+        tools.append(yes, no);
+      } else tools.append(ask);
+      li.append(tools);
       return li;
     });
     el('members').replaceChildren(...rows);
@@ -407,6 +431,23 @@ export function mountTeacherWorkspace(root, {
       return li;
     }));
   }
+  function renderProfile() {
+    el('profile-name').textContent = dashboard.name || '—';
+    const subjects = (dashboard.subjects ?? []).map(subject => subjectNames[subject.id] ?? subject.title);
+    el('profile-subjects').textContent = subjects.length ? subjects.join(', ') : '—';
+    const asked = dashboard.deletionRequested === true || deletionSent;
+    el('delete-status').textContent = asked ? 'So‘rovingiz yuborilgan. Administrator uni ko‘rib chiqadi.' : '';
+    if (asked) el('delete-confirm').hidden = true;
+    el('delete-request').hidden = asked || !el('delete-confirm').hidden;
+  }
+  el('profile-account').hidden = typeof signOut !== 'function';
+  if (typeof signOut === 'function') el('profile-signout').onclick = () => signOut();
+  el('delete-request').onclick = () => { el('delete-confirm').hidden = false; el('delete-request').hidden = true; el('delete-no').focus(); };
+  el('delete-no').onclick = () => { el('delete-confirm').hidden = true; el('delete-request').hidden = false; el('delete-request').focus(); };
+  el('delete-yes').onclick = () => {
+    el('delete-confirm').hidden = true;
+    void command('requestAccountDeletion', {}, 'Hisobni o‘chirish so‘rovi yuborildi.', () => { deletionSent = true; });
+  };
   function renderResults() {
     selectRows('result-group', dashboard.groups, undefined, group => group.name);
     const groupId = el('result-group').value;
@@ -449,6 +490,11 @@ export function mountTeacherWorkspace(root, {
       if (el('member-group').value === groupId) el('student-number').value = '';
     });
     if (!disposed && el('member-group').value === groupId) picker.refresh(true);
+  }
+  async function removeStudent(groupId, id) {
+    if (disposed || writing || groupId !== el('member-group').value) return;
+    await command('removeMember', { groupId, univeracademy_id: id }, 'O‘quvchi guruhdan chiqarildi.', () => { removing = ''; });
+    if (!disposed) { removing = ''; renderGroup(); if (el('member-group').value === groupId) picker.refresh(true); }
   }
   el('invite-button').onclick = () => {
     const groupId = el('member-group').value;
@@ -584,9 +630,9 @@ export function mountTeacherWorkspace(root, {
 
   let currentPage = 'bosh';
   function showPage(page) {
-    const changed = page !== currentPage && ['bosh', 'guruhlar', 'testlar', 'natijalar'].includes(page);
+    const changed = page !== currentPage && ['bosh', 'guruhlar', 'testlar', 'natijalar', 'profil'].includes(page);
     if (page !== currentPage) { savedSelection++; modal.dismiss(false); }
-    if (['bosh', 'guruhlar', 'testlar', 'natijalar'].includes(page)) currentPage = page;
+    if (['bosh', 'guruhlar', 'testlar', 'natijalar', 'profil'].includes(page)) currentPage = page;
     if (changed) root.ownerDocument.documentElement.scrollTop = 0;
     if (currentPage === 'testlar' && !editor) editor = createEditor();
     if (dashboard) {
@@ -656,6 +702,7 @@ export function mountTeacherWorkspace(root, {
     picker.show(null);
     fileVersion++; readVersion++;
     window.removeEventListener('focus', focus);
+    phone?.removeEventListener?.('change', unfold);
     if (hashNavigation) window.removeEventListener('hashchange', navigate);
   };
 }

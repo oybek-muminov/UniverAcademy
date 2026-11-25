@@ -736,6 +736,7 @@ const STAFF_BROWSER_AUTO_OPEN_SHA256 = '172d8f61bb86e74a8f60371dbd160157840b67d4
 const TEACHER_CABINET_MENU_SHA256 = '4d02fe0367298d11b88a112c59192c287910e6977627622e8d7e6e2a8ba7c191';
 const TEACHER_CABINET_COMFORT_SHA256 = 'ead074b678b6d2c796902ebe647c05a373e060659bc843afba502a8179ec0ec4';
 const TEACHER_CABINET_MEMBERS_SHA256 = '86630bf8820412054a2b2e9f4d25b3a79400a9a67518073c637e49c0071bc4ea';
+const TEACHER_CABINET_PROFILE_SHA256 = '8faa75909fb1ff86a42f5050b631d1a7b1085aa5e4e4fb3135907bf28c8c6f25';
 function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
   const raw = readTarget('apps/mini-app/tests/fixtures/' + filename);
   assert.equal(sha256(raw), expectedHash, diagnostic + '_OVERLAY_MISMATCH');
@@ -767,6 +768,7 @@ applySourceTransition('staff-direct-links-overlay.json', STAFF_DIRECT_LINKS_SHA2
 applySourceTransition('teacher-cabinet-menu-overlay.json', TEACHER_CABINET_MENU_SHA256, 'd693ee1dc8609360fab47b09e142cf9977d8ccdd', 'TEACHER_CABINET_MENU');
 applySourceTransition('teacher-cabinet-comfort-overlay.json', TEACHER_CABINET_COMFORT_SHA256, '42013c8ef7c17f0bcf6499196166d79f7106b072', 'TEACHER_CABINET_COMFORT');
 applySourceTransition('teacher-cabinet-members-overlay.json', TEACHER_CABINET_MEMBERS_SHA256, 'b70773313d38121823c32a594a10605573a55bde', 'TEACHER_CABINET_MEMBERS');
+applySourceTransition('teacher-cabinet-profile-overlay.json', TEACHER_CABINET_PROFILE_SHA256, '29c531b0e23afd1062c981469bb19eba7e1c58a6', 'TEACHER_CABINET_PROFILE');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

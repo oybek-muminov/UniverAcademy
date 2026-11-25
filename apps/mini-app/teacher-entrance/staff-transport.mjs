@@ -1,7 +1,7 @@
 // One mounted staff session. Token lookup happens inside every request, including private image reads.
 const limits = { json: 1024 * 1024, media: 2 * 1024 * 1024 };
 const permitted = {
-  teacher: new Set(['createGroup','addMember','createInvite','sendInvite','importTest','previewTest','readDraft','updateDraft','publishTest','assignTest']),
+  teacher: new Set(['createGroup','addMember','removeMember','requestAccountDeletion','createInvite','sendInvite','importTest','previewTest','readDraft','updateDraft','publishTest','assignTest']),
   admin: new Set(),
   owner: new Set(),
 };
@@ -14,6 +14,8 @@ const messages = {
   GROUP_MEMBERSHIP_CONFLICT: 'O‘quvchining boshqa faol guruhi bor. Guruhini almashtirish uchun Adminga murojaat qiling.',
   ADMIN_TRANSFER_REQUIRED: 'Guruhni almashtirish uchun Adminga murojaat qiling.',
   CHAT_UNAVAILABLE: 'O‘quvchi bot bilan hali suhbat boshlamagan. Guruh taklif havolasini ulashing.',
+  ACTIVE_EXAM_OR_RECOVERY: 'O‘quvchi hozir test ishlayapti. Test tugagach qayta urinib ko‘ring.',
+  MEMBERSHIP_BUSY: 'O‘quvchi hozir band. Bir ozdan keyin qayta urinib ko‘ring.',
   EMPTY_GROUP: 'Avval guruhga kamida bitta o‘quvchi qo‘shing.',
   NOT_FOUND: 'Guruh, test yoki o‘quvchining 10 xonali ID raqamini tekshiring.',
   FILE_TOO_LARGE: 'Fayl hajmi ruxsat etilgan chegaradan oshdi.',

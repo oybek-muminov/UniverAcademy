@@ -1,0 +1,66 @@
+{
+  "format_version": 1,
+  "base_commit": "29c531b0e23afd1062c981469bb19eba7e1c58a6",
+  "files": [
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-transport.mjs",
+      "previous_sha256": "0feb72361c996fc481b8f9e13a1ccdae8e2b66a010c6f14d1ffc515f5c489e10",
+      "bytes": 7673,
+      "sha256": "4242a3b9ab2d666a832768bc340732505597424a0221cf15d85ea89577ca8ac9"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-views.mjs",
+      "previous_sha256": "c4546ffd7f14a4b533afb9d70e7966c3fcc4131d2524d85ac83b303ad9485d3b",
+      "bytes": 5091,
+      "sha256": "2f171127d65f55a61a887a6b71502aa44e9d78c1a712d3cb414eab79cb554124"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/styles.css",
+      "previous_sha256": "c2abe42f539193c6f37e349f9b3e450f78cb5023e31a8ac49645137bb2afca7b",
+      "bytes": 15527,
+      "sha256": "ab7a2661dc2e9fe4394eb3470ccd8e9cbdd59727ff653756190b0d355e430ab0"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.html",
+      "previous_sha256": "6785d84a88b9593e287b3ebfa5bc1786d4c7a49267d2ed30ae43ce1f150dc2cd",
+      "bytes": 14276,
+      "sha256": "f423e0a4d2480d791325daea27cc1220451f2dfa9d4c7589f45c73f41491f3bc"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "47961feff4d20aa8ade5f23748c961f66ab1448d63c7f048ec659f8da6ae33a3",
+      "bytes": 34464,
+      "sha256": "d6e7cf7d1a9c2e5ea15d35b97bd230994e6350e2e5784060407a28f15e25b619"
+    },
+    {
+      "path": "runtime/teacher-cabinet-api.mjs",
+      "previous_sha256": "f807a0c627c52426e233b36735e5ab519ff4fe5e632c91e161f45e8e936ab280",
+      "bytes": 11145,
+      "sha256": "5e8fbccb01ac5e62aede5748aa4f801006b5c77562581becf55b2d01f32f5f72"
+    },
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": "aed4ba095de440aeca6c129b48e8cfb52cc111811629e3e5d10898ec363134df",
+      "bytes": 6879,
+      "sha256": "a043a22308535b2d176d37781bd2d375a901c50ff7c3dabdf51005b2b4290b99"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "1dedb7678c0e7298ad237bcbc97277bfcad7939c92e638ec298e3b525e2a1a4f",
+      "bytes": 20209,
+      "sha256": "a5fd52257b1da9037a288beccce4f2fd12b5a93ae3ca9845f01b1c8d3cfa24c4"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/native.test.mjs",
+      "previous_sha256": "47f0f089576216bb36410a5e1d5f23a7bffa8dc27f5affa081b49f700946cb33",
+      "bytes": 39939,
+      "sha256": "f9bcd9dd299a78b56163f86442fa68257d196b563edb0b5516e8f7d3522aab7f"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "d3f89e7741882361b9b5235d98d0d5b816f297eb7e0dc2a346d7f53c2b0836b9",
+      "bytes": 36170,
+      "sha256": "a051b6ce6b057b11f6831f6e85cfb18bef00189b22d4afb94bdc52e07e305474"
+    }
+  ]
+}

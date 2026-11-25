@@ -8,7 +8,7 @@ const profileNameSql="concat_ws(' ',nullif(p.profile->>'first_name',''),nullif(p
 export function displayName(profile){return [profile.first_name,profile.last_name].filter(Boolean).join(' ');}
 // Materialize elapsed current attempts with their own locked student row. A concurrent
 // student request owns any skipped row and will finish its own transition.
-async function expireVisible(tx,person,groupIds,teacher){
+export async function expireVisible(tx,person,groupIds,teacher){
   const due=await query(tx,`SELECT t.id,t.person_id FROM ua_private.attempts t JOIN ua_private.exam_series es ON es.current_attempt_id=t.id
     JOIN ua_private.people p ON p.id=t.person_id JOIN ua_private.assignments a ON a.id=t.assignment_id
     WHERE t.body->>'status'='in_progress' AND (t.body->>'deadlineAt')::numeric<=extract(epoch FROM clock_timestamp())*1000
@@ -33,6 +33,8 @@ export async function dashboard(tx,actor){
     return {...base,groups:gs.map(g=>({...groupView(g),teacherName:g.teacher_name}))};
   }
   const teacher=actor.role==='teacher',person=actor.personId;
+  // A teacher's own request to delete the account lives in the audit trail; nothing is deleted automatically.
+  if(teacher)base.deletionRequested=actor.deletionRequested===true;
   const groups=teacher?await query(tx,`SELECT r.id,r.name,r.subject_id,g.status FROM ua_cabinet.group_requests r
     JOIN ua_private.groups g ON g.id=r.active_group_id
     JOIN ua_private.staff_group_scope s ON s.group_id=g.id AND s.person_id=r.teacher_id AND s.revoked_at_ms IS NULL

@@ -288,6 +288,11 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     const opened=await good(student.command('startAttempt',{assignmentId:assignment.id}));
     assert.equal(opened.status,'in_progress');
     assert.equal((await student.image(media.id)).status,200);
+    // A teacher cannot remove a student while that student's test is running.
+    const busyRemoval=await teacher.command('removeMember',{groupId:group.id,univeracademy_id:byId.cabinetId});
+    assert.equal(busyRemoval.status,409);
+    assert.equal((await busyRemoval.json()).error.code,'ACTIVE_EXAM_OR_RECOVERY');
+    assert.equal((await db.query('SELECT active FROM ua_private.memberships WHERE person_id=$1',[byId.id])).rows[0].active,true);
     // Simulate the canonical administrative release. The membership/profile projection is deferred to commit.
     await db.query('BEGIN');
     try {
@@ -391,6 +396,33 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     assert.equal((await stale.json()).error.code,'GROUP_MEMBERSHIP_CONFLICT');
     assert.equal((await good(teacher.call(directory+'?after=0800000000'))).students.some(row=>row.univeracademy_id===selected),false);
     assert.equal((await db.query('SELECT affinity_group_id FROM ua_private.memberships WHERE person_id=$1',[people[0]])).rows[0].affinity_group_id,otherGroup.id);
+    // Removal: only the owning teacher, only from the group the student is really in.
+    const removal={groupId:otherGroup.id,univeracademy_id:selected};
+    await rejected(teacher.command('removeMember',removal),404);
+    await rejected(other.command('removeMember',{...removal,groupId:ownerGroup.id}),404);
+    const before=(await db.query('SELECT revision,epoch FROM ua_private.memberships WHERE person_id=$1',[people[0]])).rows[0];
+    const removeKey=randomUUID();
+    await good(other.command('removeMember',removal,removeKey));
+    await good(other.command('removeMember',removal,removeKey));
+    const after=(await db.query(`SELECT m.active,m.affinity_group_id,m.revision,m.epoch,p.profile->>'active_group_id' AS profile_group
+      FROM ua_private.memberships m JOIN ua_private.people p ON p.id=m.person_id WHERE m.person_id=$1`,[people[0]])).rows[0];
+    assert.deepEqual({active:after.active,group:after.affinity_group_id,profile:after.profile_group},{active:false,group:null,profile:null});
+    assert.equal(Number(after.revision),Number(before.revision)+1);
+    assert.equal(Number(after.epoch),Number(before.epoch)+1);
+    assert.equal(await scalar("SELECT count(*) n FROM ua_private.staff_audit WHERE action='removeMember' AND target_id=$1",[otherGroup.id]),1);
+    await rejected(other.command('removeMember',removal),404);
+    assert.equal((await good(other.dashboard())).groups.find(row=>row.id===otherGroup.id).members.some(row=>row.univeracademy_id===selected),false);
+    assert.equal((await good(teacher.call(directory+'?after=0800000000'))).students.some(row=>row.univeracademy_id===selected),true);
+    // The student is free again; the state before the check is restored.
+    await good(other.command('addMember',removal));
+    // A deletion request is recorded once, shown on the dashboard, and is open to teachers only.
+    assert.equal((await good(teacher.dashboard())).deletionRequested,false);
+    await good(teacher.command('requestAccountDeletion',{}));
+    await good(teacher.command('requestAccountDeletion',{}));
+    assert.equal((await good(teacher.dashboard())).deletionRequested,true);
+    assert.equal(await scalar("SELECT count(*) n FROM ua_private.staff_audit WHERE action='requestAccountDeletion' AND actor_id=$1",[teacherRow.id]),1);
+    assert.equal((await good(other.dashboard())).deletionRequested,false);
+    await rejected(student.command('requestAccountDeletion',{}));
     await db.query('UPDATE ua_private.teacher_subject_approvals SET revoked_at_ms=1 WHERE person_id=$1',[teacherRow.id]);
     await rejected(teacher.call(directory),403);
     await db.query('UPDATE ua_private.teacher_subject_approvals SET revoked_at_ms=NULL WHERE person_id=$1',[teacherRow.id]);

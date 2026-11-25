@@ -84,6 +84,21 @@ details.fold > summary::after { content: ''; width: 9px; height: 9px; flex: none
 details.fold[open] > summary::after { transform: rotate(-135deg); }
 details.fold[open] > summary { margin-bottom: 12px; }
 #members-card .list { margin-top: 6px; max-height: 340px; overflow-y: auto; }
+/* Kompyuterda ro‘yxatlar doim ochiq: yopilish faqat telefon uchun. */
+@media (min-width: 861px) {
+  details.fold > summary { cursor: default; pointer-events: none; }
+  details.fold > summary::after { display: none; }
+}
+.member-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.member-remove { font-size: 13px; padding: 5px 10px; }
+button.danger { color: #8a1f1f; border-color: #d9a3a3; }
+button.danger:hover { background: #fbeaea; }
+.profile-list { display: grid; gap: 0; margin: 12px 0 0; }
+.profile-list > div { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid #e4eae4; }
+.profile-list dt { color: #52675a; }
+.profile-list dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; text-align: right; }
+.danger-zone { border-color: #e3c4c4; }
+#delete-confirm { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #fbeaea; }
 #available-list { min-height: 220px; }
 
 /* ---- Kabinet qobig‘i: chap menyu (kompyuter) va pastki menyu (telefon) ---- */
@@ -131,7 +146,7 @@ details.fold[open] > summary { margin-bottom: 12px; }
   .side-account #identity-name { font-size: 13px; max-width: 46vw; }
   #toasts { right: 16px; left: 16px; width: auto; bottom: calc(var(--bar-h) + 72px + env(safe-area-inset-bottom, 0px)); }
   .content { padding: 18px 16px calc(var(--bar-h) + 28px + env(safe-area-inset-bottom, 0px)); }
-  .bottom-nav { display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  .bottom-nav { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     min-height: var(--bar-h); padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgb(255 255 255 / 96%);
     border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgb(23 63 50 / 8%); }
   .bottom-nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 2px; border-radius: 12px; font-size: 11.5px; text-align: center; color: #5b7367; }

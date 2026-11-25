@@ -4,9 +4,9 @@ import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
 import {parseTeacherTestText} from './teacher-pilot-text-import.mjs';
 import {cleanText,editableDraft,requireEditable} from './teacher-pilot-import.mjs';
 import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest,requireOwnedTest} from './teacher-staging-content.mjs';
-import {dashboard} from './teacher-staging-dashboard.mjs';
+import {dashboard,expireVisible} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
-const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia']),
+const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','removeMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','readMedia','putMedia','requestAccountDeletion']),
  student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup']),owner:new Set(['dashboard'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
@@ -34,12 +34,13 @@ async function actorFor(tx,{personId,role}){
       FOR SHARE OF a
     )
     SELECT s.roles,s.profile,s.univeracademy_id,s.all_groups,s.all_subjects,
+      EXISTS(SELECT 1 FROM ua_private.staff_audit WHERE actor_id=s.id AND action='requestAccountDeletion') AS deletion_requested,
       ARRAY(SELECT subject_id FROM ua_private.teacher_subject_approvals WHERE person_id=s.id AND approved AND revoked_at_ms IS NULL ORDER BY subject_id FOR SHARE) AS approved_subjects,
       ARRAY(SELECT group_id FROM ua_private.staff_group_scope WHERE person_id=s.id AND revoked_at_ms IS NULL ORDER BY group_id FOR SHARE) AS group_ids,
       ARRAY(SELECT subject_id FROM ua_private.staff_subject_scope WHERE person_id=s.id AND revoked_at_ms IS NULL ORDER BY subject_id FOR SHARE) AS subject_ids
     FROM staff s`,[personId,role]))[0];
   if(!s)fail('FORBIDDEN',403);
-  const actor={personId,role,roles:s.roles,enabled:true,approved:true,profile:s.profile,cabinetId:s.univeracademy_id,
+  const actor={personId,role,roles:s.roles,enabled:true,approved:true,profile:s.profile,cabinetId:s.univeracademy_id,deletionRequested:s.deletion_requested,
     approvedSubjectIds:s.approved_subjects,scope:{all_groups:s.all_groups,all_subjects:s.all_subjects,group_ids:s.group_ids,subject_ids:s.subject_ids}};
   if(role==='teacher'&&!actor.approvedSubjectIds.length)fail('FORBIDDEN',403);
   return actor;
@@ -123,6 +124,32 @@ async function enroll(tx,g,studentId){
   await query(tx,'UPDATE ua_private.groups SET revision=revision+1 WHERE id=$1',[g.id]);
   return groupView(g);
 }
+// Removing a student mirrors the roster-removal rule: never while a test is running, and the old
+// access to unstarted tests stops at once because the membership epoch moves on. The student returns
+// to the "no group" list, so the same or another teacher can add them again.
+async function unenroll(tx,g,cabinetId){
+  const student=await byCabinet(tx,cabinetId);if(!student)fail('NOT_FOUND',404);
+  let rows;
+  try {
+    rows=await query(tx,`SELECT m.*,p.profile->>'active_group_id' AS profile_group FROM ua_private.memberships m JOIN ua_private.people p ON p.id=m.person_id
+      WHERE m.person_id=$1 AND ${registeredStudent} FOR UPDATE OF m,p NOWAIT`,[student.id]);
+  }catch(error){
+    if(error.code==='55P03')fail('MEMBERSHIP_BUSY',409);
+    throw error;
+  }
+  const m=need(rows);
+  if(!m.active||m.affinity_group_id!==g.id||m.profile_group!==g.id)fail('NOT_FOUND',404);
+  // Finish tests whose time has already run out, then refuse if one is still open.
+  await expireVisible(tx,student.id,[],false);
+  const running=await query(tx,`SELECT 1 FROM ua_private.attempts t JOIN ua_private.exam_series es ON es.current_attempt_id=t.id AND es.person_id=t.person_id
+    WHERE t.person_id=$1 AND t.body->>'status'='in_progress' AND (t.body->>'deadlineAt')::numeric>extract(epoch FROM clock_timestamp())*1000 LIMIT 1`,[student.id]);
+  if(running.length)fail('ACTIVE_EXAM_OR_RECOVERY',409);
+  need(await query(tx,`UPDATE ua_private.memberships SET active=false,affinity_group_id=NULL,revision=revision+1,epoch=epoch+1
+    WHERE person_id=$1 AND revision=$2 AND active AND affinity_group_id=$3 RETURNING person_id`,[student.id,m.revision,g.id]));
+  await query(tx,"UPDATE ua_private.people SET profile=jsonb_set(profile,'{active_group_id}','null'::jsonb) WHERE id=$1",[student.id]);
+  await query(tx,'UPDATE ua_private.groups SET revision=revision+1 WHERE id=$1',[g.id]);
+  return groupView(g);
+}
 async function invite(tx,actor,g,recipient,send){
   let tg=null;
   if(send){
@@ -172,8 +199,8 @@ async function media(tx,actor,action,input){
   return {bytes:need(rows).png,contentType:'image/png'};
 }
 async function authorizeResource(tx,actor,action,input){
-  if(['approveGroup','addMember','createInvite','sendInvite','assignTest'].includes(action)){
-    const g=await group(tx,input.groupId,actor,{requireActive:action!=='approveGroup',recoverPending:actor.role==='teacher'});
+  if(['approveGroup','addMember','removeMember','createInvite','sendInvite','assignTest'].includes(action)){
+    const g=await group(tx,input.groupId,actor,{requireActive:!['approveGroup','removeMember'].includes(action),recoverPending:actor.role==='teacher'});
     return g;
   }
   if(action==='updateDraft'){
@@ -201,6 +228,10 @@ async function effect(tx,actor,action,input,subjectId,g){
     case 'addMember':{
       const student=await byCabinet(tx,input.univeracademy_id);if(!student)fail('NOT_FOUND',404);
       return enroll(tx,g,student.id);
+    }
+    case 'removeMember':return unenroll(tx,g,input.univeracademy_id);
+    case 'requestAccountDeletion':{
+      return {id:actor.personId,requested:true,repeated:actor.deletionRequested};
     }
     case 'createInvite':return invite(tx,actor,g,null,false);
     case 'sendInvite':return invite(tx,actor,g,await byCabinet(tx,input.univeracademy_id),true);
@@ -253,7 +284,9 @@ export async function runStagingPilot(tx,identity,action,input={},key){
     return prior.response;
   }
   const subject=action==='createGroup'?subjectFor(actor,input.subjectId):importSubject;
-  const response=await effect(tx,actor,action,input,subject,g);
+  const {repeated,...response}=await effect(tx,actor,action,input,subject,g);
+  // A repeated deletion request changes nothing, so it leaves no second receipt or audit row.
+  if(repeated)return response;
   await query(tx,'INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4)',[actor.personId,receiptKey,payload,response]);
   await query(tx,'INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,$5,$6)',
     [receiptKey,actor.personId,action,response.id??response.groupId,action==='updateDraft'?response.revision:0,tx.now]);

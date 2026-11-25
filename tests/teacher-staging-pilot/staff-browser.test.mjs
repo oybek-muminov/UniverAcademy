@@ -58,6 +58,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   const newGroup = {id:newId,name:'8-A',subjectId:'physics',status:'active',teacherName:'Ustoz',members:[]};
   const tests = [{id:testId,title:'Kuch',status:'published',subjectId:'physics',duration_seconds:60,questionCount:1}];
   const assignments = [], calls = [], issuedTokens = new Set();
+  let deletionRequested = false;
   const user = {current:()=>identity,subscribe(fn){notify=fn;return ()=>{};},async signOut(){identity=null;notify();}};
   const dispose = mountAuthenticatedWorkspace(host,{
     origin,identity:user,
@@ -74,7 +75,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
       calls.push([path,options]);
       const admin = path.includes('/admin/');
       if (path.endsWith('/dashboard')) return located(success({role:admin?'admin':'teacher',person_id:person,name:'Ustoz',
-        groups:admin ? [newGroup] : groups,subjects:[{id:'physics',title:'Fizika'}],tests,results:[],assignments}),url);
+        groups:admin ? [newGroup] : groups,subjects:[{id:'physics',title:'Fizika'}],tests,results:[],assignments,deletionRequested}),url);
       if (path.endsWith('/available-students')) {
         assert(!admin);
         assert.equal(options.method, 'GET');
@@ -109,6 +110,14 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
           assert(member);
           newGroup.members.push(member);
           return located(success({ok:true}),url);
+        case 'removeMember':
+          assert.deepEqual(data,{groupId:newId,univeracademy_id:studentId});
+          newGroup.members.splice(newGroup.members.findIndex(row => row.univeracademy_id === studentId),1);
+          return located(success(newGroup),url);
+        case 'requestAccountDeletion':
+          assert.deepEqual(data,{});
+          deletionRequested = true;
+          return located(success({id:person,requested:true}),url);
         case 'createInvite':
           assert.deepEqual(data,{groupId:newId});
           return located(success({telegramUrl}),url);
@@ -131,7 +140,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   assert(!el('bosh').hidden && el('guruhlar').hidden);
   assert(el('home-stats').children.length === 5);
   for (const bar of ['side-nav','bottom-nav']) {
-    assert.deepEqual([...host.querySelectorAll('.'+bar+' a')].map(a => a.hash), ['#bosh','#guruhlar','#testlar','#natijalar']);
+    assert.deepEqual([...host.querySelectorAll('.'+bar+' a')].map(a => a.hash), ['#bosh','#guruhlar','#testlar','#natijalar','#profil']);
   }
   host.querySelector('.bottom-nav a[href="#guruhlar"]').click();
   assert(el('bosh').hidden && !el('guruhlar').hidden);
@@ -187,6 +196,21 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   el('student-number').value = studentId;
   submit('member-form',el('member-form').querySelector('[value="send"]'));
   await until(()=>settled() && el('notice').textContent.includes('navbatiga'));
+  // On a computer the two group lists always stay open; the summary does not fold them.
+  el('members-card').querySelector('summary').click();
+  assert(el('members-card').open && el('available-students').open);
+  // Removing a student asks a second time first; cancelling sends nothing.
+  assert.equal(el('members').querySelectorAll('.member-remove').length,2);
+  el('members').querySelector('.member-remove').click();
+  assert.equal(el('members').querySelector('.member-remove.danger').textContent,'Ha, chiqarish');
+  [...el('members').querySelectorAll('button')].find(b => b.textContent === 'Bekor').click();
+  assert(!calls.some(([path]) => path.endsWith('/removeMember')) && !el('members').querySelector('.danger'));
+  el('members').querySelector('.member-remove').click();
+  el('members').querySelector('.member-remove.danger').click();
+  await until(() => settled() && !el('members').textContent.includes(studentId));
+  assert.equal(el('notice').textContent,'O‘quvchi guruhdan chiqarildi.');
+  assert.equal(el('members-count').textContent,'1');
+  await until(() => [...el('available-list').options].some(option => option.value === studentId));
   host.querySelector('nav a[href="#testlar"]').click();
   assert(!el('testlar').hidden && !el('tests-new').hidden);
   el('tab-new').dispatchEvent(new window.KeyboardEvent('keydown', {key:'ArrowRight', cancelable:true}));
@@ -209,11 +233,28 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   await until(()=>settled() && el('assignment-info').textContent.includes('8-A'));
   assert.match(el('assignment-info').textContent,/15:30.*00:00.*Toshkent vaqti/);
   assert.deepEqual(calls.filter(([path])=>path.includes('/commands/')).map(([path])=>path.split('/').at(-1)),
-    ['createGroup','addMember','addMember','createInvite','sendInvite','assignTest']);
+    ['createGroup','addMember','addMember','createInvite','sendInvite','removeMember','assignTest']);
   assert(!calls.some(([path])=>path.includes('/admin/')));
 
   assert.equal(host.querySelector('a[href="/admin"]'),null,'an ordinary teacher sees no admin link');
+  // The profile page shows who the teacher is and asks twice before a deletion request is sent.
+  host.querySelector('.bottom-nav a[href="#profil"]').click();
+  assert(!el('profil').hidden && el('testlar').hidden);
+  assert.equal(el('profile-name').textContent,'Ustoz');
+  assert.equal(el('profile-role').textContent,'O‘qituvchi');
+  assert.equal(el('profile-subjects').textContent,'Fizika');
+  el('delete-request').click();
+  assert(!el('delete-confirm').hidden && el('delete-request').hidden);
+  el('delete-no').click();
+  assert(el('delete-confirm').hidden && !el('delete-request').hidden && !calls.some(([path]) => path.endsWith('/requestAccountDeletion')));
+  el('delete-request').click();
+  el('delete-yes').click();
+  await until(() => settled() && el('delete-status').textContent.includes('yuborilgan'));
+  assert(el('delete-request').hidden && el('delete-confirm').hidden);
+  assert.equal(el('notice').textContent,'Hisobni o‘chirish so‘rovi yuborildi.');
   assert.equal(tokenCount,calls.length);
+  el('profile-signout').click();
+  await until(() => identity === null && host.childNodes.length === 0);
   identity={...identityValue,generation:'different'};notify();
   assert.equal(host.childNodes.length,0);
 });
@@ -526,4 +567,40 @@ test('owner transport exposes a single dashboard read and refuses commands, impo
   assert.throws(()=>port.image(person));
   await assert.rejects(port.upload(new Blob()));
   assert.equal(calls,0);
+});
+
+test('the group lists fold only on a phone and stay open on a computer', async t => {
+  const dom = new JSDOM('<div id="host"></div>',{url:origin+'/',pretendToBeVisual:true});
+  const listeners = new Set();
+  const media = {matches:true,addEventListener:(_,fn)=>listeners.add(fn),removeEventListener:(_,fn)=>listeners.delete(fn)};
+  dom.window.matchMedia = () => media;
+  context(dom,t);
+  const mountAuthenticatedWorkspace = await workspace(t);
+  const host = document.getElementById('host');
+  const el = id => host.querySelector('#'+id);
+  let identity = identityValue, notify;
+  const group = {id:crypto.randomUUID(),name:'8-B',subjectId:'physics',status:'active',members:[{name:'Sinov O‘quvchi',univeracademy_id:'0123456789'}]};
+  const dispose = mountAuthenticatedWorkspace(host,{
+    origin,identity:{current:()=>identity,subscribe(fn){notify=fn;return ()=>{};},async signOut(){identity=null;notify();}},
+    async getCurrentClerkToken() { return 'signed.1'; },
+    async fetch(url) {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/available-students')) return located(success({students:[],nextCursor:null}),url);
+      return located(success({role:'teacher',person_id:person,name:'Ustoz',groups:[group],subjects:[{id:'physics',title:'Fizika'}],tests:[],results:[],assignments:[]}),url);
+    },
+  });
+  const until = async check => { for(let i=0;i<200;i++) { if(check()) return; await pause(5); } assert.fail('View did not settle'); };
+  await until(() => el('identity-name')?.textContent === 'Ustoz');
+  host.querySelector('nav a[href="#guruhlar"]').click();
+  await until(() => !el('members-card').hidden);
+  assert(!el('members-card').open && !el('available-students').open, 'on a phone both lists start folded');
+  el('members-card').querySelector('summary').click();
+  assert(el('members-card').open, 'on a phone a tap opens a list');
+  el('members-card').open = false;
+  media.matches = false;
+  for (const listener of listeners) listener();
+  assert(el('members-card').open && el('available-students').open, 'a computer shows both lists open');
+  el('members-card').querySelector('summary').click();
+  assert(el('members-card').open, 'on a computer the lists cannot be folded');
+  dispose();
 });

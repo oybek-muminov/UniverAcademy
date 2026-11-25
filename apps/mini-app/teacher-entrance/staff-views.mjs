@@ -57,7 +57,7 @@ export function teacherView(host, port, first, lifecycle) {
       return lifecycle.dashboard();
     },
     readAvailableStudents:port.availableStudents, request:port.request, upload:port.upload, renderBlocks:privateBlocks, mountTeacherEditor, showStudentView, mountVisualFormula,
-    sentMessage:'Taklif Telegram orqali yetkazish navbatiga qo‘yildi.', inviteLink:checkedInvite, drafts,
+    signOut:leave, sentMessage:'Taklif Telegram orqali yetkazish navbatiga qo‘yildi.', inviteLink:checkedInvite, drafts,
   });
   return unmount;
 }
