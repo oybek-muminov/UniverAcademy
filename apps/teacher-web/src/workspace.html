@@ -12,8 +12,6 @@
     </aside>
     <div class="content">
       <div role="main" id="main" tabindex="-1">
-      <div id="notice" role="status" aria-live="polite"></div>
-      <div id="problem" role="alert"></div>
       <section id="bosh" class="page">
         <div class="home-hero">
           <p class="eyebrow">Xush kelibsiz</p>
@@ -45,25 +43,14 @@
           </form>
         </div>
         <div id="workspace-links" class="pilot-links"></div>
+        <div class="group-columns">
+        <div class="group-main">
         <div class="card">
           <h2>Guruh a’zolari</h2>
           <div id="group-empty" class="empty">O‘quvchi qo‘shish uchun avval guruh yarating.</div>
           <div id="group-content" hidden>
             <label>Guruh<select id="member-group"></select></label>
             <p id="group-status" class="hint"></p>
-            <section id="available-students" aria-labelledby="available-heading" hidden>
-              <h3 id="available-heading">Guruhga kirmagan o‘quvchilar</h3>
-              <p id="available-status" class="hint" role="status"></p>
-              <form id="available-form" class="line-form">
-                <label id="available-label" hidden>O‘quvchini tanlang<select id="available-list" size="5" required></select></label>
-                <button id="available-add" type="submit" disabled hidden>Tanlangan o‘quvchini qo‘shish</button>
-              </form>
-              <div class="actions">
-                <button id="available-previous" type="button" hidden>Oldingi sahifa</button>
-                <button id="available-next" type="button" hidden>Keyingi sahifa</button>
-                <button id="available-retry" type="button" hidden>Ro‘yxatni qayta yuklash</button>
-              </div>
-            </section>
             <form id="member-form" class="line-form">
               <label>O‘quvchining UniverAcademy ID raqami<input id="student-number" name="student_id" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" required autocomplete="off" placeholder="10 xonali raqam"></label>
               <div class="actions"><button type="submit">O‘quvchi qo‘shish</button><button type="submit" name="intent" value="send">Bot orqali yuborish</button></div>
@@ -79,6 +66,23 @@
               </div>
             </div>
           </div>
+        </div>
+        </div>
+        <div class="group-side">
+          <section id="available-students" class="card" aria-labelledby="available-heading" hidden>
+            <h3 id="available-heading">Guruhga kirmagan o‘quvchilar</h3>
+            <p id="available-status" class="hint" role="status"></p>
+            <form id="available-form" class="line-form">
+              <label id="available-label" hidden>O‘quvchini tanlang<select id="available-list" size="5" required></select></label>
+              <button id="available-add" type="submit" disabled hidden>Tanlangan o‘quvchini qo‘shish</button>
+            </form>
+            <div class="actions">
+              <button id="available-previous" type="button" hidden>Oldingi sahifa</button>
+              <button id="available-next" type="button" hidden>Keyingi sahifa</button>
+              <button id="available-retry" type="button" hidden>Ro‘yxatni qayta yuklash</button>
+            </div>
+          </section>
+        </div>
         </div>
       </section>
       <section id="testlar" class="page" hidden>
@@ -148,6 +152,7 @@
       <noscript>Kabinetdan foydalanish uchun brauzerda JavaScript yoqilgan bo‘lishi kerak.</noscript>
       </div>
     </div>
+    <div id="toasts"><div id="notice" role="status" aria-live="polite"></div><div id="problem" role="alert"></div></div>
     <nav class="bottom-nav" aria-label="Tezkor menyu">
       <a href="#bosh" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg><span>Bosh sahifa</span></a>
       <a href="#guruhlar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3.4 2.7-5.8 6-5.8s6 2.4 6 5.8"/><circle cx="17.2" cy="9.5" r="2.4"/><path d="M17.5 14.2c2.2.2 3.8 2 3.8 4.3"/></svg><span>Guruhlar</span></a>

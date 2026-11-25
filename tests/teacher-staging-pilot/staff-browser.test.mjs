@@ -136,6 +136,10 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   host.querySelector('.bottom-nav a[href="#guruhlar"]').click();
   assert(el('bosh').hidden && !el('guruhlar').hidden);
   assert.equal(host.querySelectorAll('nav a[aria-current="page"]').length, 2);
+  // Messages float in their own corner, and the two group columns keep members left and unassigned students right.
+  assert(el('notice').closest('#toasts') && el('problem').closest('#toasts') && !el('main').contains(el('notice')));
+  assert(el('members').closest('.group-main') && el('available-students').closest('.group-side'));
+  assert(el('invite-section').closest('.group-main'));
   const submit = (id, submitter) => el(id).dispatchEvent(new window.SubmitEvent('submit',{cancelable:true,submitter}));
   const settled = () => !el('main')?.hasAttribute('aria-busy');
   await until(() => oldListSignal && el('available-status').textContent.includes('yuklanmoqda'));
@@ -147,6 +151,8 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   await until(()=>settled() && el('member-group')?.value===newId);
   assert.equal(el('group-status').textContent, 'Faol guruh');
   assert.equal(el('notice').textContent, 'Guruh yaratildi.');
+  await pause(3100);
+  assert.equal(el('notice').textContent, '', 'the floating message disappears by itself after three seconds');
   assert(!el('member-form').hidden && !el('invite-section').hidden);
   assert(oldListSignal.aborted);
   oldPage.resolve();

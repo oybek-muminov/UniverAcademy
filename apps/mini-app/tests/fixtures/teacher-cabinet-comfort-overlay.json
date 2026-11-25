@@ -1,0 +1,30 @@
+{
+  "format_version": 1,
+  "base_commit": "42013c8ef7c17f0bcf6499196166d79f7106b072",
+  "files": [
+    {
+      "path": "apps/teacher-web/local-pilot/styles.css",
+      "previous_sha256": "7937413726aa4d2b754732952516d5cffeeae1f1b53ee2b4c18a84b14c29a2ae",
+      "bytes": 13624,
+      "sha256": "0a5e849bfd2bafe60656a9f3cbf6ede1c280ca1f01cb279461dbd9490747db42"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.html",
+      "previous_sha256": "53e7a075d5988d721c939c9b0cf33dcc50cb85c8a60f2e46ecf3f9688bee1f52",
+      "bytes": 12110,
+      "sha256": "bb3b377c3e4c1d377292ba347d85566e19d6145a58a7716e6d55de034e0aa93e"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "acd3ff3765a39f1c5ef3a63002a1c43a27c5537014a660fc75b63d1339645c44",
+      "bytes": 30998,
+      "sha256": "c99bfa20d0ad48d0e56110673797670798dd4e2debfe4763ffc1f678558d6d9c"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "e0777d19850e43d4912ce2e666e48a5581b5604bc3c9956a4093214d8e6a31ed",
+      "bytes": 30988,
+      "sha256": "2c760901c1bfb06beb1c5ec61482cbcdd4e1d22edec30a93064327308f23a070"
+    }
+  ]
+}

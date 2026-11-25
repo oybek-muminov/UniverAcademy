@@ -185,10 +185,17 @@ export function mountTeacherWorkspace(root, {
     select.replaceChildren(...rows.map(row => new Option(label(row), row.id)));
     if (rows.some(row => row.id === previous)) select.value = previous;
   }
+  // Messages float in a corner and fade away by themselves; they never push the page.
+  const toastTimers = {};
+  function toast(id, text, milliseconds) {
+    window.clearTimeout(toastTimers[id]);
+    el(id).textContent = text;
+    if (text) toastTimers[id] = window.setTimeout(() => { el(id).textContent = ''; }, milliseconds);
+  }
   function notice(text = '', error = '') {
     if (disposed) return;
-    el('notice').textContent = text;
-    el('problem').textContent = error;
+    toast('notice', text, 3000);
+    toast('problem', error, 6000);
   }
 
   async function load(selection = {}) {
@@ -637,6 +644,7 @@ export function mountTeacherWorkspace(root, {
 
   return () => {
     disposed = true;
+    for (const id of Object.keys(toastTimers)) window.clearTimeout(toastTimers[id]);
     modal.dismiss(false);
     editor?.dispose();
     picker.show(null);
