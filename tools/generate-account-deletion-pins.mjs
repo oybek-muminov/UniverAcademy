@@ -46,6 +46,9 @@ const transitions = [
   readPinned(manifests+'staff-browser-entry-overlay.json', /const STAFF_BROWSER_ENTRY_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'staff-browser-auto-open-overlay.json', /const STAFF_BROWSER_AUTO_OPEN_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'staff-direct-links-overlay.json', /const STAFF_DIRECT_LINKS_SHA256 = '([a-f0-9]{64})';/),
+  readPinned(manifests+'teacher-channel-gate-overlay.json', /const TEACHER_CHANNEL_GATE_SHA256 = '([a-f0-9]{64})';/),
+  readPinned(manifests+'student-cabinet-fixes-overlay.json', /const TEACHER_CABINET_FIXES_SHA256 = '([a-f0-9]{64})';/),
+  readPinned(manifests+'single-role-overlay.json', /const TEACHER_SINGLE_ROLE_SHA256 = '([a-f0-9]{64})';/),
 ].map(release => new Map(release.files.map(file => [file.path,file])));
 const previousFiles = new Map(previous.files.map(file => [file.path, file]));
 const rows = [];

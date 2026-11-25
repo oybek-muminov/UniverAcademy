@@ -447,7 +447,7 @@ export function mountTeacherWorkspace(root, {
     const subjects = (dashboard.subjects ?? []).map(subject => subjectNames[subject.id] ?? subject.title);
     el('profile-subjects').textContent = subjects.length ? subjects.join(', ') : '—';
     const asked = dashboard.deletionRequested === true || deletionSent;
-    el('delete-status').textContent = asked ? 'So‘rovingiz yuborilgan. Administrator uni ko‘rib chiqadi.' : '';
+    el('delete-status').textContent = asked ? 'So‘rovingiz Ega’ga yuborilgan. Ega uni ko‘rib chiqadi.' : '';
     if (asked) el('delete-confirm').hidden = true;
     el('delete-request').hidden = asked || !el('delete-confirm').hidden;
   }
@@ -457,7 +457,7 @@ export function mountTeacherWorkspace(root, {
   el('delete-no').onclick = () => { el('delete-confirm').hidden = true; el('delete-request').hidden = false; el('delete-request').focus(); };
   el('delete-yes').onclick = () => {
     el('delete-confirm').hidden = true;
-    void command('requestAccountDeletion', {}, 'Hisobni o‘chirish so‘rovi yuborildi.', () => { deletionSent = true; });
+    void command('requestAccountDeletion', {}, 'So‘rov Ega’ga yuborildi.', () => { deletionSent = true; });
   };
   function renderResults() {
     // Archived groups are gone from the working lists but their finished results stay here.

@@ -15,14 +15,15 @@ async function actorFor(tx,{personId,role}){
   needId(personId);
   if(role==='student'){
     const p=(await query(tx,'SELECT enabled,roles,profile,univeracademy_id FROM ua_private.people_registration WHERE id=$1',[personId]))[0];
-    if(!p?.enabled||!p.roles.includes(role))fail('FORBIDDEN',403);
+    // One person, one role: a student acts only as a student.
+    if(!p?.enabled||p.roles.length!==1||p.roles[0]!==role)fail('FORBIDDEN',403);
     if(!p.profile.registration_complete)fail('PROFILE_INCOMPLETE',409);
     return {personId,role,roles:p.roles,enabled:true,profile:p.profile,cabinetId:p.univeracademy_id};
   }
   if(role==='owner'){
     const [profile]=await query(tx,`SELECT p.profile->>'first_name' AS first_name,p.profile->>'last_name' AS last_name
       FROM ua_private.people_registration p JOIN ua_private.staff_access a ON a.person_id=p.id
-      WHERE p.id=$1 AND p.enabled AND 'owner'=ANY(p.roles) AND a.approved FOR SHARE OF a`,[personId]);
+      WHERE p.id=$1 AND p.enabled AND p.roles=ARRAY['owner']::text[] AND a.approved FOR SHARE OF a`,[personId]);
     if(!profile)fail('FORBIDDEN',403);
     return {personId,role,profile};
   }
@@ -30,7 +31,7 @@ async function actorFor(tx,{personId,role}){
   const s=(await query(tx,`WITH staff AS MATERIALIZED (
       SELECT p.id,p.roles,p.profile,p.univeracademy_id,a.all_groups,a.all_subjects
       FROM ua_private.people_registration p JOIN ua_private.staff_access a ON a.person_id=p.id
-      WHERE p.id=$1 AND p.enabled AND $2=ANY(p.roles) AND a.approved AND ($2<>'admin' OR a.manage_roster)
+      WHERE p.id=$1 AND p.enabled AND p.roles=ARRAY[$2]::text[] AND a.approved AND ($2<>'admin' OR a.manage_roster)
       FOR SHARE OF a
     )
     SELECT s.roles,s.profile,s.univeracademy_id,s.all_groups,s.all_subjects,

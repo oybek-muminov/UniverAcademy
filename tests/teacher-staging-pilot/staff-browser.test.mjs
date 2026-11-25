@@ -278,6 +278,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   assert.equal(el('profile-name').textContent,'Ustoz');
   assert.equal(el('profile-role').textContent,'O‘qituvchi');
   assert.equal(el('profile-subjects').textContent,'Fizika');
+  assert.equal(el('delete-request').textContent,'Ega’ga so‘rov yuborish');
   el('delete-request').click();
   assert(!el('delete-confirm').hidden && el('delete-request').hidden);
   el('delete-no').click();
@@ -286,7 +287,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   el('delete-yes').click();
   await until(() => settled() && el('delete-status').textContent.includes('yuborilgan'));
   assert(el('delete-request').hidden && el('delete-confirm').hidden);
-  assert.equal(el('notice').textContent,'Hisobni o‘chirish so‘rovi yuborildi.');
+  assert.equal(el('notice').textContent,'So‘rov Ega’ga yuborildi.');
   assert.equal(tokenCount,calls.length);
   el('profile-signout').click();
   await until(() => identity === null && host.childNodes.length === 0);

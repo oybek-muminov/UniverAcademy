@@ -27,6 +27,8 @@ WHERE i.issuer=$1 AND i.provider_subject=$2 AND i.person_id=$3 AND i.revoked_at_
     const r=result.rows[0];
     if(r.id!==personId||!Array.isArray(r.roles)||r.roles.some(v=>typeof v!=="string")||
       [r.enabled,r.approved,r.manage_roster,r.manage_content,r.all_groups,r.all_subjects].some(v=>typeof v!=="boolean"))fail("RESPONSE_INVARIANT_FAILED",500);
+    // One person, one role. A person holding several roles is a data fault: no staff authority is granted.
+    if(r.roles.length!==1)fail("RESPONSE_INVARIANT_FAILED",500);
     const roles=r.roles.filter((v):v is "teacher"|"admin"|"owner"=>v==="teacher"||v==="admin"||v==="owner");
     const groups=await query(tx,"ua_staff_group_scope","SELECT group_id::text FROM ua_private.staff_group_scope WHERE person_id=$1 AND revoked_at_ms IS NULL ORDER BY group_id",[personId]);
     const subjects=await query(tx,"ua_staff_subject_scope","SELECT subject_id FROM ua_private.staff_subject_scope WHERE person_id=$1 AND revoked_at_ms IS NULL ORDER BY subject_id",[personId]);

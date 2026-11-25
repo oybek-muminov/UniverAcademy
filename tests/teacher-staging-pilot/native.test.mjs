@@ -143,6 +143,17 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     await rejected(owner.dashboard(),401);
   });
 
+  await t.test('one person, one role: a second role closes the cabinet until the person holds a single role again',async()=>{
+    const set=roles=>db.query(`UPDATE ua_private.people_registration SET roles=$2::text[],profile=jsonb_set(profile,'{roles}',to_jsonb($2::text[])) WHERE id=$1`,[teacherRow.id,roles]);
+    await good(teacher.dashboard());
+    await set(['student','teacher']);
+    await rejected(teacher.dashboard(),403);
+    await set(['teacher','admin']);
+    await rejected(teacher.dashboard(),403);
+    await set(['teacher']);
+    await good(teacher.dashboard());
+  });
+
   const groupKey=randomUUID();
   await t.test('a verified teacher immediately creates one usable group across concurrent retries and enrolls by leading-zero ID',async()=>{
     const data={name:'Mexanika 01',subjectId:'physics'};

@@ -33,7 +33,7 @@ export async function firstTestFixture(t) {
   const d=pool.read();
   for(const [role,session]of Object.entries({admin,teacher})){
     const person=session.profile.person_id,subject=crypto.randomUUID(),providerSession=crypto.randomUUID();
-    d.people[person].roles=["student",role];d.people[person].profile.roles=["student",role];
+    d.people[person].roles=[role];d.people[person].profile.roles=[role];
     d.staffIdentities[issuer+"|"+subject]={person_id:person,revoked_at_ms:null};
     d.staffAccess[person]={approved:true,manage_content:role==="admin",manage_roster:role==="admin",all_groups:false,all_subjects:false};
     d.staffGroups[person]=[{group_id:group,revoked_at_ms:null}];d.staffSubjects[person]=[{subject_id:"physics",revoked_at_ms:null}];

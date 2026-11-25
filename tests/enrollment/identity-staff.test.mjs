@@ -108,25 +108,36 @@ async function staffSetup(f){
 }
 test("staff authority comes from current normalized rows, never JWT metadata or a cached owner projection",async(t)=>{
   const f=await setup(t),s=await staffSetup(f);assert.equal((await s.patch()).status,403); // real current role is student only
-  s.roles(["student","admin"]);assert.equal((await s.patch()).status,404); // no content capability
+  s.roles(["admin"]);assert.equal((await s.patch()).status,404); // no content capability
   s.update(d=>{d.staffAccess[s.person].manage_content=true;d.staffSubjects[s.person][0].revoked_at_ms=clock;});assert.equal((await s.patch()).status,404);
   s.update(d=>{d.staffSubjects[s.person][0].revoked_at_ms=null;});const first=await s.patch();assert.equal(first.status,200,JSON.stringify(first.json));
   assert.deepEqual(await s.patch(),first);s.update(d=>{d.staffAccess[s.person].manage_content=false;});assert.equal((await s.patch()).status,404);
   assert.equal(f.pool.read().staffProjection.audit.length,1);
 });
+test("one person, one role: a person holding two roles gets no staff authority even with every other grant",async(t)=>{
+  const f=await setup(t),s=await staffSetup(f),rows=new StaffAccessRows(),runner=new PostgresTransactions(f.pool);
+  s.roles(["admin"]);s.update(d=>{d.staffAccess[s.person].manage_content=true;});
+  const read=()=>runner.run([s.person],tx=>rows.load(tx,s.proof,s.person));
+  assert.deepEqual((await read()).roles,["admin"]);
+  for(const roles of [["student","admin"],["admin","teacher"],["student","teacher","admin","owner"]]){
+    s.roles(roles);await assert.rejects(read(),e=>e.code==="RESPONSE_INVARIANT_FAILED"&&e.status===500);
+    assert.equal((await s.patch()).status,500);
+  }
+  s.roles(["admin"]);assert.deepEqual((await read()).roles,["admin"]);
+});
 test("group/subject/all-scope and Teacher approval readers reflect current revocation; roster stays independent",async(t)=>{
   const f=await setup(t),s=await staffSetup(f),rows=new StaffAccessRows(),runner=new PostgresTransactions(f.pool);
-  s.roles(["student","admin"]);s.update(d=>{d.staffAccess[s.person].manage_content=true;});
+  s.roles(["admin"]);s.update(d=>{d.staffAccess[s.person].manage_content=true;});
   const read=()=>runner.run([s.person],tx=>rows.load(tx,s.proof,s.person));let record=await read();assert.equal(groupScope(record,s.group),true);assert.equal(canWriteContent(record,"physics"),true);
   assert.throws(()=>requireRosterAuthority(record),e=>e.code==="CAPABILITY_REQUIRED");
   s.update(d=>{d.staffGroups[s.person][0].revoked_at_ms=clock;d.staffSubjects[s.person][0].revoked_at_ms=clock;});record=await read();assert.equal(groupScope(record,s.group),false);assert.equal(canWriteContent(record,"physics"),false);
   s.update(d=>{d.staffAccess[s.person].all_groups=true;d.staffAccess[s.person].all_subjects=true;});record=await read();assert.equal(groupScope(record,crypto.randomUUID()),true);assert.equal(canWriteContent(record,"math"),true);
-  s.roles(["student","teacher"]);s.update(d=>{d.staffAccess[s.person].all_subjects=false;d.staffAccess[s.person].all_groups=false;d.staffAccess[s.person].manage_content=false;d.teacherSubjects[s.person]=[{subject_id:"physics",approved:true,revoked_at_ms:null}];});
+  s.roles(["teacher"]);s.update(d=>{d.staffAccess[s.person].all_subjects=false;d.staffAccess[s.person].all_groups=false;d.staffAccess[s.person].manage_content=false;d.teacherSubjects[s.person]=[{subject_id:"physics",approved:true,revoked_at_ms:null}];});
   record=await read();assert.equal(canWriteContent(record,"physics"),true);assert.deepEqual(record.scope.group_ids,[]);
   s.update(d=>{d.teacherSubjects[s.person][0].approved=false;});assert.equal(canWriteContent(await read(),"physics"),false);
 });
 test("current mapping/access/approval/account/session revocation fails closed even with the same signed staff JWT",async(t)=>{
-  const f=await setup(t),s=await staffSetup(f);s.roles(["student","admin"]);s.update(d=>{d.staffAccess[s.person].manage_content=true;});
+  const f=await setup(t),s=await staffSetup(f);s.roles(["admin"]);s.update(d=>{d.staffAccess[s.person].manage_content=true;});
   for(const[change,status]of[
     [d=>{d.staffIdentities[s.issuer+"|"+s.subject].revoked_at_ms=clock;},401],
     [d=>{delete d.staffAccess[s.person];},401],[d=>{d.staffAccess[s.person].approved=false;},403],

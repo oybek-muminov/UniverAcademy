@@ -1,0 +1,54 @@
+{
+  "format_version": 1,
+  "base_commit": "f2e2bd64d33af47c5fb0e339e6f82d3df4e5da28",
+  "files": [
+    {
+      "path": "apps/teacher-web/src/workspace.html",
+      "previous_sha256": "03bc900fa5bb1e59cf61871e6214e02c0d9c41fa1f2cdeaa759fa0918cfc1dce",
+      "bytes": 15202,
+      "sha256": "8da6450a76fb8288a9249e321f8f46ddb0eba2b2dcd7389eb4745ed49d771963"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "eb5d4c00369bc1e7afce91250b45441dbf7fa347a386d9641549c86c7fbb5adb",
+      "bytes": 36821,
+      "sha256": "1c2d1d8c550628f3a63836c767be9a87bac6495f4682dd3739258e01a6cdc06f"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "a91048781c824533f8a88be1f13a6ceafb2a7c97a18bc303752c0c5ec94705b9",
+      "bytes": 25482,
+      "sha256": "f1a31d20781b3345ab4e4c4534671e04c54710c14806b1300f36b23f49855114"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/staff-access-rows.ts",
+      "previous_sha256": "cec02c6a6392c51fdcd004189fbcb504d1a48efbf20e5f6b2af912f5244ab700",
+      "bytes": 3917,
+      "sha256": "db9092e94f391a3634026f9bceb34203bf9bf3de73d8173d69267d912ccdd808"
+    },
+    {
+      "path": "tests/enrollment/identity-staff.test.mjs",
+      "previous_sha256": "0e1a37749579c93d7357b1174ed337096480ffc9beb67aca9711a7c534503b5f",
+      "bytes": 16487,
+      "sha256": "df5292081cba77b3f5719430c59fe1451cb83a903a0f15affa0c520706b02557"
+    },
+    {
+      "path": "tests/first-test/fixture.mjs",
+      "previous_sha256": "6e9c113a2d754fcdf5ca54e382b949e21859beb61a77016bdebaab0be7f4f35f",
+      "bytes": 7261,
+      "sha256": "74b3f8b85c564063e79cffefbe10d9bd14bcc83a2ba5bc9752cd3de4503d1c59"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/native.test.mjs",
+      "previous_sha256": "798db1e9688b1fdb7ac1461b3722b3bb363bb95ae526f2ecd3e53cdebc48c79c",
+      "bytes": 40700,
+      "sha256": "ce64428a37a16cd82d4b1055a3e4341583b39db7759390c3975d725baf925b6f"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "e949dae9ddfc8f870999ea1b7af9f0a27321d9ab45968c4a017116b26602372a",
+      "bytes": 38880,
+      "sha256": "4e320a9ca1b0858620e7ac28c2a51338bd11eef0da9aac54d09db17414a53ca3"
+    }
+  ]
+}
