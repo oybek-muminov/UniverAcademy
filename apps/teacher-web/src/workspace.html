@@ -19,7 +19,7 @@
           <p id="home-hint" class="hint">Kabinetingiz holati shu yerda ko‘rinadi.</p>
         </div>
         <div class="stat-grid" id="home-stats"></div>
-        <h2 class="section-title">Tezkor amallar</h2>
+        <h2 class="section-title quick-title">Tezkor amallar</h2>
         <div class="quick-grid">
           <a class="quick page-link" href="#guruhlar"><strong>Guruh yaratish</strong><span>Yangi guruh oching va o‘quvchilarni ID raqami bilan qo‘shing</span></a>
           <a class="quick page-link" href="#testlar"><strong>Test yozish yoki yuklash</strong><span>Savollarni o‘zingiz yozing yoki fayldan yuklang</span></a>
@@ -46,7 +46,7 @@
         <div class="group-columns">
         <div class="group-main">
         <div class="card">
-          <h2>Guruh a’zolari</h2>
+          <h2>Guruh</h2>
           <div id="group-empty" class="empty">O‘quvchi qo‘shish uchun avval guruh yarating.</div>
           <div id="group-content" hidden>
             <label>Guruh<select id="member-group"></select></label>
@@ -55,7 +55,6 @@
               <label>O‘quvchining UniverAcademy ID raqami<input id="student-number" name="student_id" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" required autocomplete="off" placeholder="10 xonali raqam"></label>
               <div class="actions"><button type="submit">O‘quvchi qo‘shish</button><button type="submit" name="intent" value="send">Bot orqali yuborish</button></div>
             </form>
-            <ul class="list" id="members"></ul>
             <div class="invite" id="invite-section">
               <h3>Bot orqali taklif</h3>
               <button id="invite-button" type="button">Taklif havolasini yaratish</button>
@@ -69,8 +68,12 @@
         </div>
         </div>
         <div class="group-side">
-          <section id="available-students" class="card" aria-labelledby="available-heading" hidden>
-            <h3 id="available-heading">Guruhga kirmagan o‘quvchilar</h3>
+          <details id="members-card" class="card fold" open hidden>
+            <summary><h3 id="members-heading">Guruh a’zolari</h3><span id="members-count" class="fold-count"></span></summary>
+            <ul class="list" id="members"></ul>
+          </details>
+          <details id="available-students" class="card fold" open hidden>
+            <summary><h3 id="available-heading">Guruhga kirmagan o‘quvchilar</h3></summary>
             <p id="available-status" class="hint" role="status"></p>
             <form id="available-form" class="line-form">
               <label id="available-label" hidden>O‘quvchini tanlang<select id="available-list" size="5" required></select></label>
@@ -81,7 +84,7 @@
               <button id="available-next" type="button" hidden>Keyingi sahifa</button>
               <button id="available-retry" type="button" hidden>Ro‘yxatni qayta yuklash</button>
             </div>
-          </section>
+          </details>
         </div>
         </div>
       </section>

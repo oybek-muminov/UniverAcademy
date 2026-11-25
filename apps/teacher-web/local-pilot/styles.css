@@ -70,10 +70,20 @@ th { color: #53695c; }
 /* ---- Guruhlar: kompyuterda ikki ustun ---- */
 .group-columns { display: grid; gap: 18px; align-items: start; }
 .group-side > .card, .group-main > .card { margin-bottom: 18px; }
+.group-side > details.fold > summary + * { margin-top: 0; }
 @media (min-width: 1000px) {
-  .group-columns:has(#available-students:not([hidden])) { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .group-columns:has(.group-side > .card:not([hidden])) { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
   .group-side { position: sticky; top: 20px; }
 }
+details.fold > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h3 { margin: 0; flex: 1; }
+.fold-count { min-width: 26px; padding: 2px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 13px; font-weight: 650; text-align: center; }
+.fold-count:empty { display: none; }
+details.fold > summary::after { content: ''; width: 9px; height: 9px; flex: none; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; }
+details.fold[open] > summary::after { transform: rotate(-135deg); }
+details.fold[open] > summary { margin-bottom: 12px; }
+#members-card .list { margin-top: 6px; max-height: 340px; overflow-y: auto; }
 #available-list { min-height: 220px; }
 
 /* ---- Kabinet qobig‘i: chap menyu (kompyuter) va pastki menyu (telefon) ---- */
@@ -128,6 +138,7 @@ th { color: #53695c; }
   .bottom-nav a[aria-current] { color: var(--green); background: var(--green-soft); }
   .bottom-nav a:hover { text-decoration: none; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
+  .quick-title, .quick-grid { display: none; }
   .page-heading { gap: 10px; }
   .test-tabs button { flex: 1 1 auto; }
 }

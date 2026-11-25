@@ -138,8 +138,9 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   assert.equal(host.querySelectorAll('nav a[aria-current="page"]').length, 2);
   // Messages float in their own corner, and the two group columns keep members left and unassigned students right.
   assert(el('notice').closest('#toasts') && el('problem').closest('#toasts') && !el('main').contains(el('notice')));
-  assert(el('members').closest('.group-main') && el('available-students').closest('.group-side'));
+  assert(el('members').closest('.group-side') && !el('members-card').hidden && el('available-students').closest('.group-side'));
   assert(el('invite-section').closest('.group-main'));
+  assert(el('members-card').tagName === 'DETAILS' && el('available-students').tagName === 'DETAILS'  && /^[0-9]+$/.test(el('members-count').textContent));
   const submit = (id, submitter) => el(id).dispatchEvent(new window.SubmitEvent('submit',{cancelable:true,submitter}));
   const settled = () => !el('main')?.hasAttribute('aria-busy');
   await until(() => oldListSignal && el('available-status').textContent.includes('yuklanmoqda'));
@@ -211,7 +212,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
     ['createGroup','addMember','addMember','createInvite','sendInvite','assignTest']);
   assert(!calls.some(([path])=>path.includes('/admin/')));
 
-  assert.equal(host.querySelector('a[href="/admin"]').textContent,'Admin bo‘limi');
+  assert.equal(host.querySelector('a[href="/admin"]'),null,'an ordinary teacher sees no admin link');
   assert.equal(tokenCount,calls.length);
   identity={...identityValue,generation:'different'};notify();
   assert.equal(host.childNodes.length,0);

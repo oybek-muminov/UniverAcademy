@@ -173,6 +173,10 @@ export function mountTeacherWorkspace(root, {
   const retries = new Map();
   const invites = new Map();
   const picker = mountStudentPicker(el, readAvailableStudents, addStudent);
+  // On a phone the two long lists start folded; the teacher opens the one they need.
+  if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 860px)').matches) {
+    el('members-card').open = el('available-students').open = false;
+  }
 
   function node(tag, text) {
     const item = document.createElement(tag);
@@ -277,6 +281,7 @@ export function mountTeacherWorkspace(root, {
     picker.show(group?.status === 'active' ? group.id : null);
     el('group-content').hidden = !group;
     el('group-empty').hidden = Boolean(group);
+    el('members-card').hidden = !group;
     if (!group) return;
     const active = group.status === 'active';
     el('group-status').textContent = groupStatusLabel(group.status);
@@ -288,6 +293,7 @@ export function mountTeacherWorkspace(root, {
       return li;
     });
     el('members').replaceChildren(...rows);
+    el('members-count').textContent = String(group.members.length);
     if (active && !rows.length) el('members').append(node('li', 'Guruhga hozircha o‘quvchi qo‘shilmagan.'));
     const invite = invites.get(group.id);
     el('invite-detail').hidden = !active || !invite;
