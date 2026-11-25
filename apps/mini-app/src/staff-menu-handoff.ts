@@ -23,11 +23,7 @@ export function mountStaffHandoff(element: HTMLElement, role: StaffRole) {
   link.textContent = 'Brauzerda ochish';
   link.onclick = event => { if (openStaffBrowser(role, window)) event.preventDefault(); };
 
-  const recheck = document.createElement('a');
-  recheck.className = 'cabinet-recheck';
-  recheck.href = '/';
-  recheck.textContent = 'Kabinetimni qayta aniqlash';
-  status.replaceWith(link, recheck);
+  status.replaceWith(link);
   if (autoOpenStaffBrowser(role, window) === 'opened') {
     const note = document.createElement('p');
     note.setAttribute('role', 'status');

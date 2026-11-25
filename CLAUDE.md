@@ -6,6 +6,7 @@ Milliy sertifikat/DTM uchun online test platformasi. Hozir faqat **PILOT**: 30 o
 
 ## Qat'iy qoidalar
 - **`git push`** (UniverAcademy va `lab_univeracademy` repolari) — har safar alohida, aynan shu push uchun tasdiq. Oldingi rozilik, lokal tayyorlik yoki tavsiya tasdiq emas.
+- **Push = jonli deploy:** `main` ga har bir `git push` Cloudflare'da `univeracademy-mini` va `univeracademy-bot` ni ~1 daqiqada avtomatik yangilaydi (2026-11-25 dagi push bilan kuzatilgan; sayt kalitlari Cloudflare'ning o'z yig'ishida saqlangan). Push oldidan foydalanuvchiga "bu jonli saytga chiqadi" deb ayt. Saytni qo'lda `wrangler deploy` bilan yuklama: kalitlarni taxmin qilib, avtomatik to'g'ri versiyani buzib qo'yish mumkin.
 - Joriy topshiriqdan tashqari: migratsiya, deploy, Cloudflare/Clerk/provider sozlamalari **yo'q**.
 - Supabase `academic-works` loyihasiga umuman tegilmaydi (o'qish ham, yozish ham).
 - Lokal test/build o'tishi production tayyorligi emas. Jonli holat (Worker versiyalari, `keep_vars`, bayroqlar) paneldan tekshiriladi.

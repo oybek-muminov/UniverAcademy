@@ -43,11 +43,11 @@ test('private menu reconciles the current staff handoff and falls back to the or
     const path = hint==='admin'||hint==='owner' ? 'open-staff/'+hint : '';
     assert.deepEqual(lastMenu(),{type:'web_app',text:'Kabinet',web_app:{url:h.env.MINI_CABINET_URL+path}});
   }
-  assert.equal(reads,5);
+  assert.equal(reads,6); // The first /start reads the role twice: once for the button message, once for the menu.
   h.setStatus('disabled'); await h.engine.reconcile();
   assert.deepEqual(lastMenu(),{type:'commands'});
-  assert.equal(reads,5);
-  assert.equal(h.calls.filter(c=>c.method==='sendMessage').length,0);
+  assert.equal(reads,6);
+  assert.equal(h.calls.filter(c=>c.method==='sendMessage').length,1); // Only the first /start sends the browser button.
 });
 test('expiry cleanup works even when database lookup fails', async () => {
   const h = harness(); await h.engine.start(context); h.advance(60000); h.failLookup(); await h.engine.drain();
@@ -181,4 +181,33 @@ test('diagnostics emit only fixed enums and cannot break persisted work', async 
   await h.engine.save(state);
   assert.deepEqual(events.at(-1), {event:'telegram_menu_lifecycle',send:'none',menu:'none',cleanup:'none'});
   assert.ok(!JSON.stringify(events).includes('secret'));
+});
+
+test('/start gives a linked teacher, admin or owner a direct browser button and leaves students and failed hints quiet', async () => {
+  for (const [role, url] of [['teacher', 'https://ustoz.univeracademy.uz/'], ['admin', 'https://ustoz.univeracademy.uz/admin'], ['owner', 'https://ustoz.univeracademy.uz/owner']]) {
+    const h = harness();
+    h.setStatus('linked');
+    h.env.TELEGRAM_TEACHER_PILOT_ENABLED = 'true';
+    h.env.TELEGRAM_PILOT_DIRECTORY = { async readStaffCabinet() { return role; } };
+    await h.engine.start(context);
+    const sends = h.calls.filter(c => c.method === 'sendMessage');
+    assert.equal(sends.length, 1);
+    assert.deepEqual(sends[0].body.reply_markup.inline_keyboard, [[{ text: 'Ustoz kabinetini ochish', url }]]);
+    assert.equal(h.state().receipts.length, 1);
+    h.advance(60000); await h.engine.drain();
+    assert.ok(h.calls.some(c => c.method === 'deleteMessage' && c.body.message_id === 100));
+  }
+  for (const directory of [{ async readStaffCabinet() { return null; } }, { async readStaffCabinet() { throw Error('SERVICE_UNAVAILABLE'); } }]) {
+    const h = harness();
+    h.setStatus('linked');
+    h.env.TELEGRAM_TEACHER_PILOT_ENABLED = 'true';
+    h.env.TELEGRAM_PILOT_DIRECTORY = directory;
+    await h.engine.start(context);
+    assert.equal(h.calls.filter(c => c.method === 'sendMessage').length, 0);
+  }
+  const off = harness();
+  off.setStatus('linked');
+  off.env.TELEGRAM_PILOT_DIRECTORY = { async readStaffCabinet() { return 'teacher'; } };
+  await off.engine.start(context);
+  assert.equal(off.calls.filter(c => c.method === 'sendMessage').length, 0);
 });

@@ -12,7 +12,7 @@ test('a Telegram receipt must identify the linked private chat and message',asyn
     let saved;
     const store = {claimSend:async()=>({claim:'a',chatId:50}),finishSend:async(key,status)=>{assert.equal(key,'a');saved=status;}};
     await sendTeacherNotice(store,async(method,body)=>{
-      assert.deepEqual([method,body],['sendMessage',{chat_id:50,text:'UniverAcademy’da sizga o‘qituvchi huquqi berildi.'}]);
+      assert.deepEqual([method,body],['sendMessage',{chat_id:50,text:'UniverAcademy’da sizga o‘qituvchi huquqi berildi.',reply_markup:{inline_keyboard:[[{text:'Ustoz kabinetini ochish',url:'https://ustoz.univeracademy.uz/'}]]}}]);
       return {kind:'ok',result};
     });
     assert.deepEqual(saved,{status:'unconfirmed'});

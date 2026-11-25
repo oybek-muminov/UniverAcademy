@@ -45,7 +45,7 @@ test('only eligible teachers receive a single private notice and its own receipt
     };
     const results = await Promise.all([sendTeacherNotice(store,firstSend),sendTeacherNotice(store,firstSend)]);
     assert.deepEqual(results.sort(),[false,true]);
-    assert.deepEqual(sent,[{method:'sendMessage',body:{chat_id:firstChat,text:'UniverAcademy’da sizga fizika o‘qituvchisi huquqi berildi.'}}]);
+    assert.deepEqual(sent,[{method:'sendMessage',body:{chat_id:firstChat,text:'UniverAcademy’da sizga fizika o‘qituvchisi huquqi berildi.',reply_markup:{inline_keyboard:[[{text:'Ustoz kabinetini ochish',url:'https://ustoz.univeracademy.uz/'}]]}}}]);
     const row = await state(first);
     assert.equal(row.state,'sent');
     assert.equal(row.delete_after.getTime()-row.sent_at.getTime(),86400000);

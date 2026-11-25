@@ -1,4 +1,6 @@
 const maxPerMinute = 12;
+// Opens the staff cabinet in the browser directly, not inside the Mini App.
+const cabinetButton = { inline_keyboard: [[{ text: 'Ustoz kabinetini ochish', url: 'https://ustoz.univeracademy.uz/' }]] };
 const retryDelay = result => result?.kind === 'retry' && Number.isSafeInteger(result.delay) && result.delay > 0
   ? result.delay : undefined;
 
@@ -9,7 +11,7 @@ export async function sendTeacherNotice(store, deliver) {
   try {
     reply = await deliver('sendMessage', { chat_id:job.chatId, text:job.physics
       ? 'UniverAcademy’da sizga fizika o‘qituvchisi huquqi berildi.'
-      : 'UniverAcademy’da sizga o‘qituvchi huquqi berildi.' });
+      : 'UniverAcademy’da sizga o‘qituvchi huquqi berildi.', reply_markup:cabinetButton });
   } catch { /* Telegram may have accepted the message; a blind retry can duplicate it. */ }
   const message = reply?.result;
   const delay = retryDelay(reply);

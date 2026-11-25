@@ -38,19 +38,22 @@ export class LoginMessageLifecycle {
     if (s.seen.length >= 256 || s.receipts.length >= 64) throw new Error('BOT_BUSY');
     // Lookup before marking delivery, so transient DB failure can be retried.
     const nav = await lookupValidatedStart(context, this.env.TELEGRAM_START_LOOKUP);
+    // A linked teacher/admin/owner gets a direct browser button; students keep the existing quiet menu.
+    const staff = nav.status === 'linked' ? await staffCabinetNavigation(this.env, chatId) : null;
     s.chatId = chatId; s.updateId = updateId;
     s.seen.push({ id: updateId, at: now });
     for (const receipt of s.receipts) { receipt.expires = now; receipt.next = Math.max(now, receipt.notBefore || 0); }
     s.menuDue = Math.max(now, s.menuNotBefore || 0); s.menuDeadline = now + 47 * 3600000;
     // Persist before external send. Crash/unknown send must NOT blindly resend.
     s.sendRetry = null; // A fresh /start supersedes any unsent older button.
-    s.lastSend = nav.status === 'needs_clerk' ? 'pending' : 'not_needed';
+    s.lastSend = nav.status === 'needs_clerk' || staff ? 'pending' : 'not_needed';
     await this.save(s);
     if (nav.status === 'needs_clerk') await this.sendLogin(s, ttl, now + 47 * 3600000);
+    else if (staff) await this.sendLogin(s, ttl, now + 47 * 3600000, staff);
     await this.drain();
     return { status: s.lastSend };
   }
-  async sendLogin(s, ttl, retryDeadline) {
+  async sendLogin(s, ttl, retryDeadline, staff) {
     if (s.sendNotBefore > this.now()) {
       s.sendRetry = s.sendNotBefore < retryDeadline ? { next: s.sendNotBefore, deadline: retryDeadline, ttl } : null;
       s.lastSend = s.sendRetry ? 'rate_limited' : 'retry_window_exhausted';
@@ -60,7 +63,9 @@ export class LoginMessageLifecycle {
     // Clear scheduled retry BEFORE the external call. A crash/unknown result
     // must not replay a send Telegram might already have accepted.
     s.sendRetry = null; s.lastSend = 'pending'; await this.save(s);
-    const sent = await this.deliver('sendMessage', { chat_id: s.chatId,
+    const sent = await this.deliver('sendMessage', staff ? { chat_id: s.chatId,
+      text: 'Ustoz kabinetini ochish uchun tugmani bosing. Tugma yo‘qolsa, /start yuboring.',
+      reply_markup: { inline_keyboard: [[{ text: 'Ustoz kabinetini ochish', url: staff.browser }]] } } : { chat_id: s.chatId,
       text: 'Kirish yoki ro‘yxatdan o‘tish uchun tugmani bosing. Tugma yo‘qolsa, /start yuboring.',
       reply_markup: { inline_keyboard: [[{ text: 'Kirish / Ro‘yxatdan o‘tish', web_app: { url: urls.signIn } }]] } });
     const now = this.now();

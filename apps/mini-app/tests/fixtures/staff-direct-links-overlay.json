@@ -1,0 +1,54 @@
+{
+  "format_version": 1,
+  "base_commit": "b47dda25d54e902601c779de124dfd829099ab43",
+  "files": [
+    {
+      "path": "apps/mini-app/src/staff-menu-handoff.ts",
+      "previous_sha256": "66b40e4e650c3a0d4ee6aad3ffda1247fd6a0dd02257d6f04935f58146e4b757",
+      "bytes": 1362,
+      "sha256": "344b9c18bbf9bed1cc80589bd68266d5061ae91418317dcc807d610663177d8b"
+    },
+    {
+      "path": "apps/telegram-bot/src/login-message-lifecycle.mjs",
+      "previous_sha256": "b11f57a6fdea3b8ec2a44023c5c642f0fef3460f29f6a4a3a1684de09fc2a9e0",
+      "bytes": 9283,
+      "sha256": "1b32325dec02673cc57ab82e26dd6e3d6b4dc3b3ad2868a0acf18bbd9fad7b23"
+    },
+    {
+      "path": "apps/telegram-bot/src/teacher-notice.mjs",
+      "previous_sha256": "e4a4eef7d5f5b24e743aae2f430b6efee977ea638ed3326970d1e6e62318e37f",
+      "bytes": 2562,
+      "sha256": "83a4a40a1b0354e894b0200d63e37f6b02335b0812d306af011d452a0cfb5722"
+    },
+    {
+      "path": "apps/telegram-bot/tests/login-message-lifecycle.test.mjs",
+      "previous_sha256": "53a326dd67a7c28bbf0d5ff98ffbe1fe75ee9f32b53e7cfb5a43a550200f64b3",
+      "bytes": 14225,
+      "sha256": "a9899121cfc5f2cd3303c441b0e5772db6b4a98d1e4fe7cd731faeea2325c376"
+    },
+    {
+      "path": "apps/telegram-bot/tests/teacher-notice.test.mjs",
+      "previous_sha256": "5058a8144261577b9b281f2f338d993cb5b84cf5856269023d4109980c1910e3",
+      "bytes": 2081,
+      "sha256": "3d8db0239bd3d48e5b2c9878cf6df486457d27637cbd386a3ccba479fb2a86e5"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/telegram-browser-handoff.test.mjs",
+      "previous_sha256": "76948cb902b7d8f4b6257d1f8c8d75e24df34a937dbf070b559efc6d3b5ab8f8",
+      "bytes": 8203,
+      "sha256": "2fb9dd1084ed9d5c91275c21b1d67c0e4b81e1be579366756f31097c4fa614a2"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/teacher-notice-delivery.test.mjs",
+      "previous_sha256": "7c4dd358aa3f0c8c56571b158fad01e3d46eba7001a158936e9042d4b591e49a",
+      "bytes": 6416,
+      "sha256": "39c2645378ccf36d49b08ab73b2a4b4e3fc28882224084fd8b3b0220c7cb5fd6"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "c20fbce2c150514c46b1069eb9416e25e535ea0f2033f34ada514bdd323a5be0",
+      "bytes": 5651,
+      "sha256": "f54082d1ad12075ecff169d9242d0773ebc20075f912a905444ceb1116f1025e"
+    }
+  ]
+}

@@ -731,6 +731,7 @@ const TEACHER_DRAFT_EDIT_SHA256 = '269c2c358d1fed1736bd479635e7c6693c7fd2b0c18b2
 const TEACHER_TEST_SCHEDULE_SHA256 = 'd40126f2dd01e308b85080e9b14fb03d88bc6d43d6dc18f5dccde8c1dd3d29d8';
 const PLATFORM_PERFORMANCE_SHA256 = '1621fe2f014a76c57d014f64c1ddfbc2393491ea3a33ddc2ff18ad9b1f378f55';
 const STAFF_BROWSER_ENTRY_SHA256 = '45e17d9796bab5e88bcc42aa417ed01a51ead9129049694f78d8e1875afe619f';
+const STAFF_DIRECT_LINKS_SHA256 = '02cf437a821fb81485ce96a6a1425e3d3e3fae08431cc7a85d097d19379ade82';
 const STAFF_BROWSER_AUTO_OPEN_SHA256 = '172d8f61bb86e74a8f60371dbd160157840b67d4fe614b0ca11f9fdb3fae4d80';
 function applySourceTransition(filename, expectedHash, baseCommit, diagnostic) {
   const raw = readTarget('apps/mini-app/tests/fixtures/' + filename);
@@ -759,6 +760,7 @@ applySourceTransition('teacher-test-schedule-overlay.json', TEACHER_TEST_SCHEDUL
 applySourceTransition('platform-performance-overlay.json', PLATFORM_PERFORMANCE_SHA256, '1f2eeeaaca8a718991f2151538cc0773e9122609', 'PLATFORM_PERFORMANCE');
 applySourceTransition('staff-browser-entry-overlay.json', STAFF_BROWSER_ENTRY_SHA256, 'ff76a3e641bba28f6cf773239ea1850b38d5c87a', 'STAFF_BROWSER_ENTRY');
 applySourceTransition('staff-browser-auto-open-overlay.json', STAFF_BROWSER_AUTO_OPEN_SHA256, 'e52c54b20139fe857c8a5ead4e2ad7e699683dad', 'STAFF_BROWSER_AUTO_OPEN');
+applySourceTransition('staff-direct-links-overlay.json', STAFF_DIRECT_LINKS_SHA256, 'b47dda25d54e902601c779de124dfd829099ab43', 'STAFF_DIRECT_LINKS');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

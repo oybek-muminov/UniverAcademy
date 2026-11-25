@@ -101,7 +101,8 @@ test('the actual Mini menu route launches staff without loading the sign-in stac
         assert.match(window.document.querySelector('[role="status"]').textContent,/brauzerda ochilmoqda/);
         link.click();
         assert.deepEqual(opened,[destination,destination]);
-        assert.equal(window.document.querySelector('a.cabinet-recheck').pathname,'/');
+        assert.equal(window.document.querySelector('a.cabinet-recheck'),null);
+        assert.equal(window.document.querySelectorAll('a').length,1);
       }
       assert.equal(requests.length,0);
     } finally { dom.window.close(); }
