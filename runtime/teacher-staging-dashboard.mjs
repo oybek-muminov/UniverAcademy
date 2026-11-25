@@ -35,19 +35,22 @@ export async function dashboard(tx,actor){
   const teacher=actor.role==='teacher',person=actor.personId;
   // A teacher's own request to delete the account lives in the audit trail; nothing is deleted automatically.
   if(teacher)base.deletionRequested=actor.deletionRequested===true;
-  const groups=teacher?await query(tx,`SELECT r.id,r.name,r.subject_id,g.status FROM ua_cabinet.group_requests r
+  const everyGroup=teacher?await query(tx,`SELECT r.id,r.name,r.subject_id,g.status FROM ua_cabinet.group_requests r
     JOIN ua_private.groups g ON g.id=r.active_group_id
     JOIN ua_private.staff_group_scope s ON s.group_id=g.id AND s.person_id=r.teacher_id AND s.revoked_at_ms IS NULL
     WHERE r.teacher_id=$1 AND r.subject_id=ANY($2::text[]) ORDER BY r.created_at,r.id`,[person,actor.approvedSubjectIds]):
     await query(tx,`SELECT r.id,r.name,r.subject_id,g.status FROM ua_private.memberships m JOIN ua_private.groups g ON g.id=m.affinity_group_id
     JOIN ua_cabinet.group_requests r ON r.active_group_id=g.id WHERE m.person_id=$1 AND m.active`,[person]);
+  // Archived groups leave the teacher's working lists; only their finished results stay readable.
+  const groups=teacher?everyGroup.filter(g=>g.status==='active'):everyGroup;
+  const archivedGroups=teacher?everyGroup.filter(g=>g.status!=='active').map(groupView):[];
   const tests=teacher?await query(tx,`SELECT v.id,d.title,v.status,d.subject_id "subjectId",(v.wire->>'duration_seconds')::int duration_seconds,
     (SELECT count(*)::int FROM ua_private.draft_questions q WHERE q.version_id=v.id) "questionCount"
     FROM ua_cabinet.test_owners o JOIN ua_private.test_versions v ON v.id=o.version_id JOIN ua_private.demos d ON d.id=v.demo_id
     WHERE o.teacher_id=$1 AND d.subject_id=ANY($2::text[]) ${await archivedFilter(tx,'v')} ORDER BY v.id`,[person,actor.approvedSubjectIds]):[];
   const subjects=teacher?actor.approvedSubjectIds.map(id=>({id,title:id})):[];
-  if(teacher&&!groups.length)return {...base,subjects,groups:[],tests,assignments:[],results:[]};
-  const ids=groups.map(g=>g.id);
+  if(teacher&&!everyGroup.length)return {...base,subjects,groups:[],archivedGroups:[],tests,assignments:[],results:[]};
+  const ids=everyGroup.map(g=>g.id);
   await expireVisible(tx,person,ids,teacher);
   const assignments=ids.length?await query(tx,`SELECT a.id,a.group_id "groupId",a.version_id "testId",d.title,
     a.record#>'{admission,opensAt}' AS "opensAt",a.record#>'{admission,closesAt}' AS "closesAt",a.record#>>'{reviewGate,timezone}' AS timezone,
@@ -65,12 +68,12 @@ export async function dashboard(tx,actor){
   if(!teacher)return {...base,univeracademy_id:actor.cabinetId,group:groups.length?groupView(groups[0]):null,serverNow:tx.now,
     assignments:assignments.map(({cancelled,...row})=>({...row,status:studentAssignmentStatus(row,tx.now,row.status,cancelled)})),results};
   const members=await query(tx,`SELECT m.affinity_group_id,${profileNameSql} AS name,p.univeracademy_id FROM ua_private.people_registration p
-    JOIN ua_private.memberships m ON m.person_id=p.id WHERE p.enabled AND m.active AND m.affinity_group_id=ANY($1::uuid[]) ORDER BY p.id`,[ids]);
+    JOIN ua_private.memberships m ON m.person_id=p.id WHERE p.enabled AND m.active AND m.affinity_group_id=ANY($1::uuid[]) ORDER BY p.id`,[groups.map(g=>g.id)]);
   const rosters=new Map();
   for(const {affinity_group_id,name,univeracademy_id} of members){
     if(!rosters.has(affinity_group_id))rosters.set(affinity_group_id,[]);
     rosters.get(affinity_group_id).push({name,univeracademy_id});
   }
-  return {...base,subjects,groups:groups.map(g=>({...groupView(g),members:rosters.get(g.id)??[]})),
+  return {...base,subjects,groups:groups.map(g=>({...groupView(g),members:rosters.get(g.id)??[]})),archivedGroups,
     tests,assignments:assignments.map(({attemptId,status,cancelled,...a})=>a),results};
 }

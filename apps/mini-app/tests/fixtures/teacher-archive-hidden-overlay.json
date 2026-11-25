@@ -1,0 +1,30 @@
+{
+  "format_version": 1,
+  "base_commit": "cd813f54e0aa75751f9afb867cd66ddf45f4736d",
+  "files": [
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "b4c265cda3776643ce188d4b77fa6991b116a462390a5cf11dcb9a5fa1f9d5f2",
+      "bytes": 36834,
+      "sha256": "eb5d4c00369bc1e7afce91250b45441dbf7fa347a386d9641549c86c7fbb5adb"
+    },
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": "7d81d49f57c4730bf381fa1fa51e16f2640b328c259e3048a9e9222eb7510d8c",
+      "bytes": 7255,
+      "sha256": "95c52eb583762a2cd64a63c02c98bdbab1c1d9232eb181fda65e921fbca3490c"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "5e7f2c8608e786d521a6c67deef259545be7ff6397b4abe2c3ea3f8f34c966c7",
+      "bytes": 25385,
+      "sha256": "a91048781c824533f8a88be1f13a6ceafb2a7c97a18bc303752c0c5ec94705b9"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "cadbe97c2dee3d36965db281ffd3ce206fc5b12f9176c8a325dda44955ee51a8",
+      "bytes": 38813,
+      "sha256": "e949dae9ddfc8f870999ea1b7af9f0a27321d9ab45968c4a017116b26602372a"
+    }
+  ]
+}

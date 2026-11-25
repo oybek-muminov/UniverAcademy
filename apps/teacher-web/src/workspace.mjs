@@ -296,8 +296,8 @@ export function mountTeacherWorkspace(root, {
     el('invite-section').hidden = !active;
     el('group-delete').hidden = !active || deletingGroup === group.id;
     el('group-delete-confirm').hidden = !active || deletingGroup !== group.id;
-    el('group-delete-text').textContent = dashboard.assignments.some(row => row.groupId === group.id)
-      ? 'Bu guruhga test berilgan. Guruh arxivga olinadi: natijalar saqlanadi, o‘quvchilar guruhdan chiqariladi. Davom etasizmi?'
+    el('group-delete-text').textContent = dashboard.results.some(row => row.groupId === group.id)
+      ? 'Bu guruhda test topshirilgan. Guruh ro‘yxatdan yo‘qoladi, lekin natijalar “Natijalar” bo‘limida saqlanadi. O‘quvchilar guruhdan chiqariladi. Davom etasizmi?'
       : 'Guruh butunlay o‘chiriladi, o‘quvchilar guruhdan chiqariladi. Davom etasizmi?';
     const rows = group.members.map(member => {
       const li = node('li', member.name);
@@ -460,10 +460,12 @@ export function mountTeacherWorkspace(root, {
     void command('requestAccountDeletion', {}, 'Hisobni o‘chirish so‘rovi yuborildi.', () => { deletionSent = true; });
   };
   function renderResults() {
-    selectRows('result-group', dashboard.groups, undefined, group => group.name);
+    // Archived groups are gone from the working lists but their finished results stay here.
+    const resultGroups = [...dashboard.groups, ...(dashboard.archivedGroups ?? [])];
+    selectRows('result-group', resultGroups, undefined, group => group.name + (group.status === 'archived' ? ' (arxiv)' : ''));
     const groupId = el('result-group').value;
     const results = dashboard.results.filter(result => result.groupId === groupId);
-    el('result-group').disabled = !dashboard.groups.length;
+    el('result-group').disabled = !resultGroups.length;
     el('results-empty').hidden = Boolean(results.length);
     el('results-empty').textContent = groupId ? 'Bu guruhda hali topshirilgan test yo‘q.' : 'Natijalarni ko‘rish uchun avval guruh yarating.';
     el('results-wrap').hidden = !results.length;

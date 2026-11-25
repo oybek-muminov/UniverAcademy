@@ -10,4 +10,6 @@
 
 Ruxsatlar faqat `ua_cabinet_stage` roliga va faqat o‘qituvchining o‘z qatorlari uchun beriladi (`ua_cabinet.acting_teacher()`).
 
-Ortga qaytarish: avval xizmat jarayonlarini to‘xtating, so‘ng `001_down.sql`. Arxivlangan testlar jadvali va natijalar saqlanadi.
+Ortga qaytarish: avval xizmat jarayonlarini to‘xtating, so‘ng `002_down.sql`, undan keyin `001_down.sql`. Arxivlangan testlar jadvali va natijalar saqlanadi.
+
+`002_up.sql`: hech kim boshlamagan topshiriqlari bor guruh ham butunlay o‘chadi (bitta urinish bo‘lsa ham arxivlanadi). Avval `001_up.sql` qo‘llangan bo‘lishi kerak.

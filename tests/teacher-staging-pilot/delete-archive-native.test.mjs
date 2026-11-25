@@ -20,6 +20,7 @@ test('teachers delete empty groups and unassigned tests, and archive the ones st
     await db.query('ALTER TABLE ua_cabinet.'+table+' OWNER TO ua_owner');
   await migration('draft-edit/001_up.sql');
   await migration('delete-archive/001_up.sql');
+  await migration('delete-archive/002_up.sql');
   const database=await createServiceLogin(cluster,'qa_delete_writer',[
     {role:'ua_api_login',inherit:true,set:false},{role:'ua_cabinet_stage',inherit:false,set:true}]);
   pool=new pg.Pool({connectionString:database,max:5});
@@ -68,6 +69,20 @@ test('teachers delete empty groups and unassigned tests, and archive the ones st
   assert.equal((await good(own.command('deleteTest',{testId:unused.id}))).outcome,'deleted');
   assert.equal(await count('SELECT count(*) n FROM ua_private.test_versions'),0);
 
+  // A test was given to the group but nobody started it: the group goes away with those unstarted assignments.
+  const idle=await good(own.command('createGroup',{name:'Boshlanmagan'}));
+  await good(own.command('addMember',{groupId:idle.id,univeracademy_id:vali.cabinetId}));
+  const waiting=await make();
+  await good(own.command('publishTest',{testId:waiting.id}));
+  const unstarted=await good(own.command('assignTest',{testId:waiting.id,groupId:idle.id}));
+  assert.equal(await count('SELECT count(*) n FROM ua_private.assignments WHERE group_id=$1',[idle.id]),1);
+  assert.equal((await good(own.command('deleteGroup',{groupId:idle.id}))).outcome,'deleted');
+  for(const sql of ['SELECT count(*) n FROM ua_private.groups WHERE id=$1','SELECT count(*) n FROM ua_private.assignments WHERE group_id=$1',
+    'SELECT count(*) n FROM ua_private.grants WHERE assignment_id=$1'])assert.equal(await count(sql,[sql.includes('grants')?unstarted.id:idle.id]),0);
+  assert.equal(await count('SELECT count(*) n FROM ua_private.test_versions WHERE id=$1',[waiting.id]),1);
+  assert.equal((await dashboard()).archivedGroups.length,0);
+  assert.equal((await good(own.command('deleteTest',{testId:waiting.id}))).outcome,'deleted');
+
   // --- a group and a test that students already used ---
   const used=await good(own.command('createGroup',{name:'Ishlagan'}));
   await good(own.command('addMember',{groupId:used.id,univeracademy_id:ali.cabinetId}));
@@ -98,7 +113,8 @@ test('teachers delete empty groups and unassigned tests, and archive the ones st
   assert.equal(archivedGroup.outcome,'archived');
   assert.equal(archivedGroup.status,'archived');
   view=await dashboard();
-  assert.deepEqual(view.groups.map(g=>g.status),['archived']);
+  assert.deepEqual(view.groups,[]); // no longer among the working groups
+  assert.deepEqual(view.archivedGroups.map(g=>g.status),['archived']);
   assert.equal(view.results.length,1);
   assert.equal(await count('SELECT count(*) n FROM ua_private.memberships WHERE affinity_group_id=$1',[used.id]),0);
   assert.equal(await count("SELECT count(*) n FROM ua_private.people WHERE id=ANY($1) AND profile->>'active_group_id' IS NULL",[[ali.id,vali.id]]),2);
@@ -127,6 +143,8 @@ test('teachers delete empty groups and unassigned tests, and archive the ones st
     // fresh still has Vali, and used has assignments
     assert.equal(await direct(teacher.id,'DELETE FROM ua_private.groups WHERE id=$1',[fresh.id]),0);
     assert.equal(await direct(teacher.id,'DELETE FROM ua_private.groups WHERE id=$1',[used.id]),0);
+    assert.equal(await direct(teacher.id,'DELETE FROM ua_private.grants WHERE assignment_id=$1',[assignment.id]),0); // someone started it
+    assert.equal(await direct(teacher.id,'DELETE FROM ua_private.assignments WHERE id=$1',[assignment.id]),0);
     assert.equal(await direct(teacher.id,'DELETE FROM ua_private.staff_group_scope WHERE group_id=$1',[used.id]),0);
   }finally{probe.release();}
 });

@@ -150,8 +150,8 @@ async function unenroll(tx,g,cabinetId){
   await query(tx,'UPDATE ua_private.groups SET revision=revision+1 WHERE id=$1',[g.id]);
   return groupView(g);
 }
-// Deleting a group: an empty group (no test was ever given to it) disappears completely. A group whose
-// students already took or were given a test is archived, so every result stays visible to the teacher.
+// Deleting a group: a group nobody has started a test in disappears completely. A group whose
+// students already started a test is archived, so every result stays visible to the teacher.
 // Either way the students are released first, and never while one of them is in the middle of a test.
 async function retireGroup(tx,g){
   await expireVisible(tx,null,[g.id],true);
@@ -174,8 +174,13 @@ async function retireGroup(tx,g){
     await query(tx,"UPDATE ua_private.people SET profile=jsonb_set(profile,'{active_group_id}','null'::jsonb) WHERE id=ANY($1::uuid[])",[ids]);
   }
   await query(tx,'DELETE FROM ua_cabinet.invites WHERE group_id=$1',[g.id]);
-  const used=(await query(tx,'SELECT count(*)::int n FROM ua_private.assignments WHERE group_id=$1',[g.id]))[0].n;
+  // Only a test that a student actually started keeps the group (archived). Assignments nobody started go with it.
+  const used=(await query(tx,`SELECT count(*)::int n FROM ua_private.attempts t JOIN ua_private.assignments a ON a.id=t.assignment_id
+    WHERE a.group_id=$1`,[g.id]))[0].n;
   if(!used){
+    await query(tx,`WITH media AS (DELETE FROM ua_cabinet.assignment_media WHERE assignment_id IN (SELECT id FROM ua_private.assignments WHERE group_id=$1) RETURNING 1),
+      grants AS (DELETE FROM ua_private.grants WHERE assignment_id IN (SELECT id FROM ua_private.assignments WHERE group_id=$1) RETURNING 1)
+      DELETE FROM ua_private.assignments WHERE group_id=$1`,[g.id]);
     // One statement: the foreign keys are checked once the request, scope and group are all gone.
     need(await query(tx,`WITH request AS (DELETE FROM ua_cabinet.group_requests WHERE id=$1 AND active_group_id=$1 RETURNING id),
       scope AS (DELETE FROM ua_private.staff_group_scope WHERE group_id=$1 RETURNING group_id)

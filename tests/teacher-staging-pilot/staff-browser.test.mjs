@@ -57,7 +57,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   ];
   const newGroup = {id:newId,name:'8-A',subjectId:'physics',status:'active',teacherName:'Ustoz',members:[]};
   const tests = [{id:testId,title:'Kuch',status:'published',subjectId:'physics',duration_seconds:60,questionCount:1}];
-  const assignments = [], calls = [], issuedTokens = new Set();
+  const archived = [], assignments = [], calls = [], issuedTokens = new Set();
   let deletionRequested = false;
   const user = {current:()=>identity,subscribe(fn){notify=fn;return ()=>{};},async signOut(){identity=null;notify();}};
   const dispose = mountAuthenticatedWorkspace(host,{
@@ -75,7 +75,7 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
       calls.push([path,options]);
       const admin = path.includes('/admin/');
       if (path.endsWith('/dashboard')) return located(success({role:admin?'admin':'teacher',person_id:person,name:'Ustoz',
-        groups:admin ? [newGroup] : groups,subjects:[{id:'physics',title:'Fizika'}],tests,results:[],assignments,deletionRequested}),url);
+        groups:admin ? [newGroup] : groups,archivedGroups:archived,subjects:[{id:'physics',title:'Fizika'}],tests,results:assignments.map(()=>({attemptId:'a',assignmentId:'b',groupId:newId,title:'Kuch',studentName:'Ali',earned:'1.0',maximum:'1.0',percentage:'100.00'})),assignments,deletionRequested}),url);
       if (path.endsWith('/available-students')) {
         assert(!admin);
         assert.equal(options.method, 'GET');
@@ -120,7 +120,8 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
           return located(success({id:person,requested:true}),url);
         case 'deleteGroup':
           assert.deepEqual(data,{groupId:newId});
-          newGroup.status='archived';
+          groups.splice(groups.indexOf(newGroup),1);
+          archived.push({id:newId,name:newGroup.name,status:'archived',subjectId:'physics'});
           return located(success({id:newId,status:'archived',outcome:'archived'}),url);
         case 'deleteTest':
           assert.deepEqual(data,{testId});
@@ -260,14 +261,17 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   host.querySelector('.bottom-nav a[href="#guruhlar"]').click();
   assert(!el('group-delete').hidden && el('group-delete-confirm').hidden);
   el('group-delete').click();
-  assert(!el('group-delete-confirm').hidden && /arxivga olinadi/.test(el('group-delete-text').textContent));
+  assert(!el('group-delete-confirm').hidden && /saqlanadi/.test(el('group-delete-text').textContent));
   el('group-delete-no').click();
   assert(el('group-delete-confirm').hidden && !calls.some(([path]) => path.endsWith('/deleteGroup')));
   el('group-delete').click();
   el('group-delete-yes').click();
   await until(() => settled() && el('notice').textContent === 'Guruh arxivga olindi, natijalar saqlandi.');
-  assert.equal(el('group-status').textContent,'Arxivlangan guruh');
-  assert(el('group-delete').hidden && el('group-delete-confirm').hidden);
+  // The archived group leaves the working list and the home count, but stays in the results list.
+  assert(![...el('member-group').options].some(option => option.value === newId));
+  assert.equal(el('home-stats').children[0].querySelector('strong').textContent,String(groups.length));
+  host.querySelector('.bottom-nav a[href="#natijalar"]').click();
+  assert([...el('result-group').options].some(option => option.value === newId && option.textContent.endsWith('(arxiv)')));
   // The profile page shows who the teacher is and asks twice before a deletion request is sent.
   host.querySelector('.bottom-nav a[href="#profil"]').click();
   assert(!el('profil').hidden && el('testlar').hidden);
