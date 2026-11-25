@@ -207,6 +207,7 @@ export function mountTeacherWorkspace(root, {
     selectRows('member-group', next.groups, selection.group, group => group.name);
     renderGroup();
     displayTab(selection.tab ?? activeTab, selection.test, selection.group);
+    renderHome();
     if (currentPage === 'natijalar') renderResults();
   }
   function refresh() {
@@ -368,6 +369,30 @@ export function mountTeacherWorkspace(root, {
     let message = names.length ? 'Tayinlangan guruhlar: ' + names.join(', ') : '';
     if (!groups.length) message = 'Testni tayinlash uchun shu fandan faol guruh yarating.';
     el('assignment-info').textContent = message;
+  }
+  function renderHome() {
+    const groups = dashboard.groups ?? [], tests = dashboard.tests ?? [], results = dashboard.results ?? [];
+    const students = new Set(groups.flatMap(group => (group.members ?? []).map(member => member.univeracademy_id))).size;
+    const drafts = tests.filter(test => test.status === 'draft').length;
+    const published = tests.filter(test => test.status === 'published').length;
+    el('home-greeting').textContent = dashboard.name ? 'Salom, ' + dashboard.name : 'Bosh sahifa';
+    el('home-hint').textContent = !groups.length ? 'Boshlash uchun avval guruh yarating.'
+      : !published ? 'Guruh tayyor. Endi test yozing yoki yuklang va nashr qiling.'
+      : 'Hammasi joyida. Yangi natijalar shu yerda ko‘rinadi.';
+    el('home-stats').replaceChildren(...[[groups.length, 'Guruhlar'], [students, 'O‘quvchilar'], [drafts, 'Qoralama testlar'],
+      [published, 'Nashr qilingan testlar'], [results.length, 'Topshirilgan testlar']].map(([value, label]) => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.append(node('strong', String(value)), node('span', label));
+      return card;
+    }));
+    const latest = results.slice(0, 5);
+    el('home-results-empty').hidden = Boolean(latest.length);
+    el('home-results').replaceChildren(...latest.map(result => {
+      const li = node('li', result.studentName + ' · ' + result.title);
+      li.append(node('span', result.earned + ' / ' + result.maximum + ' (' + result.percentage + '%)'));
+      return li;
+    }));
   }
   function renderResults() {
     selectRows('result-group', dashboard.groups, undefined, group => group.name);
@@ -544,10 +569,12 @@ export function mountTeacherWorkspace(root, {
   el('refresh-groups').onclick = () => { picker.refresh(); void refresh(); };
   el('refresh-results').onclick = refresh;
 
-  let currentPage = 'guruhlar';
+  let currentPage = 'bosh';
   function showPage(page) {
+    const changed = page !== currentPage && ['bosh', 'guruhlar', 'testlar', 'natijalar'].includes(page);
     if (page !== currentPage) { savedSelection++; modal.dismiss(false); }
-    if (['guruhlar', 'testlar', 'natijalar'].includes(page)) currentPage = page;
+    if (['bosh', 'guruhlar', 'testlar', 'natijalar'].includes(page)) currentPage = page;
+    if (changed) root.ownerDocument.documentElement.scrollTop = 0;
     if (currentPage === 'testlar' && !editor) editor = createEditor();
     if (dashboard) {
       renderGroup();
@@ -562,7 +589,7 @@ export function mountTeacherWorkspace(root, {
   const navigate = () => { showPage(location.hash.slice(1)); notice(); refresh(); };
   const focus = () => { if (dashboard && !disposed) refresh(); };
   if (hashNavigation) window.addEventListener('hashchange', navigate);
-  else for (const link of root.querySelectorAll('nav a')) link.onclick = event => {
+  else for (const link of root.querySelectorAll('nav a, a.page-link')) link.onclick = event => {
     event.preventDefault(); showPage(link.hash.slice(1)); notice(); refresh();
   };
   window.addEventListener('focus', focus);

@@ -127,6 +127,15 @@ test('the teacher can use a new group immediately and the staff browser keeps ea
   await until(()=>el('identity-name')?.textContent==='Ustoz');
   assert.equal(el('test-subject').value,'physics');
   assert(!host.textContent.includes('Mahalliy'));
+  // The cabinet opens on the home page; both the side menu and the phone bottom bar carry the same four sections.
+  assert(!el('bosh').hidden && el('guruhlar').hidden);
+  assert(el('home-stats').children.length === 5);
+  for (const bar of ['side-nav','bottom-nav']) {
+    assert.deepEqual([...host.querySelectorAll('.'+bar+' a')].map(a => a.hash), ['#bosh','#guruhlar','#testlar','#natijalar']);
+  }
+  host.querySelector('.bottom-nav a[href="#guruhlar"]').click();
+  assert(el('bosh').hidden && !el('guruhlar').hidden);
+  assert.equal(host.querySelectorAll('nav a[aria-current="page"]').length, 2);
   const submit = (id, submitter) => el(id).dispatchEvent(new window.SubmitEvent('submit',{cancelable:true,submitter}));
   const settled = () => !el('main')?.hasAttribute('aria-busy');
   await until(() => oldListSignal && el('available-status').textContent.includes('yuklanmoqda'));

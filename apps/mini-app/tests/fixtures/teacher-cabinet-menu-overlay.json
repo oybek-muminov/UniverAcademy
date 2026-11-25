@@ -1,0 +1,60 @@
+{
+  "format_version": 1,
+  "base_commit": "d693ee1dc8609360fab47b09e142cf9977d8ccdd",
+  "files": [
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-views.mjs",
+      "previous_sha256": "889916d3394702eef8e30ab4b6d5e93dae65ed0fb99882448c7986001aef8fec",
+      "bytes": 5110,
+      "sha256": "0e0267055a526e0d5d1e75d1514f674a404df0624a2f50226f83ca866de79b40"
+    },
+    {
+      "path": "apps/mini-app/teacher-entrance/staff-workspace.mjs",
+      "previous_sha256": "ce96f819c63970c9bc7e78149be4f24386ff1669c74dc2c2c696bbf1bd248f17",
+      "bytes": 6511,
+      "sha256": "35dd477cb8ad274e96ab8c0ae20c791c97ffeee4f6bf3fb9c7caf585d8e76371"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/draft-autosave.mjs",
+      "previous_sha256": null,
+      "bytes": 5431,
+      "sha256": "4087f590201459ac1fcdeb51fd998856c35e532af6f5d04bd0739456b310cb91"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/rich-editor.mjs",
+      "previous_sha256": "8d6e7585e5fbf517d0b1000f6e1f3f991c18286ecfb43be4a3092ca1aa478883",
+      "bytes": 22903,
+      "sha256": "abbf512bdc1c872db41a50f29e9f7ae38019fba7f76367978aa8bc93b5447f07"
+    },
+    {
+      "path": "apps/teacher-web/local-pilot/styles.css",
+      "previous_sha256": "b855cd1502d01d1729f8f48cd761124e2c3614bb1db07a1d5703f0ff0fe17c49",
+      "bytes": 12282,
+      "sha256": "7937413726aa4d2b754732952516d5cffeeae1f1b53ee2b4c18a84b14c29a2ae"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.html",
+      "previous_sha256": "890d55fb53c21ce07a7ce686b43f539fb8eb9e417cb09edb9c76e43880dcd434",
+      "bytes": 11962,
+      "sha256": "53e7a075d5988d721c939c9b0cf33dcc50cb85c8a60f2e46ecf3f9688bee1f52"
+    },
+    {
+      "path": "apps/teacher-web/src/workspace.mjs",
+      "previous_sha256": "8420bfddcba8b12641d7603265e7c75efb0e1f41f619898ac779673344be0092",
+      "bytes": 30587,
+      "sha256": "acd3ff3765a39f1c5ef3a63002a1c43a27c5537014a660fc75b63d1339645c44"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/staff-browser.test.mjs",
+      "previous_sha256": "9457e98d516cc0a9c929f9b7c7884b5ab14da9d3b458947d57b5b20264155413",
+      "bytes": 30469,
+      "sha256": "e0777d19850e43d4912ce2e666e48a5581b5604bc3c9956a4093214d8e6a31ed"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/teacher-autosave.test.mjs",
+      "previous_sha256": null,
+      "bytes": 12082,
+      "sha256": "e8e4ca7d1d3ba6025cdcc3d670e80e1c67729a2dc0543adbab4a565284d2fcf0"
+    }
+  ]
+}

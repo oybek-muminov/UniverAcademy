@@ -1,20 +1,40 @@
   <a class="skip" href="#main">Asosiy bo‘limga o‘tish</a>
-  <header class="masthead">
-    <div class="wrap header-row">
-      <div class="identity"><span class="brand">UniverAcademy</span><span class="product">O‘qituvchi kabineti</span></div>
-      <div class="identity account"><span id="identity-name"></span><span id="workspace-actions"></span></div>
-    </div>
-  </header>
-  <div class="wrap layout">
-    <nav aria-label="Kabinet bo‘limlari">
-      <a href="#guruhlar" aria-current="page">Guruhlar</a>
-      <a href="#testlar">Testlar</a>
-      <a href="#natijalar">Natijalar</a>
-    </nav>
-    <div role="main" id="main" tabindex="-1">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="side-brand"><span class="brand">UniverAcademy</span><span class="product">O‘qituvchi kabineti</span></div>
+      <nav class="side-nav" aria-label="Kabinet bo‘limlari">
+      <a href="#bosh" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg><span>Bosh sahifa</span></a>
+      <a href="#guruhlar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3.4 2.7-5.8 6-5.8s6 2.4 6 5.8"/><circle cx="17.2" cy="9.5" r="2.4"/><path d="M17.5 14.2c2.2.2 3.8 2 3.8 4.3"/></svg><span>Guruhlar</span></a>
+      <a href="#testlar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3.5 3.5v13.5H6z"/><path d="M14.5 3.5V7.5h4"/><path d="M9 12h6M9 15.5h6"/></svg><span>Testlar</span></a>
+      <a href="#natijalar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Natijalar</span></a>
+      </nav>
+      <div class="side-account"><span id="identity-name"></span><span id="workspace-actions"></span></div>
+    </aside>
+    <div class="content">
+      <div role="main" id="main" tabindex="-1">
       <div id="notice" role="status" aria-live="polite"></div>
       <div id="problem" role="alert"></div>
-      <section id="guruhlar" class="page">
+      <section id="bosh" class="page">
+        <div class="home-hero">
+          <p class="eyebrow">Xush kelibsiz</p>
+          <h1 id="home-greeting">Bosh sahifa</h1>
+          <p id="home-hint" class="hint">Kabinetingiz holati shu yerda ko‘rinadi.</p>
+        </div>
+        <div class="stat-grid" id="home-stats"></div>
+        <h2 class="section-title">Tezkor amallar</h2>
+        <div class="quick-grid">
+          <a class="quick page-link" href="#guruhlar"><strong>Guruh yaratish</strong><span>Yangi guruh oching va o‘quvchilarni ID raqami bilan qo‘shing</span></a>
+          <a class="quick page-link" href="#testlar"><strong>Test yozish yoki yuklash</strong><span>Savollarni o‘zingiz yozing yoki fayldan yuklang</span></a>
+          <a class="quick page-link" href="#testlar"><strong>Nashr qilish va guruhga berish</strong><span>Tayyor testni guruhga tayinlang</span></a>
+          <a class="quick page-link" href="#natijalar"><strong>Natijalarni ko‘rish</strong><span>Har bir o‘quvchining balli va foizi</span></a>
+        </div>
+        <div class="card">
+          <h2>So‘nggi natijalar</h2>
+          <p id="home-results-empty" class="empty">Hali topshirilgan test yo‘q.</p>
+          <ul class="list" id="home-results"></ul>
+        </div>
+      </section>
+      <section id="guruhlar" class="page" hidden>
         <div class="page-heading"><h1>Guruhlar</h1><button type="button" id="refresh-groups">Yangilash</button></div>
         <div class="card">
           <h2>Guruh yaratish</h2>
@@ -126,7 +146,14 @@
         </div>
       </section>
       <noscript>Kabinetdan foydalanish uchun brauzerda JavaScript yoqilgan bo‘lishi kerak.</noscript>
+      </div>
     </div>
+    <nav class="bottom-nav" aria-label="Tezkor menyu">
+      <a href="#bosh" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg><span>Bosh sahifa</span></a>
+      <a href="#guruhlar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3.4 2.7-5.8 6-5.8s6 2.4 6 5.8"/><circle cx="17.2" cy="9.5" r="2.4"/><path d="M17.5 14.2c2.2.2 3.8 2 3.8 4.3"/></svg><span>Guruhlar</span></a>
+      <a href="#testlar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3.5 3.5v13.5H6z"/><path d="M14.5 3.5V7.5h4"/><path d="M9 12h6M9 15.5h6"/></svg><span>Testlar</span></a>
+      <a href="#natijalar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Natijalar</span></a>
+    </nav>
   </div>
   <dialog id="student-dialog" aria-modal="true" aria-labelledby="preview-heading">
     <div class="preview-window">
