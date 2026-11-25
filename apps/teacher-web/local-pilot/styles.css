@@ -124,3 +124,11 @@ body:has(#student-dialog[open]) { overflow: hidden; }
   .block-row { grid-template-columns: minmax(0,1fr); }
   .block-row button { justify-self: start; }
 }
+
+.session-note { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 14px; margin: 0 0 12px;
+  background: #fff7e0; color: #5a4300; border-left: 4px solid #d6a516; border-radius: 5px; font-size: 14px; }
+#autosave-status { margin: 12px 0 0; font-size: 13px; color: #53695c; min-height: 1.3em; }
+#restore-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; margin: 0 0 16px;
+  background: #fff7e0; color: #5a4300; border-left: 4px solid #d6a516; border-radius: 5px; }
+#restore-banner[hidden] { display: none; }
+#restore-banner p { flex: 1 1 100%; margin: 0; }

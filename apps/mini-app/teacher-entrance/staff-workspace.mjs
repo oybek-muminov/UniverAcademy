@@ -24,14 +24,41 @@ export function mountAuthenticatedWorkspace(host, options) {
   const {role} = destination;
   const expected = options.identity.current();
   let boundPerson = null, controller, cleanup, disposed = false;
+  // `check` exists only while a verified cabinet is on screen; it re-reads the server's permission without touching the screen.
+  let check = null, checking = false, note = null, slowTimer;
   function sameIdentity() {
     const now = options.identity.current();
     return expected && now && now.userId === expected.userId && now.generation === expected.generation;
   }
   function clear() {
     controller?.abort(); controller = null;
+    check = null; checking = false; note = null; win.clearTimeout(slowTimer);
     cleanup?.(); cleanup = null;
     host.replaceChildren();
+  }
+  function notify(text, action) {
+    if (!text) { note?.remove(); note = null; return; }
+    if (!note) { note = doc.createElement('div'); note.className = 'session-note'; note.setAttribute('role', 'status'); }
+    const message = doc.createElement('span'); message.textContent = text;
+    note.replaceChildren(message, ...(action ? [action] : []));
+    host.prepend(note);
+  }
+  // Returning to the tab: keep the page and any unsent typing, check permission quietly in the background.
+  async function recheck() {
+    const run = check, own = controller;
+    if (!run || checking || disposed || !sameIdentity()) return;
+    checking = true;
+    win.clearTimeout(slowTimer);
+    slowTimer = win.setTimeout(() => { if (check === run) notify('Ruxsat tekshirilmoqda…'); }, 400);
+    try {
+      await run();
+      if (check === run && !own.signal.aborted) notify('');
+    } catch {
+      // A real denial already replaced the page through `denied`. Anything else is only a failed look-up.
+      if (check === run && !own.signal.aborted) notify('Ruxsatni tekshirib bo‘lmadi. Yozganlaringiz saqlangan.', button(doc, 'Qayta tekshirish', () => void recheck()));
+    } finally {
+      if (check === run) { win.clearTimeout(slowTimer); checking = false; }
+    }
   }
   function panel(text, actions = []) {
     const section = doc.createElement('section'); section.className = 'status-card';
@@ -68,9 +95,11 @@ export function mountAuthenticatedWorkspace(host, options) {
       boundPerson = data.person_id;
       return data;
     }
+    const verify = async () => { await dashboard(); };
     try {
       const [data, views] = await Promise.all([dashboard(), role === 'owner' ? null : import('./staff-views.mjs')]);
       if (signal.aborted || !sameIdentity()) return;
+      check = verify;
       if (role === 'owner') {
         const section = doc.createElement('section');
         section.className = 'status-card';
@@ -87,26 +116,21 @@ export function mountAuthenticatedWorkspace(host, options) {
     }
   }
   const unsubscribe = options.identity.subscribe(() => { clear(); if (sameIdentity()) void open(); });
-  let visibleRestore;
-  const suspend = () => { visibleRestore = null; clear(); };
+  // Leaving the tab never clears the cabinet: unsent typing must survive switching windows.
   const resume = () => {
-    if (doc.visibilityState === 'hidden') suspend();
-    else if (!controller) { void open(); visibleRestore = controller; }
+    if (doc.visibilityState === 'hidden') return;
+    if (!controller) void open(); else void recheck();
   };
   const pageshow = event => {
-    if (!event.persisted) return;
-    if (doc.visibilityState === 'hidden') { suspend(); return; }
-    // A standalone BFCache restore always revalidates. A paired visibility
-    // event may already have started this exact authorization check.
-    if (!controller || visibleRestore !== controller) void open();
-    visibleRestore = null;
+    if (!event.persisted || doc.visibilityState === 'hidden') return;
+    if (!controller) void open(); else void recheck();
   };
-  win.addEventListener('pagehide', suspend); win.addEventListener('pageshow', pageshow);
+  win.addEventListener('pageshow', pageshow);
   doc.addEventListener('visibilitychange', resume);
   void open();
   return () => {
     disposed = true; clear(); unsubscribe();
-    win.removeEventListener('pagehide', suspend); win.removeEventListener('pageshow', pageshow);
+    win.removeEventListener('pageshow', pageshow);
     doc.removeEventListener('visibilitychange', resume);
   };
 }

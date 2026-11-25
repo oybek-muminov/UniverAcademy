@@ -4,6 +4,7 @@ import sampleJson from '../../teacher-web/local-pilot/sample.json?url&no-inline'
 import { groupStatusLabel, mountTeacherWorkspace } from '../../teacher-web/src/workspace.mjs';
 import { mountTeacherEditor, showStudentView } from '../../teacher-web/local-pilot/rich-editor.mjs';
 import { mountVisualFormula } from '../../teacher-web/local-pilot/visual-formula.mjs';
+import { browserStorage, createDraftStore } from '../../teacher-web/local-pilot/draft-autosave.mjs';
 import { renderBlocks } from '../src/rich-blocks.mjs';
 import { uuid } from './staff-transport.mjs';
 import '../src/rich-blocks.css';
@@ -25,8 +26,16 @@ export function teacherView(host, port, first, lifecycle) {
   const fragment = doc.createElement('template');
   fragment.innerHTML = template;
   host.replaceChildren(fragment.content.cloneNode(true));
+  // Browser safety copies of unsent tests. They belong to this verified teacher only.
+  const drafts = createDraftStore({storage: browserStorage(doc.defaultView), owner: first.person_id});
+  function leave() {
+    drafts.flushAll();
+    // On a shared computer the next person must not find these tests.
+    if (drafts.hasAny() && doc.defaultView.confirm('Brauzerda serverga yuborilmagan test nusxalari bor.\n\nOK — ularni o‘chirib chiqish (umumiy kompyuter uchun).\nBekor qilish — saqlab chiqish.')) drafts.wipe();
+    return lifecycle.signout();
+  }
   const actionBar = host.querySelector('#workspace-actions');
-  actionBar.append(alternateCabinet(doc, 'teacher'), button(doc, 'Chiqish', lifecycle.signout));
+  actionBar.append(alternateCabinet(doc, 'teacher'), button(doc, 'Chiqish', leave));
   for (const [ext, url] of [['txt',sampleText], ['json',sampleJson]]) host.querySelector('a[href="./sample.' + ext + '"]').href = url;
   host.querySelector('.skip').onclick = event => {event.preventDefault(); host.querySelector('#main').focus();};
   const loading = new Map();
@@ -48,7 +57,7 @@ export function teacherView(host, port, first, lifecycle) {
       return lifecycle.dashboard();
     },
     readAvailableStudents:port.availableStudents, request:port.request, upload:port.upload, renderBlocks:privateBlocks, mountTeacherEditor, showStudentView, mountVisualFormula,
-    sentMessage:'Taklif Telegram orqali yetkazish navbatiga qo‘yildi.', inviteLink:checkedInvite,
+    sentMessage:'Taklif Telegram orqali yetkazish navbatiga qo‘yildi.', inviteLink:checkedInvite, drafts,
   });
   return unmount;
 }

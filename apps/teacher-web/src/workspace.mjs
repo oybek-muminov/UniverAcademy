@@ -155,7 +155,7 @@ function scheduledStart(value) {
 // Sessions, authorization, media transport and invitation destinations belong to each host.
 export function mountTeacherWorkspace(root, {
   readDashboard, readAvailableStudents, request, upload, renderBlocks, mountTeacherEditor, showStudentView,
-  mountVisualFormula, inviteLink, sentMessage, hashNavigation = false,
+  mountVisualFormula, inviteLink, sentMessage, hashNavigation = false, drafts = null,
 }) {
   const controls = new Map([...root.querySelectorAll('[id]')].map(item => [item.id, item]));
   const el = id => controls.get(id);
@@ -576,7 +576,7 @@ export function mountTeacherWorkspace(root, {
 
   function createEditor() {
     return mountTeacherEditor(el('question-editor'), {
-      renderBlocks, mountVisualFormula, uploadImage: upload, notify: notice, previewStudent: modal.open,
+      renderBlocks, mountVisualFormula, uploadImage: upload, notify: notice, previewStudent: modal.open, drafts,
       onNewTest() { displayTab('new'); },
       async readDraft(testId) {
         const result = await request('commands/readDraft', {testId}, crypto.randomUUID());

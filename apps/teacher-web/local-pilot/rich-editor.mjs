@@ -1,4 +1,5 @@
 import { hoursFromSeconds, secondsFromHours } from '../../../packages/test-content/duration.mjs';
+import { meaningful } from './draft-autosave.mjs';
 
 function node(tag, text) {
   const item = document.createElement(tag);
@@ -115,12 +116,18 @@ function makeLayout(root) {
   const fields = item('fieldset', 'editor-controls');
   fields.setAttribute('aria-label', 'Test mazmuni');
   fields.append(meta, nav, hint, item('div', 'question-fields'));
-  form.append(fields, buttons);
+  const restore = item('div', 'restore-banner');
+  restore.hidden = true;
+  restore.setAttribute('role', 'alert');
+  const status = item('p', 'autosave-status');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  form.append(restore, fields, status, buttons);
   root.replaceChildren(form);
 }
 
 // The host supplies the official block renderer, scoped media upload and a QuestionWrite draft saver.
-export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uploadImage, readDraft, saveDraft, onTargetChange, onNewTest, previewStudent, notify: notice}) {
+export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uploadImage, readDraft, saveDraft, onTargetChange, onNewTest, previewStudent, notify: notice, drafts = null, autosaveMs = 1000}) {
   makeLayout(root);
   const el = id => root.querySelector('#' + id);
   let questions = [newQuestion()];
@@ -130,9 +137,49 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   let target = null;
   let metadata = {}, originalSeconds = 1800;
 
+  // Browser safety copy. One slot per saved draft id, plus 'new' for a test not yet on the server.
+  const doc = root.ownerDocument, win = doc.defaultView;
+  const store = drafts?.available ? drafts : null;
+  let slot = 'new', timer = null, waitingForChoice = false;
+  const clock = () => { const now = new Date(); return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'); };
+  function say(text) { if (!disposed) el('autosave-status').textContent = text; }
+  const snapshot = () => ({
+    title: el('editor-title').value, durationText: el('editor-duration').value, originalSeconds,
+    metadata: structuredClone(metadata), targetRevision: target?.revision ?? null, questions: structuredClone(questions),
+  });
+  function flush() {
+    if (timer !== null) { win.clearTimeout(timer); timer = null; }
+    if (!store || !dirty || waitingForChoice) return;
+    say(store.write(slot, snapshot()) ? 'Brauzerda saqlandi, soat ' + clock() + '.' :
+      'Brauzer xotirasiga saqlab bo‘lmadi. Qoralamani serverga saqlang.');
+  }
+  function schedule() {
+    if (!store) return;
+    if (waitingForChoice) { say('Avval topilgan saqlangan nusxa haqida qaror qiling.'); return; }
+    if (timer === null) { say('Saqlanmoqda…'); timer = win.setTimeout(flush, autosaveMs); }
+  }
+  function discardCopy() {
+    if (timer !== null) { win.clearTimeout(timer); timer = null; }
+    store?.remove(slot);
+  }
+  if (!store) say('Brauzer xotirasi yopiq: yozganlaringiz o‘zi saqlanmaydi. Qoralamani tez-tez serverga saqlang.');
+  const unregister = store?.onFlush(flush);
+  const hiddenFlush = () => { if (doc.visibilityState === 'hidden') flush(); };
+  const otherWindow = event => {
+    if (store && event.key === store.key(slot) && event.newValue !== null) {
+      say('Bu test boshqa oynada ham tahrirlanmoqda. Faqat bitta oynada ishlang, aks holda o‘zgarishlar bir-birini ezadi.');
+    }
+  };
+  if (store) {
+    doc.addEventListener('visibilitychange', hiddenFlush);
+    win.addEventListener('pagehide', flush);
+    win.addEventListener('storage', otherWindow);
+  }
+
   function changed() {
     dirty = true;
     el('save-editor').disabled = busy;
+    schedule();
   }
   function blockGroup(question, blocks, legend, option) {
     const group = document.createElement('fieldset');
@@ -314,6 +361,7 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   }
   function replaceContent(preview, reference, index = 0) {
     metadata = {};
+    el('restore-banner').hidden = true; el('restore-banner').replaceChildren(); waitingForChoice = false;
     if (preview.instructions_blocks) metadata.instructions_blocks = structuredClone(preview.instructions_blocks);
     if (preview.grading_config) metadata.grading_config = structuredClone(preview.grading_config);
     el('editor-title').value = preview.title;
@@ -330,10 +378,45 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     current = Math.min(index, questions.length - 1);
     target = reference;
     dirty = false;
+    slot = reference?.id ?? 'new';
     drawEditor(); syncControls();
   }
   function canReplace() {
-    return !busy && (!dirty || window.confirm('Muharrirdagi saqlanmagan o‘zgarishlarni bekor qilasizmi?'));
+    if (busy) return false;
+    if (!dirty) return true;
+    if (!window.confirm('Muharrirdagi saqlanmagan o‘zgarishlarni bekor qilasizmi?')) return false;
+    discardCopy();
+    return true;
+  }
+  // A copy left by an earlier visit (closed tab, switched window, power cut) is offered back, never applied silently.
+  function offerCopy() {
+    const banner = el('restore-banner');
+    banner.hidden = true; banner.replaceChildren(); waitingForChoice = false;
+    const saved = store?.read(slot);
+    if (!saved || !meaningful(saved) || dirty) return;
+    waitingForChoice = true;
+    const stale = target && saved.targetRevision !== target.revision;
+    const when = new Date(saved.savedAt);
+    const text = node('p', 'Brauzerda saqlangan, serverga yuborilmagan nusxa topildi (' +
+      String(when.getDate()).padStart(2, '0') + '.' + String(when.getMonth() + 1).padStart(2, '0') + ' ' +
+      String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0') + '). Davom ettirasizmi?' +
+      (stale ? ' Diqqat: bu qoralama serverda keyin o‘zgargan, saqlashda to‘qnashuv chiqishi mumkin.' : ''));
+    const done = () => { waitingForChoice = false; banner.hidden = true; banner.replaceChildren(); };
+    banner.append(text,
+      button('Davom ettirish', () => { done(); applyCopy(saved); }),
+      button('O‘chirib tashlash', () => { store.remove(slot); done(); say(''); }));
+    banner.hidden = false;
+  }
+  function applyCopy(saved) {
+    metadata = saved.metadata;
+    originalSeconds = saved.originalSeconds;
+    el('editor-title').value = saved.title;
+    el('editor-duration').value = saved.durationText;
+    questions = saved.questions;
+    current = 0;
+    dirty = true;
+    drawEditor(); syncControls();
+    changed(); notice('Saqlangan nusxa tiklandi.');
   }
   async function loadCanonical(id, stillSelected, index) {
     const result = await readDraft(id);
@@ -347,7 +430,7 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     let opened = false;
     try {
       opened = await loadCanonical(id, stillSelected, 0);
-      if (opened) notice('Qoralama tahrirlash uchun ochildi.');
+      if (opened) { notice('Qoralama tahrirlash uchun ochildi.'); offerCopy(); }
     } catch (error) { if (!disposed && stillSelected()) notice('', error.message); }
     finally { if (!disposed) { busy = false; syncControls(); } }
     if (opened && !disposed) el('editor-title').focus();
@@ -367,6 +450,8 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
         // test immediately so even a failed follow-up read cannot create a duplicate.
         target = {id:receipt.id, revision: creating ? null : receipt.revision};
         dirty = false;
+        // The server now holds this version, so the browser copy of it is no longer needed.
+        discardCopy(); slot = receipt.id; say('Serverga saqlandi.');
       }
       if (target.revision === null && await loadCanonical(target.id, () => true, current)) notice('Test qoralamasi saqlandi.');
     } catch (error) {
@@ -378,6 +463,7 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
   }
   function newTest() {
     if (!canReplace()) return false;
+    discardCopy();
     reset(); onNewTest(); el('editor-title').focus(); notice();
     return true;
   }
@@ -388,10 +474,18 @@ export function mountTeacherEditor(root, {renderBlocks, mountVisualFormula, uplo
     changed(); el('editor-title').focus(); notice('Fayldagi savollar muharrirga olindi.');
   }
   drawEditor();
+  offerCopy();
   return {
     openFile, openSaved, newTest,
     readyToPublish(id) { return !busy && (target?.id !== id || !dirty); },
-    published(id) { if (target?.id === id) reset(); },
-    dispose() { disposed = true; },
+    published(id) { if (target?.id === id) { discardCopy(); reset(); } },
+    dispose() {
+      flush();
+      disposed = true;
+      unregister?.();
+      doc.removeEventListener('visibilitychange', hiddenFlush);
+      win.removeEventListener('pagehide', flush);
+      win.removeEventListener('storage', otherWindow);
+    },
   };
 }

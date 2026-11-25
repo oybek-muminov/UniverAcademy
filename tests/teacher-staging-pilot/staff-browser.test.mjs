@@ -342,7 +342,7 @@ test('private media uses the same bearer gate and accepts PNG only',async t=>{
   assert.equal((await port.image(imageId)).type,'image/png');assert.equal(calls,2);
 });
 
-test('focus and navigation share one pending dashboard, and returning to a hidden cabinet rechecks permission once', async t => {
+test('focus and navigation share one pending dashboard, and returning to a hidden cabinet keeps the page and rechecks permission once in the background', async t => {
   const dom = new JSDOM('<div id="host"></div>',{url:origin+'/',pretendToBeVisual:true});
   context(dom,t);
   const mount = await workspace(t), host = document.getElementById('host');
@@ -376,10 +376,11 @@ test('focus and navigation share one pending dashboard, and returning to a hidde
   // A pending response from before suspension must never repaint the new session.
   Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});
   document.dispatchEvent(new window.Event('visibilitychange'));
-  assert.equal(host.textContent,'');
+  assert.equal(host.querySelector('#identity-name').textContent,'Yangilangan'); // leaving the tab never blanks the page
   Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});
   document.dispatchEvent(new window.Event('visibilitychange'));
   await until(()=>reads.length === 4);
+  assert(host.querySelector('#identity-name')); // still on screen while the check runs
   window.dispatchEvent(new window.PageTransitionEvent('pageshow',{persisted:true}));
   await pause(5);
   assert.equal(reads.length,4);
