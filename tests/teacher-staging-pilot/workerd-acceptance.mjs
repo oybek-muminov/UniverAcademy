@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createCluster, createServiceLogin } from './cluster.mjs';
-import { issuer, party, provisionStaff, provisionStudent, testClerk } from './credentials.mjs';
+import { issuer, party, ownerParty, provisionStaff, provisionStudent, testClerk } from './credentials.mjs';
 import { apiOrigin, good, graphSvg, rejected, richDocument, routes, studentOrigin } from './requests.mjs';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
@@ -34,6 +34,7 @@ try {
   });
   const botCode=await readFile(join(botBundle,'lifecycle-cloudflare-entry.js'),'utf8');
   const gateway=await readFile(join(root,'apps/mini-app/dist-teacher-entrance/_worker.js/index.js'),'utf8');
+  const egaGateway=await readFile(join(root,'apps/mini-app/dist-owner-entrance/_worker.js/index.js'),'utf8');
   cluster=await createCluster();
   const db=cluster.admin;
   await db.query(await readFile(join(root,'supabase/migrations/teacher-staging/up.sql'),'utf8'));
@@ -45,7 +46,7 @@ try {
   const delivery=await createServiceLogin(cluster,'qa_workerd_delivery',[{role:'ua_cabinet_delivery',inherit:false,set:true}]);
   const lookup=await createServiceLogin(cluster,'qa_workerd_lookup',[{role:'ua_api_login',inherit:true,set:false}]);
   const clerk=await testClerk(), teacher=await provisionStaff(db,'Muallim','teacher'),admin=await provisionStaff(db,'Tasdiq','admin');
-  const owner=await provisionStaff(db,'Loyiha egasi','owner'),ownerJwt=await clerk.sign(owner.subject);
+  const owner=await provisionStaff(db,'Loyiha egasi','owner'),ownerJwt=await clerk.sign(owner.subject,{azp:ownerParty});
   const account=await provisionStudent(db,'O‘quvchi','0000000017',710300035,{clerk});
   const invitee=await provisionStudent(db,'Taklifli','0000000018',710300036,{clerk});
   const botOrigin='https://bot.stage-classroom.example.com', webhookSecret=randomBytes(24).toString('hex');
@@ -69,11 +70,16 @@ try {
     return Response.json({id,banned:false,locked:false,deprovisioned:false});
   }
   const switches={UA_CABINET_RUNTIME:'worker',UA_CABINET_STAGING_ENABLED:'true',UA_CABINET_TEACHER_ORIGIN:party};
+  const ownerSwitches={UA_CABINET_RUNTIME:'worker',UA_CABINET_STAGING_ENABLED:'true',UA_CABINET_OWNER_ORIGIN:ownerParty};
   const date='2026-11-11';
   mf=new Miniflare(convertV4MiniflareOptions({workers:[
     {name:'staff',modules:true,script:gateway,compatibilityDate:date,routes:[party+'/*'],bindings:switches,
       serviceBindings:{UA_CABINET_API:{name:'api',entrypoint:'TeacherCabinetGateway'},ASSETS:()=>new Response('static fixture')},
       outboundService:()=>{throw Error('Pages unexpectedly requested external transport');}},
+    // The Owner has its own site, Pages worker and gateway entry point; nothing is shared with the Ustoz worker above.
+    {name:'ega',modules:true,script:egaGateway,compatibilityDate:date,routes:[ownerParty+'/*'],bindings:ownerSwitches,
+      serviceBindings:{UA_CABINET_API:{name:'api',entrypoint:'OwnerCabinetGateway'},ASSETS:()=>new Response('static fixture')},
+      outboundService:()=>{throw Error('Owner Pages unexpectedly requested external transport');}},
     {name:'bot',modules:true,script:botCode,compatibilityDate:date,routes:[botOrigin+'/*'],
       bindings:{TELEGRAM_TEACHER_PILOT_ENABLED:'true',TELEGRAM_WEBHOOK_SECRET:webhookSecret,
         MINI_CABINET_URL:studentOrigin+'/',MINI_SIGN_IN_URL:studentOrigin+'/sign-in'},
@@ -81,7 +87,7 @@ try {
         TELEGRAM_START_LOOKUP:{name:'api',entrypoint:'TelegramAccountDirectory'}},
       outboundService:()=>{throw Error('Bot unexpectedly requested external transport');}},
     {name:'api',modules,modulesRoot:bundle,compatibilityDate:date,compatibilityFlags:['nodejs_compat'],routes:[apiOrigin+'/*'],
-      bindings:{...switches,UA_TELEGRAM_PILOT_DIRECTORY_ENABLED:'true',UA_TELEGRAM_LOOKUP_TIMEOUT_MS:'4000',UA_API_ORIGIN:apiOrigin,UA_ALLOWED_ORIGINS:JSON.stringify([studentOrigin]),UA_CABINET_STUDENT_ORIGIN:studentOrigin,UA_CLERK_SECRET_KEY:'local-session-fixture',
+      bindings:{...switches,UA_CABINET_OWNER_ORIGIN:ownerParty,UA_TELEGRAM_PILOT_DIRECTORY_ENABLED:'true',UA_TELEGRAM_LOOKUP_TIMEOUT_MS:'4000',UA_API_ORIGIN:apiOrigin,UA_ALLOWED_ORIGINS:JSON.stringify([studentOrigin]),UA_CABINET_STUDENT_ORIGIN:studentOrigin,UA_CLERK_SECRET_KEY:'local-session-fixture',
         UA_CLERK_PROVIDER_SETTINGS:JSON.stringify({issuer,authorizedParties:[studentOrigin],audience:{kind:'clerk_default_no_audience'},
           jwksCacheMs:300000,jwksCooldownMs:0,timeoutMs:4000,maxJwksBytes:65536})},
       hyperdrives:{CABINET_HYPERDRIVE:connection,TEACHER_PILOT_HYPERDRIVE:delivery,HYPERDRIVE:lookup},outboundService:clerkProvider}
@@ -93,10 +99,14 @@ try {
   const ownerUI=routes(browser,'owner',ownerJwt),ownerDashboard=await ownerUI.dashboard();
   assert.equal(ownerDashboard.headers.get('cache-control'),'no-store');
   assert.deepEqual(await good(ownerDashboard),{role:'owner',person_id:owner.id,name:'Loyiha egasi Sinov'});
-  for(const token of [teacherJwt,adminJwt]) await rejected(routes(browser,'owner',token).dashboard(),403);
+  // Tokens minted for the Ustoz site are not valid on the Owner site (wrong audience).
+  for(const token of [teacherJwt,adminJwt]) await rejected(routes(browser,'owner',token).dashboard(),401);
+  for(const token of [teacherJwt,adminJwt]) await rejected(routes(browser,'owner',await clerk.sign(token===teacherJwt?teacher.subject:admin.subject,{azp:ownerParty})).dashboard(),403);
   await rejected(routes(browser,'owner',account.token).dashboard(),401);
   await rejected(ownerUI.call('dashboard','POST'),404);
   assert.equal((await mf.dispatchFetch(apiOrigin+'/api/v1/owner/pilot/dashboard',{headers:{authorization:'Bearer '+ownerJwt}})).status,404);
+  // The Ustoz site has no Owner route at all: the path is a plain asset and never crosses the binding.
+  assert.equal(await (await mf.dispatchFetch(party+'/api/v1/owner/pilot/dashboard',{headers:{authorization:'Bearer '+ownerJwt}})).text(),'static fixture');
   assert.equal((await good(teacherUI.dashboard())).role,'teacher');
   assert.equal((await good(adminUI.dashboard())).role,'admin');
   assert.equal((await good(student.dashboard())).univeracademy_id,account.cabinetId);

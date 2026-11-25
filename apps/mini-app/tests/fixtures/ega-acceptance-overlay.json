@@ -1,0 +1,18 @@
+{
+  "format_version": 1,
+  "base_commit": "1a5107b57b3342d69a202fb903193751974ec97f",
+  "files": [
+    {
+      "path": "tests/teacher-staging-pilot/workerd-acceptance.mjs",
+      "previous_sha256": "4d38bd54e7ce7a5c524487257044e7870e2de768f65540f99ab87d68450a5b17",
+      "bytes": 15241,
+      "sha256": "7dfc563051b45c8f3804b1f2e5a62d6fa48483a023f421627ff07e6de22ec275"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "5189d781f0d2817e09813f3d5b80e35a28a809247b0a7a2c592d5e74e4b94c4c",
+      "bytes": 6440,
+      "sha256": "93a262ce9e8c546e7254d5faa8d40e79d0b0a11f76bd5d0d4dc121d2f2680a3e"
+    }
+  ]
+}
