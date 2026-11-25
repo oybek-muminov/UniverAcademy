@@ -1,7 +1,8 @@
 import {StaffBrowserChoices} from './staff-browser-entry.tsx';
 import {AccountDeletionHost} from './account-deletion-candidate/host.tsx';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
-import {SignIn,useClerk,useSession,useReverification} from '@clerk/react';
+import {useClerk,useSession,useReverification} from '@clerk/react';
+import {SignInCard} from './sign-in-card.tsx';
 import {reverificationError} from '@clerk/shared/authorization-errors';
 import type {CommonEntryConfig} from './common-production-runtime.ts';
 import {createProductionOwnerConnection} from './production-connection.ts';
@@ -44,7 +45,7 @@ export function AtomicTelegramEntry({config,scope}:{config:CommonEntryConfig;sco
       <p>Shu hisobni hozirgi Telegram hisobingiz bilan bog‘lashni tasdiqlang.</p>
       <button type="button" onClick={()=>void runtime.confirm('link-telegram-account-v1')}>Shu hisob bilan davom etish</button>
       <button type="button" onClick={()=>{const selected=clerk.session;if(selected)void clerk.signOut({sessionId:selected.id}).catch(()=>runtime.cancel())}}>Boshqa hisobni tanlash</button>
-    </>:<SignIn routing="hash" withSignUp oauthFlow="redirect" forceRedirectUrl={config.callbackUrl} signUpForceRedirectUrl={config.callbackUrl}/> ):<>
+    </>:<SignInCard inTelegram={true} callbackUrl={config.callbackUrl}/> ):<>
       <p role="status">{state.phase==='blocked'?'Telegram botida /start orqali yangidan oching.':'Kirish tekshirilmoqda…'}</p>
       {state.phase!=='blocked'&&<button type="button" onClick={()=>runtime.cancel()}>Bekor qilish</button>}
     </>}

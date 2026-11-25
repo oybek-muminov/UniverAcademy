@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "base_commit": "d6a476036fea2de41ca4437f8db842e398aae076",
+  "files": [
+    {
+      "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+      "previous_sha256": "5c991fe5c147195cbb5f002bac529ac4f5c207eb262a4e9d387308fe32e567b3",
+      "bytes": 5560,
+      "sha256": "3b46711ec8d6ddd02d1f0c7b0708ac9009b91efa519da69e15f1ed6f2ce9ba67"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-atomic-entry.tsx",
+      "previous_sha256": "351e249827a2419fc1cbd0e9dc4a9b255e9a871b6c1b4653c3249ed17ed96905",
+      "bytes": 4637,
+      "sha256": "50becae8eef4b7a4397691e100c361e1cd36fdd2ebb2c4c6b64b380d30288636"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "f54082d1ad12075ecff169d9242d0773ebc20075f912a905444ceb1116f1025e",
+      "bytes": 6115,
+      "sha256": "b8b44671960af4b498c226ec12e8516d67bae85c5c5d362142e3306fed55f3e2"
+    }
+  ]
+}

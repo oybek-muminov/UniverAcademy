@@ -5,11 +5,14 @@ import { createSignInController } from '../src/sign-in-controller.ts';
 import { StudentFailure } from '../src/transport.ts';
 
 test('production prebuilt uses same-window OAuth and no alternate Telegram sign-in link', () => {
-  const source = readFileSync(new URL('../src/clerk-prebuilt-entry.tsx', import.meta.url), 'utf8');
+  // The sign-in form lives in sign-in-card.tsx; the entry only mounts it with the configured callback.
+  const entry = readFileSync(new URL('../src/clerk-prebuilt-entry.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/sign-in-card.tsx', import.meta.url), 'utf8');
+  assert.match(entry, /<SignInCard inTelegram=\{webview\} callbackUrl=\{config.callbackUrl\} \/>/);
   assert.match(source, /oauthFlow="redirect"/);
-  assert.doesNotMatch(source, /window\.open|oauthFlow="popup"|Telegram orqali kirish — ixtiyoriy|https:\/\/t\.me/);
-  assert.match(source, /forceRedirectUrl=\{config.callbackUrl\}/);
-  assert.match(source, /signUpForceRedirectUrl=\{config.callbackUrl\}/);
+  for (const text of [entry, source]) assert.doesNotMatch(text, /window\.open|oauthFlow="popup"|Telegram orqali kirish — ixtiyoriy|https:\/\/t\.me/);
+  assert.match(source, /forceRedirectUrl=\{callbackUrl\}/);
+  assert.match(source, /signUpForceRedirectUrl=\{callbackUrl\}/);
   const callback = readFileSync(new URL('../src/common-production-entry.tsx', import.meta.url), 'utf8').split('// Exported content')[0];
   assert.match(callback, /\/start orqali yangidan oching/);
   assert.doesNotMatch(callback, /href=\{config.signInUrl\}|localStorage|sessionStorage|\.authorize\(|\.continueSession\(/);

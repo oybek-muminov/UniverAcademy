@@ -2,7 +2,8 @@ import {StaffBrowserChoices} from './staff-browser-entry.tsx';
 import {AccountDeletionHost} from './account-deletion-candidate/host.tsx';
 import { AtomicTelegramEntry } from './telegram-atomic-entry.tsx';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { SignIn, useClerk, useSession } from '@clerk/react';
+import { useClerk, useSession } from '@clerk/react';
+import { SignInCard } from './sign-in-card.tsx';
 import type { SignInFutureResource, SignUpFutureResource } from '@clerk/react/types';
 import { createCommonProductionRuntime } from './common-production-runtime.ts';
 import type { CommonEntryConfig } from './common-production-runtime.ts';
@@ -65,8 +66,7 @@ function LegacyPrebuiltReadyEntry({ config, scope, signIn, signUp }: {
         <button className="primary" onClick={() => void act(() => gate.enter())}>Tasdiqlangan hisob bilan davom etish</button></section>
       : webview && !launch ? <section className="card"><h1>Brauzerda davom etish kerak</h1>
         <p>Bu Telegram oynasida Google bilan kirish va tashqi brauzerdan qaytish hali ulanmagan.</p></section>
-      : <SignIn routing="hash" withSignUp oauthFlow="redirect" forceRedirectUrl={config.callbackUrl}
-        signUpForceRedirectUrl={config.callbackUrl} fallback={<p role="status">Kirish oynasi tayyorlanmoqda…</p>} />}
+      : <SignInCard inTelegram={webview} callbackUrl={config.callbackUrl} />}
     {webview && !state.busy && !authBusy && !resumePending && <StaffBrowserChoices />}
   </main>;
 }
