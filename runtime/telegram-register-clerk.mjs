@@ -2,9 +2,14 @@ import {ApiFault} from '../supabase/functions/univeracademy-api/fault.ts';
 const unavailable=()=>new ApiFault('SERVICE_UNAVAILABLE',503);
 const userId=v=>typeof v==='string'&&/^user_[A-Za-z0-9]+$/.test(v);
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const username=v=>typeof v==='string'&&/^tg[1-9][0-9]{0,15}(?:x[a-z0-9]{4,12})?$/.test(v);
+const hasUsername=u=>typeof u.username==='string'&&u.username.length>0;
+// Clerk answers a duplicate username with 422 form_identifier_exists on param "username".
+const usernameTaken=r=>r.status===422&&object(r.value)&&Array.isArray(r.value.errors)&&
+  r.value.errors.some(e=>object(e)&&e.code==='form_identifier_exists'&&object(e.meta)&&e.meta.param_name==='username');
 
 /** Quick-registration Clerk Backend API calls only: find by external_id,
- * create a password-less user, and mint a one-time sign-in token. Uses the
+ * create a password-less user with a username, add a missing username, and mint a one-time sign-in token. Uses the
  * API Worker's existing secret key. Never logs or returns bodies, tokens or
  * identities; never follows redirects. Every call shares one deadline. */
 export function createClerkRegisterTransport({secretKey,transport,timeoutMs=5000,maxResponseBytes=65536,signal}={}){
@@ -22,8 +27,12 @@ export function createClerkRegisterTransport({secretKey,transport,timeoutMs=5000
       if(!(response instanceof Response)||response.redirected||(response.url&&response.url!==url)){void response?.body?.cancel().catch(()=>{});throw unavailable();}
       if(controller.signal.aborted){void response.body?.cancel().catch(()=>{});throw unavailable();}
       const status=response.status;
-      if(status!==200){void response.body?.cancel().catch(()=>{});return {status,value:null};}
-      if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))throw unavailable();
+      // 422 bodies are read only to tell "username taken" apart from other form errors.
+      if(status!==200&&status!==422){void response.body?.cancel().catch(()=>{});return {status,value:null};}
+      if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??'')){
+        if(status===422){void response.body?.cancel().catch(()=>{});return {status,value:null};}
+        throw unavailable();
+      }
       reader=response.body?.getReader();if(!reader)throw unavailable();
       let size=0;const chunks=[];
       for(;;){const part=await reader.read();if(controller.signal.aborted)throw unavailable();if(part.done)break;
@@ -39,16 +48,24 @@ export function createClerkRegisterTransport({secretKey,transport,timeoutMs=5000
       const r=await call('/users?external_id='+encodeURIComponent(externalId)+'&limit=10','GET');
       if(r.status!==200||!Array.isArray(r.value))throw unavailable();
       // Defense in depth: keep only exact external_id matches.
-      return r.value.filter(u=>object(u)&&u.external_id===externalId).map(u=>{if(!userId(u.id))throw unavailable();return Object.freeze({id:u.id});});
+      return r.value.filter(u=>object(u)&&u.external_id===externalId).map(u=>{if(!userId(u.id))throw unavailable();return Object.freeze({id:u.id,hasUsername:hasUsername(u)});});
     },
-    async createUser({externalId,firstName,lastName}){
-      if(!/^tg:[1-9][0-9]{0,15}$/.test(externalId))throw unavailable();
-      const r=await call('/users','POST',{external_id:externalId,first_name:firstName,last_name:lastName,skip_password_requirement:true});
-      // 422: Clerk rejected the form — most commonly a concurrent request already
-      // took this external_id. The caller re-reads; nothing else is assumed.
+    async createUser({externalId,firstName,lastName,username:name}){
+      if(!/^tg:[1-9][0-9]{0,15}$/.test(externalId)||!username(name))throw unavailable();
+      const r=await call('/users','POST',{external_id:externalId,first_name:firstName,last_name:lastName,username:name,skip_password_requirement:true});
+      if(usernameTaken(r))return 'username_taken';
+      // Other 422: Clerk rejected the form — most commonly a concurrent request
+      // already took this external_id. The caller re-reads; nothing else is assumed.
       if(r.status===422)return 'exists';
-      if(r.status!==200||!object(r.value)||!userId(r.value.id)||r.value.external_id!==externalId)throw unavailable();
-      return Object.freeze({id:r.value.id});
+      if(r.status!==200||!object(r.value)||!userId(r.value.id)||r.value.external_id!==externalId||r.value.username!==name)throw unavailable();
+      return Object.freeze({id:r.value.id,hasUsername:true});
+    },
+    async setUsername(id,name){
+      if(!userId(id)||!username(name))throw unavailable();
+      const r=await call('/users/'+id,'PATCH',{username:name});
+      if(usernameTaken(r))return 'taken';
+      if(r.status!==200||!object(r.value)||r.value.id!==id||r.value.username!==name)throw unavailable();
+      return 'ok';
     },
     async createSignInToken(id,expiresInSeconds){
       if(!userId(id)||!Number.isSafeInteger(expiresInSeconds)||expiresInSeconds<120||expiresInSeconds>300)throw unavailable();

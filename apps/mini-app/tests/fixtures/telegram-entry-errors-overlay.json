@@ -1,0 +1,30 @@
+{
+  "format_version": 1,
+  "base_commit": "31c4950862225c4b4698922677a02b303e08e85d",
+  "files": [
+    {
+      "path": "apps/mini-app/src/style.css",
+      "previous_sha256": "07f6bee1d5f647dd1369387e4957be7dd3906fb73e4248d3eb2802fef1185a7c",
+      "bytes": 11233,
+      "sha256": "4e6c8942a0664d93e38bdba14916becd796419c799da546e13591efd6689acbd"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "previous_sha256": "b4867e90d20d4a18bd409ce6c71e289227dc08c31e536651a16847cb67ae7332",
+      "bytes": 18261,
+      "sha256": "73cea752f9682317e655da374385380a1f3c1c4fdc43d7c65a5cf3cfdf610dd9"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/clerk-domain.ts",
+      "previous_sha256": "599880e782602624831ea44e94e2727f1ab4c891bf6604c4b450f93fbc641656",
+      "bytes": 23569,
+      "sha256": "ace95b8a6a6ec3194d6585d4a9703196aa3a1889bf6c3cdc5c88a9b0bc646bb6"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "beb274333eadb8c21185f9b590caaebc253b9e06964fe59e9b0a9a29141b4dbf",
+      "bytes": 6666,
+      "sha256": "25da26f6d7af42828759323a61e369e7e0b2bfffebee158f68b222a02b493b3e"
+    }
+  ]
+}

@@ -35,6 +35,11 @@ function snapshot(state:ClerkCandidateState,personId:string):ClerkAuthSnapshot{
     identities:state.identities,familyBindings:state.familyBindings,studentSessions:state.studentSessions,consumedTokens:state.consumedTokens,
     families:state.domain.student.families,access:state.domain.student.access,refresh:state.domain.student.refresh};
 }
+// The API Worker and PostgreSQL keep separate clocks a few milliseconds apart.
+// Comparing them directly rejected valid sessions (GET /me 401 right after sign-in
+// whenever the database clock ran ahead). Checks use the later of the two clocks,
+// which is never earlier than either, so expiry checks only get stricter.
+const laterClock=(worker:number,database:number)=>Number.isSafeInteger(worker)&&Number.isSafeInteger(database)?Math.max(worker,database):NaN;
 async function fresh(tx:LockedTransaction){
   const r=await query(tx,"ua_clock","SELECT floor(extract(epoch FROM clock_timestamp())*1000)::text AS now_ms");
   if(r.rows.length!==1)fail("SERVICE_UNAVAILABLE",503);const now=integer(r.rows[0].now_ms);
@@ -79,8 +84,8 @@ export class ClerkDomainTransactions implements ClerkTransactions{
           verifier:o.verifier!,liveness:(id,now)=>o.liveness(id,now,{signal:o.request.signal}),
           ...(o.botToken?{legacyTelegram:{botToken:o.botToken}}:{})});
         return ()=>{
-          const now=o.verifier!.now();
-          if(o.request.signal.aborted||!Number.isSafeInteger(now)||now<checked||now<tx.now||
+          const now=laterClock(o.verifier!.now(),tx.now);
+          if(o.request.signal.aborted||!Number.isSafeInteger(now)||now<checked||
             (expiresAt!==undefined&&now>=expiresAt))fail("CLERK_SESSION_REVOKED",401);
         };
       });
@@ -118,8 +123,9 @@ export class ClerkDomainTransactions implements ClerkTransactions{
       lease=lease===undefined?value:Math.min(lease,value);
     };
     const checkTime=()=>{
-      const now=o.verifier!.now();
-      if(o.request.signal.aborted||!tx||!Number.isSafeInteger(now)||now<checkedAt||now<tx.now)fail("SERVICE_UNAVAILABLE",503);
+      if(o.request.signal.aborted||!tx)fail("SERVICE_UNAVAILABLE",503);
+      const now=laterClock(o.verifier!.now(),tx.now);
+      if(!Number.isSafeInteger(now)||now<checkedAt)fail("SERVICE_UNAVAILABLE",503);
       if(lease!==undefined&&now>=lease)fail("CLERK_SESSION_REVOKED",401);
       if((deadline!==undefined&&now>=deadline)||(issuedDeadline!==undefined&&now>=issuedDeadline))fail(proofs.kind==="access"?"APP_SESSION_EXPIRED":"REFRESH_EXPIRED",401);
       checkedAt=now;return now;
@@ -204,8 +210,8 @@ export class ClerkDomainTransactions implements ClerkTransactions{
       lease=lease===undefined?value:Math.min(lease,value);
     };
     const checkLease=()=>{
-      const now=o.verifier!.now();
-      if(o.request.signal.aborted||!tx||!Number.isSafeInteger(now)||now<checkedAt||now<tx.now||
+      const now=tx?laterClock(o.verifier!.now(),tx.now):NaN;
+      if(o.request.signal.aborted||!tx||!Number.isSafeInteger(now)||now<checkedAt||
         (lease!==undefined&&now>=lease))fail("CLERK_SESSION_REVOKED",401);
       if(appExpires!==undefined&&now>=appExpires)fail("APP_SESSION_EXPIRED",401);
     };

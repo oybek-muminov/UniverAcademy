@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {createQuickRegisterRuntime} from '../src/telegram-quick-register-runtime.ts';
+import {createQuickRegisterRuntime,describeFailure} from '../src/telegram-quick-register-runtime.ts';
+import {StudentClientProtocolError} from '../src/owner-client/student-client.ts';
 import {createTelegramRegisterClient,readTelegramNamePrefill} from '../src/telegram-register-client.ts';
 import {StudentFailure} from '../src/transport.ts';
 
 const profile=(complete,names={})=>({person:'p1',firstName:names.first??'',lastName:names.last??'',displayId:'0000000001',registrationComplete:complete});
-function setup({register,ticket=async()=>'jwt',linked=false,entry}={}){
+function setup({register,ticket=async()=>'jwt',linked=false,entry,readProfile}={}){
   const calls=[],registered=[];let person=null,complete=false,names={};
   const runtime=createQuickRegisterRuntime({
     readLaunch:()=>'signed-launch',
@@ -16,7 +17,7 @@ function setup({register,ticket=async()=>'jwt',linked=false,entry}={}){
       login:async proof=>{
         if(method==='telegram_resume'){if(!linked)throw new StudentFailure('conflict','TELEGRAM_LINK_REQUIRED');complete=true;return person='p1';}
         if(entry)await entry(proof);assert.equal(proof,'jwt');linked=true;return person='p1';}},
-      port:{profile:async()=>profile(complete,names),exams:async()=>[],register:async(f,l)=>{registered.push([f,l]);complete=true;names={first:f,last:l};return profile(true,names);}}};},
+      port:{profile:async()=>readProfile?readProfile():profile(complete,names),exams:async()=>[],register:async(f,l)=>{registered.push([f,l]);complete=true;names={first:f,last:l};return profile(true,names);}}};},
   });
   return{runtime,calls,registered};
 }
@@ -51,7 +52,8 @@ test('double tap sends one registration only',async()=>{
 test('ordinary failure returns to the name card with a retry message, never to Clerk',async()=>{
   let fail=true;const h=setup({register:async()=>{if(fail)throw new StudentFailure('temporary','SERVICE_UNAVAILABLE');return {status:'ticket',ticket:'tkt'};}});
   await h.runtime.resume();await h.runtime.submit({firstName:'A',lastName:'B'});
-  assert.equal(h.runtime.snapshot().phase,'name');assert.match(h.runtime.snapshot().notice,/qayta urinib/);
+  assert.equal(h.runtime.snapshot().phase,'name');assert.match(h.runtime.snapshot().notice,/Qayta urinib/);
+  assert.doesNotMatch(h.runtime.snapshot().notice,/Internet/);assert.equal(h.runtime.snapshot().errorCode,'SERVICE_UNAVAILABLE');
   fail=false;await h.runtime.submit({firstName:'A',lastName:'B'});assert.equal(h.runtime.snapshot().phase,'ready');
 });
 test('ticket sign-in failure also stays on the name card',async()=>{
@@ -91,4 +93,40 @@ test('wiring: default off, chosen before other Telegram entries, no Clerk/Google
   const entry=await readFile(new URL('../src/telegram-quick-register-entry.tsx',import.meta.url),'utf8');
   assert.doesNotMatch(entry,/SignInCard|SignIn\b|authenticateWithRedirect|oauth_google|openSignIn/);
   assert.match(entry,/strategy:'ticket'/);assert.match(entry,/getToken\(\{skipCache:true\}\)/);
+  assert.match(entry,/signIn\.create\(\{strategy:'ticket',ticket\}\)/);assert.doesNotMatch(entry,/signIn\.ticket\(/);
+  assert.match(entry,/className="error-code"/);
+});
+// Live 2026-11-27: entry 200, then the first profile read answered 401
+// CLERK_SESSION_REVOKED, and the card said "check the internet".
+test('a server refusal after sign-in is not called an internet problem; its code is shown',async()=>{
+  const h=setup({readProfile:async()=>{throw new StudentFailure('auth','CLERK_SESSION_REVOKED');}});
+  await h.runtime.resume();await h.runtime.submit({firstName:'A',lastName:'B'});
+  const s=h.runtime.snapshot();
+  assert.equal(s.phase,'name');assert.doesNotMatch(s.notice,/Internet/);assert.equal(s.errorCode,'CLERK_SESSION_REVOKED');
+});
+test('a request that never got an answer is called a connection problem',async()=>{
+  const h=setup({register:async()=>{throw new StudentFailure('temporary','CLIENT_REQUEST_UNCONFIRMED');}});
+  await h.runtime.resume();await h.runtime.submit({firstName:'A',lastName:'B'});
+  assert.match(h.runtime.snapshot().notice,/Internet aloqasi uzildi/);assert.equal(h.runtime.snapshot().errorCode,'CLIENT_REQUEST_UNCONFIRMED');
+});
+test('Clerk ticket failure shows Clerk\'s own code',async()=>{
+  const h=setup({ticket:async()=>{throw Object.assign(Error('x'),{code:'CLERK_TICKET_form_identifier_not_found'});}});
+  await h.runtime.resume();await h.runtime.submit({firstName:'A',lastName:'B'});
+  assert.equal(h.runtime.snapshot().errorCode,'CLERK_TICKET_FORM_IDENTIFIER_NOT_FOUND');assert.doesNotMatch(h.runtime.snapshot().notice,/Internet/);
+});
+test('blocked screen (reopen from the bot) also carries the code',async()=>{
+  const h=setup({register:async()=>{throw new StudentFailure('conflict','INIT_DATA_REPLAY');}});
+  await h.runtime.resume();await h.runtime.submit({firstName:'A',lastName:'B'});
+  assert.equal(h.runtime.snapshot().phase,'blocked');assert.equal(h.runtime.snapshot().errorCode,'INIT_DATA_REPLAY');
+});
+test('describeFailure separates real network loss from everything else',()=>{
+  assert.deepEqual(describeFailure(new StudentFailure('offline','OFFLINE')),{code:'OFFLINE',network:true});
+  assert.deepEqual(describeFailure(new StudentFailure('temporary','CLIENT_REQUEST_UNCONFIRMED')),{code:'CLIENT_REQUEST_UNCONFIRMED',network:true});
+  assert.deepEqual(describeFailure(new StudentFailure('temporary','SERVICE_UNAVAILABLE')),{code:'SERVICE_UNAVAILABLE',network:false});
+  assert.deepEqual(describeFailure(new StudentClientProtocolError('CLIENT_REQUEST_UNCONFIRMED')),{code:'CLIENT_REQUEST_UNCONFIRMED',network:true});
+  assert.deepEqual(describeFailure(new StudentClientProtocolError('CLIENT_INVALID_RESPONSE')),{code:'CLIENT_INVALID_RESPONSE',network:false});
+  assert.deepEqual(describeFailure(Object.assign(Error('n'),{code:'network_error'})),{code:'NETWORK_ERROR',network:true});
+  assert.deepEqual(describeFailure(new TypeError('Failed to fetch')),{code:'NETWORK_ERROR',network:true});
+  assert.deepEqual(describeFailure(Error('Something odd')),{code:'SOMETHING_ODD',network:false});
+  assert.deepEqual(describeFailure(42),{code:'UNKNOWN',network:false});
 });

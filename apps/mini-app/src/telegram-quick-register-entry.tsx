@@ -13,19 +13,31 @@ type Clerk=ReturnType<typeof useClerk>;
 /** One-time ticket sign-in, invisible to the student. Any previous Clerk
  * session in this Telegram window is signed out first so the ticket account
  * is the only active one. Returns a fresh (uncached) Clerk token. */
+const coded=(code:string)=>Object.assign(Error(code),{code});
+/** Clerk's own answer becomes a short code (e.g. CLERK_FORM_IDENTIFIER_NOT_FOUND);
+ * its "network_error" stays a connection problem. */
+function clerkFailure(error:unknown,step:string):Error{
+  const e=error as {code?:unknown;errors?:{code?:unknown}[]}|null;
+  if(e&&e.code==='network_error')return coded('network_error');
+  const code=Array.isArray(e?.errors)&&typeof e.errors[0]?.code==='string'?e.errors[0].code:'';
+  return coded('CLERK_'+step+(code?'_'+code:''));
+}
+// signIn.create({strategy:'ticket'}) + setActive, deliberately not the ticket() shortcut
+// (clerk/javascript#8219). Each step reports its own code on failure.
 export async function signInWithTicket(clerk:Clerk,ticket:string):Promise<string>{
-  if(clerk.session)await clerk.signOut();
+  try{if(clerk.session)await clerk.signOut();}catch(error){throw clerkFailure(error,'SIGN_OUT');}
   const signIn=clerk.client?.signIn;
-  if(!signIn)throw Error('Clerk client unavailable');
-  const attempt=await signIn.create({strategy:'ticket',ticket});
-  if(attempt.status!=='complete'||!attempt.createdSessionId)throw Error('Ticket sign-in incomplete');
-  await clerk.setActive({session:attempt.createdSessionId});
+  if(!signIn)throw coded('CLERK_NOT_READY');
+  let attempt;try{attempt=await signIn.create({strategy:'ticket',ticket});}catch(error){throw clerkFailure(error,'TICKET');}
+  if(attempt.status!=='complete'||!attempt.createdSessionId)throw coded('CLERK_TICKET_'+String(attempt.status??'INCOMPLETE'));
+  try{await clerk.setActive({session:attempt.createdSessionId});}catch(error){throw clerkFailure(error,'SET_ACTIVE');}
   const session=clerk.session;
-  if(!session||session.id!==attempt.createdSessionId||session.status!=='active'||session.currentTask)throw Error('Session not active');
-  const token=await session.getToken({skipCache:true});
-  if(!token)throw Error('No token');
+  if(!session||session.id!==attempt.createdSessionId||session.status!=='active'||session.currentTask)throw coded('CLERK_SESSION_NOT_ACTIVE');
+  let token;try{token=await session.getToken({skipCache:true});}catch(error){throw clerkFailure(error,'TOKEN');}
+  if(!token)throw coded('CLERK_NO_TOKEN');
   return token;
 }
+const ErrorCode=({code}:{code:string})=>code?<p className="error-code">Xato kodi: {code}</p>:null;
 
 export function QuickTelegramEntry({config,scope}:{config:CommonEntryConfig;scope:unknown}){
   const clerk=useClerk();
@@ -60,9 +72,11 @@ export function QuickTelegramEntry({config,scope}:{config:CommonEntryConfig;scop
         {busy?'Kabinet tayyorlanmoqda…':state.notice?'Qayta urinish':'Davom etish'}
       </button>
       {busy&&<p role="status">Kabinet tayyorlanmoqda…</p>}
+      {!busy&&<ErrorCode code={state.errorCode}/>}
     </form></main>;
   }
   return <main className="shell"><section className="card"><p className="eyebrow">UniverAcademy</p><h1>O‘quvchi kabineti</h1>
     <p role={state.phase==='blocked'?'alert':'status'}>{state.phase==='blocked'?state.notice:'Kabinet ochilmoqda…'}</p>
+    {state.phase==='blocked'&&<ErrorCode code={state.errorCode}/>}
   </section></main>;
 }

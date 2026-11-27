@@ -63,6 +63,7 @@ input::placeholder { color: #718175; }
 .instructions li { margin-bottom: 12px; padding-left: 4px; }
 .notice { margin-bottom: 20px; padding: 16px 18px; border: 1px solid #decb92; background: #fff7de; color: #67501c; border-radius: 14px; font-size: .83rem; line-height: 1.7; }
 .notice p { color: inherit; }
+.error-code { margin: 18px 0 0; color: #9aa0a6; font-size: .7rem; line-height: 1.4; text-align: center; letter-spacing: .02em; }
 .notice .text-button { margin-left: 14px; }
 .exam-bar { background: #fff; border: 1px solid #dfe6de; border-radius: 20px; padding: 20px 20px 8px; margin-bottom: 18px; }
 .exam-clock { display: flex; align-items: center; justify-content: space-between; gap: 16px; }

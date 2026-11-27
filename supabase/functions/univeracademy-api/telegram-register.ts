@@ -8,7 +8,9 @@ import {fail} from "./fault.ts";
  * Telegram replay and never creates, links or reads a cabinet session. */
 export type TelegramRegisterInput={init_data:string;first_name:string;last_name:string};
 export type TelegramRegisterResult={status:"already_registered"}|{status:"ticket";ticket:string};
-export type ClerkRegisterUser={id:string};
+/** hasUsername: Clerk refuses a sign-in ticket for a user with no identifier
+ * (no email, phone or username). Every quick-registered account gets a username. */
+export type ClerkRegisterUser={id:string;hasUsername:boolean};
 export type TelegramRegisterPorts={
   /** Verifies HMAC and freshness only. Must not consume the replay digest. */
   verifyLaunch(raw:string):Promise<{telegramUserId:number}>;
@@ -18,7 +20,10 @@ export type TelegramRegisterPorts={
   clerkMapped(userId:string):Promise<boolean>;
   clerk:{
     findByExternalId(externalId:string):Promise<ClerkRegisterUser[]>;
-    createUser(input:{externalId:string;firstName:string;lastName:string}):Promise<ClerkRegisterUser|"exists">;
+    /** "exists": this external_id was taken (double tap); "username_taken": pick another username. */
+    createUser(input:{externalId:string;firstName:string;lastName:string;username:string}):Promise<ClerkRegisterUser|"exists"|"username_taken">;
+    /** Adds a username to an existing account; "taken" when another account holds it. */
+    setUsername(userId:string,username:string):Promise<"ok"|"taken">;
     createSignInToken(userId:string,expiresInSeconds:number):Promise<string>;
   };
   /** Returns false when the caller exceeded its budget. */
@@ -47,9 +52,21 @@ export function registerInput(body:unknown):TelegramRegisterInput{
   return {init_data:b.init_data,first_name:registerName(b.first_name),last_name:registerName(b.last_name)};
 }
 export const telegramExternalId=(telegramUserId:number)=>"tg:"+telegramUserId;
-const validUser=(v:unknown):v is ClerkRegisterUser=>!!v&&typeof v==="object"&&typeof (v as {id?:unknown}).id==="string"&&/^user_[A-Za-z0-9]+$/.test((v as {id:string}).id);
+const validUser=(v:unknown):v is ClerkRegisterUser=>!!v&&typeof v==="object"&&typeof (v as {id?:unknown}).id==="string"&&/^user_[A-Za-z0-9]+$/.test((v as {id:string}).id)
+  &&typeof (v as {hasUsername?:unknown}).hasUsername==="boolean";
+/** Letters and digits only (no underscore): "tg<telegram id>", then two random
+ * fallbacks in case someone already holds that username. */
+export function registerUsernames(telegramUserId:number,random:()=>string=randomSuffix):string[]{
+  const base="tg"+telegramUserId,out=[base];
+  for(let i=0;i<2;i++){const tail=random();if(!/^[a-z0-9]{4,12}$/.test(tail))fail("SERVICE_UNAVAILABLE",503);out.push(base+"x"+tail);}
+  return out;
+}
+function randomSuffix():string{
+  const alphabet="abcdefghijklmnopqrstuvwxyz0123456789",bytes=crypto.getRandomValues(new Uint8Array(6));
+  return Array.from(bytes,b=>alphabet[b%alphabet.length]).join("");
+}
 
-export function createTelegramRegister(ports:TelegramRegisterPorts,options:{ticketSeconds?:number}={}){
+export function createTelegramRegister(ports:TelegramRegisterPorts,options:{ticketSeconds?:number;randomSuffix?:()=>string}={}){
   const ticketSeconds=options.ticketSeconds??REGISTER_TICKET_SECONDS;
   if(!Number.isSafeInteger(ticketSeconds)||ticketSeconds<120||ticketSeconds>300)fail("SERVICE_UNAVAILABLE",503);
   async function single(externalId:string):Promise<ClerkRegisterUser|null>{
@@ -66,16 +83,27 @@ export function createTelegramRegister(ports:TelegramRegisterPorts,options:{tick
     if(!await ports.allow(telegramUserId))fail("RATE_LIMITED",429);
     if(await ports.telegramLinked(telegramUserId))return {status:"already_registered"};
     const externalId=telegramExternalId(telegramUserId);
+    const usernames=registerUsernames(telegramUserId,options.randomSuffix);
     let user=await single(externalId);
     if(!user){
-      const created=await ports.clerk.createUser({externalId,firstName:input.first_name,lastName:input.last_name});
-      // A concurrent request (double tap) created it first: Clerk keeps
-      // external_id unique, so re-read and continue with that same account.
-      if(created==="exists")user=await single(externalId);
-      else if(validUser(created))user=created;
+      for(const username of usernames){
+        const created=await ports.clerk.createUser({externalId,firstName:input.first_name,lastName:input.last_name,username});
+        if(created==="username_taken")continue;
+        // A concurrent request (double tap) created it first: Clerk keeps
+        // external_id unique, so re-read and continue with that same account.
+        if(created==="exists")user=await single(externalId);
+        else if(validUser(created))user=created;
+        break;
+      }
       if(!user)fail("SERVICE_UNAVAILABLE",503);
     }
     if(await ports.clerkMapped(user.id))fail("IDENTITY_LINK_CONFLICT",409);
+    // An older account made without a username cannot use a ticket: add one first.
+    if(!user.hasUsername){
+      let added=false;
+      for(const username of usernames)if(await ports.clerk.setUsername(user.id,username)==="ok"){added=true;break;}
+      if(!added)fail("SERVICE_UNAVAILABLE",503);
+    }
     const ticket=await ports.clerk.createSignInToken(user.id,ticketSeconds);
     if(typeof ticket!=="string"||!ticket||ticket.length>4096||/[\s\x00-\x1f\x7f]/.test(ticket))fail("SERVICE_UNAVAILABLE",503);
     return {status:"ticket",ticket};

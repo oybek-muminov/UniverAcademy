@@ -75,9 +75,12 @@ function ensureClerkStudent(state:ClerkCandidateState,id:ClerkIdentity,policy:Se
 }
 function serverTime(tx:ClerkTransaction,deps:Pick<ClerkCandidateDependencies,"verifier">&{signal?:AbortSignal},floor=0):number{
   if(deps.signal?.aborted)fail("SERVICE_UNAVAILABLE",503);
-  const lockedAt=tx.now(),now=deps.verifier.now();
-  if(!Number.isSafeInteger(lockedAt)||lockedAt<0||!Number.isSafeInteger(now)||now<lockedAt||now<floor)
-    fail("SERVICE_UNAVAILABLE",503);
+  const lockedAt=tx.now(),worker=deps.verifier.now();
+  if(!Number.isSafeInteger(lockedAt)||lockedAt<0||!Number.isSafeInteger(worker))fail("SERVICE_UNAVAILABLE",503);
+  // The API Worker and PostgreSQL keep separate clocks that can differ by a few
+  // milliseconds. Use the later of the two; never reject a request for the gap.
+  const now=Math.max(worker,lockedAt);
+  if(now<floor)fail("SERVICE_UNAVAILABLE",503);
   return now;
 }
 function checkCurrentTime(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies,providerExpires:number,floor:number):number{

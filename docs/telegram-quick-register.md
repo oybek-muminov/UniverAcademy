@@ -49,3 +49,9 @@ Maxfiy kalit: yangi kalit **kerak emas** — API Worker'dagi mavjud `UA_CLERK_SE
 - Bir martalik token bilan kirgan Clerk sessiyasida «yaqinda tasdiqlangan» belgisi (`fva`) bo'lishi kerak: Clerk `ticket` ni birinchi omil deb hisoblaydi. Lokal testlar buni tasdiqlay olmaydi — 4-qadamda tekshiriladi. Bo'lmasa, atomik kirish `REVERIFICATION_REQUIRED` beradi, o'quvchi «Qayta urinish»ni ko'radi; tekshiruv yumshatilmagan.
 - `initData` 300 soniya (5 daqiqa) amal qiladi. Ism oldindan to'ldirilgani uchun odatda yetadi; o'tib ketsa, «Vaqt tugadi. Kabinetni botdan /start orqali qayta oching» chiqadi.
 - Clerk'da «yangi qurilma tasdig'i» (client trust) yoqilgan bo'lsa, `ticket` kirishiga ta'sir qilmasligi 4-qadamda tekshirilsin.
+
+## Birinchi jonli sinov (2026-11-27) va tuzatishlar
+- **Ticket rad etildi:** Clerk identifikatorsiz (email, telefon yoki username yo'q) foydalanuvchiga ticket bilan kirishni bermaydi. Endi server har bir yangi hisobni `tg<telegram_id>` username bilan yaratadi (faqat harf va raqam). Bu nom band bo'lsa, `tg<telegram_id>x<6 ta harf/raqam>` ishlatiladi. Username'i yo'q eski hisobga ticket berishdan oldin username qo'shiladi.
+- **Kirgandan keyin «internet» xatosi:** kirish muvaffaqiyatli edi, lekin keyingi profil so'rovi 401 `CLERK_SESSION_REVOKED` qaytardi. Sabab: API Worker soati baza soatidan bir necha millisoniya orqada qolsa, server sessiyani noto'g'ri «muddati o'tgan» deb hisoblardi. Bu 25-noyabrdan beri barcha Clerk orqali kirgan o'quvchilarga (qayta kirishga ham) ta'sir qilgan. Endi tekshiruvlar ikki soatning kechroq ko'rsatganini oladi.
+- **Xato ekrani:** faqat javob umuman kelmagan holatda «Internet aloqasi uzildi» deyiladi. Boshqa xatolarda umumiy xabar chiqadi, pastda esa kichik kulrang `Xato kodi: ...` yozuvi turadi. Muammo haqida xabar berilganda shu kodni so'rang.
+- Keyingi jonli sinov uchun **yangi** Telegram hisobi kerak: `tg:1096148024` endi ro'yxatdan o'tgan.

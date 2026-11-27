@@ -13,30 +13,71 @@ const env=(extra={})=>({UA_TELEGRAM_REGISTER_ENABLED:'true',...extra});
 const body=(over={})=>JSON.stringify({init_data:signedInitData(4000000001,'q-'+Math.random()),first_name:'Aziz',last_name:'Karimov',...over});
 const request=(b=body(),headers={})=>new Request(api+'/api/v1/auth/telegram/register',{method:'POST',headers:{origin:mini,'content-type':'application/json',...headers},body:b});
 
-/** In-memory Clerk + directory that behave like the real services for these checks. */
-function world({linked=new Set(),mapped=new Set(),allow}={}){
-  const users=[],events=[];let n=0;
+/** In-memory Clerk + directory that behave like the real services for these checks.
+ * Like production Clerk, a user with no identifier (no email, phone or username)
+ * cannot sign in with a ticket: the live test on 2026-11-27 failed exactly there. */
+function world({linked=new Set(),mapped=new Set(),allow,users=[]}={}){
+  const events=[];let n=0;
+  const view=u=>({id:u.id,hasUsername:!!u.username});
+  const taken=name=>users.some(u=>u.username===name);
   const clerk={
-    async findByExternalId(ext){events.push('find');await null;return users.filter(u=>u.external_id===ext).map(u=>({id:u.id}));},
-    async createUser({externalId,firstName,lastName}){events.push('create');await null;
+    async findByExternalId(ext){events.push('find');await null;return users.filter(u=>u.external_id===ext).map(view);},
+    async createUser({externalId,firstName,lastName,username}){events.push('create:'+username);await null;
       if(users.some(u=>u.external_id===externalId))return 'exists'; // Clerk keeps external_id unique
-      const u={id:'user_'+(++n),external_id:externalId,first_name:firstName,last_name:lastName};users.push(u);return {id:u.id};},
-    async createSignInToken(id,seconds){events.push('ticket');assert.ok(seconds>=120&&seconds<=300);return 'ticket_'+id;},
+      if(taken(username))return 'username_taken';
+      const u={id:'user_'+(++n),external_id:externalId,first_name:firstName,last_name:lastName,username};users.push(u);return view(u);},
+    async setUsername(id,username){events.push('username:'+username);await null;
+      if(taken(username))return 'taken';users.find(u=>u.id===id).username=username;return 'ok';},
+    async createSignInToken(id,seconds){events.push('ticket');assert.ok(seconds>=120&&seconds<=300);
+      const u=users.find(x=>x.id===id);
+      if(!u||!(u.username||u.email||u.phone))throw Object.assign(Error('Clerk: no identifier for ticket sign-in'),{status:503});
+      return 'ticket_'+id;},
   };
   const rows={telegramLinked:async id=>{events.push('linked?');return linked.has(id);},clerkMapped:async id=>{events.push('mapped?');return mapped.has(id);}};
   const registerApi=createTelegramRegisterApi({allowedOrigins:[mini],now:()=>clock,transport:async()=>{throw Error('no network')},
     getBindings:()=>({settings,secretKey:'sk_fixture',botToken:botKey,sessionPolicy:testPolicy,postgres:{connectionString:'x'}}),
     loadClient:async()=>class{},makePostgres:()=>({pool:{},close:async()=>events.push('db-close')}),
     makeClerk:()=>clerk,makeRows:()=>rows,allow:allow??createRegisterLimiter({now:()=>clock})});
-  return {api:registerApi,users,events};
+  return {api:registerApi,users,events,clerk};
 }
 const json=async r=>({status:r.status,body:await r.json()});
 
 test('new student: one Clerk account with the typed names, only a ticket is returned',async()=>{
   const w=world();const r=await json(await w.api.fetch(request(),env()));
   assert.equal(r.status,200);assert.deepEqual(r.body,{status:'ticket',ticket:'ticket_user_1'});
-  assert.equal(w.users.length,1);assert.deepEqual(w.users[0],{id:'user_1',external_id:'tg:4000000001',first_name:'Aziz',last_name:'Karimov'});
+  assert.equal(w.users.length,1);assert.deepEqual(w.users[0],{id:'user_1',external_id:'tg:4000000001',first_name:'Aziz',last_name:'Karimov',username:'tg4000000001'});
   assert.deepEqual(Object.keys(r.body).sort(),['status','ticket']);
+});
+test('fake Clerk, like the real one, refuses a ticket for a user with no identifier',async()=>{
+  const w=world({users:[{id:'user_bare',external_id:'tg:9',first_name:'A',last_name:'B'}]});
+  await assert.rejects(w.clerk.createSignInToken('user_bare',180),/no identifier/);
+  w.users[0].username='tg9';assert.equal(await w.clerk.createSignInToken('user_bare',180),'ticket_user_bare');
+});
+test('username taken by someone else: a letters-and-digits fallback is used',async()=>{
+  const w=world({users:[{id:'user_other',external_id:'tg:1',username:'tg4000000001'}]});
+  const r=await json(await w.api.fetch(request(),env()));
+  assert.equal(r.status,200);const mine=w.users.find(u=>u.external_id==='tg:4000000001');
+  assert.match(mine.username,/^tg4000000001x[a-z0-9]{6}$/);assert.ok(!/_/.test(mine.username));
+  assert.deepEqual(w.events.filter(e=>e.startsWith('create:')).length,2);
+});
+test('existing account without a username gets one before the ticket',async()=>{
+  const w=world({users:[{id:'user_old',external_id:'tg:4000000001',first_name:'Aziz',last_name:'Karimov'}]});
+  const r=await json(await w.api.fetch(request(),env()));
+  assert.equal(r.status,200);assert.deepEqual(r.body,{status:'ticket',ticket:'ticket_user_old'});
+  assert.equal(w.users.length,1);assert.equal(w.users[0].username,'tg4000000001');
+  assert.ok(w.events.indexOf('username:tg4000000001')<w.events.indexOf('ticket'));
+  assert.ok(!w.events.some(e=>e.startsWith('create:')));
+});
+test('no usable username at all: no ticket, a temporary error',async()=>{
+  const w=world({users:[{id:'user_old',external_id:'tg:4000000001'}]});
+  w.users.push({id:'x',username:'tg4000000001'});
+  const api=createTelegramRegisterApi({allowedOrigins:[mini],now:()=>clock,transport:async()=>{throw Error('no network')},
+    getBindings:()=>({settings,secretKey:'sk_fixture',botToken:botKey,sessionPolicy:testPolicy,postgres:{connectionString:'x'}}),
+    loadClient:async()=>class{},makePostgres:()=>({pool:{},close:async()=>{}}),
+    makeClerk:()=>({findByExternalId:async()=>[{id:'user_old',hasUsername:false}],createUser:async()=>{throw Error('unused');},
+      setUsername:async()=>'taken',createSignInToken:async()=>{throw Error('must not mint');}}),
+    makeRows:()=>({telegramLinked:async()=>false,clerkMapped:async()=>false}),allow:()=>true});
+  const r=await json(await api.fetch(request(),env()));assert.equal(r.status,503);
 });
 test('double tap (sequential and concurrent) never creates a second Clerk account',async()=>{
   const w=world();
@@ -107,18 +148,26 @@ test('Clerk transport: exact calls, no password, no email, secret only in header
   const seen=[];const reply=(v,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{'content-type':'application/json'}});
   const t=createClerkRegisterTransport({secretKey:'sk_x',transport:async r=>{
     seen.push({m:r.method,u:r.url,a:r.headers.get('authorization'),b:r.method==='POST'?await r.json():null});
-    if(r.url.includes('/users?'))return reply([{id:'user_A',external_id:'tg:7'},{id:'user_B',external_id:'tg:77'}]);
-    if(r.url.endsWith('/users'))return reply({id:'user_C',external_id:'tg:7'});
+    if(r.url.includes('/users?'))return reply([{id:'user_A',external_id:'tg:7',username:null},{id:'user_B',external_id:'tg:77'}]);
+    if(r.url.endsWith('/users'))return reply({id:'user_C',external_id:'tg:7',username:'tg7'});
+    if(r.method==='PATCH')return reply({id:'user_A',username:'tg7'});
     return reply({object:'sign_in_token',user_id:'user_C',token:'tok123',status:'pending'});}});
-  assert.deepEqual(await t.findByExternalId('tg:7'),[{id:'user_A'}]);
-  assert.deepEqual(await t.createUser({externalId:'tg:7',firstName:'A',lastName:'B'}),{id:'user_C'});
+  assert.deepEqual(await t.findByExternalId('tg:7'),[{id:'user_A',hasUsername:false}]);
+  assert.deepEqual(await t.createUser({externalId:'tg:7',firstName:'A',lastName:'B',username:'tg7'}),{id:'user_C',hasUsername:true});
+  assert.equal(await t.setUsername('user_A','tg7'),'ok');
   assert.equal(await t.createSignInToken('user_C',180),'tok123');
   assert.equal(seen[0].u,'https://api.clerk.com/v1/users?external_id=tg%3A7&limit=10');
-  assert.deepEqual(seen[1].b,{external_id:'tg:7',first_name:'A',last_name:'B',skip_password_requirement:true});
-  assert.deepEqual(seen[2].b,{user_id:'user_C',expires_in_seconds:180});
+  assert.deepEqual(seen[1].b,{external_id:'tg:7',first_name:'A',last_name:'B',username:'tg7',skip_password_requirement:true});
+  assert.equal(seen[2].m,'PATCH');assert.equal(seen[2].u,'https://api.clerk.com/v1/users/user_A');
+  assert.deepEqual(seen[3].b,{user_id:'user_C',expires_in_seconds:180});
   assert.ok(seen.every(s=>s.a==='Bearer sk_x'));
+  await assert.rejects(t.createUser({externalId:'tg:7',firstName:'A',lastName:'B',username:'tg_7'}),e=>e.status===503);
   const dup=createClerkRegisterTransport({secretKey:'sk_x',transport:async()=>reply({errors:[]},422)});
-  assert.equal(await dup.createUser({externalId:'tg:7',firstName:'A',lastName:'B'}),'exists');
+  assert.equal(await dup.createUser({externalId:'tg:7',firstName:'A',lastName:'B',username:'tg7'}),'exists');
+  const takenErr={errors:[{code:'form_identifier_exists',meta:{param_name:'username'}}]};
+  const taken=createClerkRegisterTransport({secretKey:'sk_x',transport:async()=>reply(takenErr,422)});
+  assert.equal(await taken.createUser({externalId:'tg:7',firstName:'A',lastName:'B',username:'tg7'}),'username_taken');
+  assert.equal(await taken.setUsername('user_A','tg7'),'taken');
   const down=createClerkRegisterTransport({secretKey:'sk_x',transport:async()=>reply({},500)});
   await assert.rejects(down.createSignInToken('user_C',180),e=>e.status===503);
 });
