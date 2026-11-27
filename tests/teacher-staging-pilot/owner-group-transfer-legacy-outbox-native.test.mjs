@@ -4,16 +4,17 @@ import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import pg from 'pg';
 import {createCloudflareEntrypoint} from '../../runtime/cloudflare-entry.mjs';
+import {createCabinetApi} from '../../runtime/teacher-cabinet-api.mjs';
 import {runStagingPilot} from '../../runtime/teacher-staging-store.mjs';
 import {createStagingInviteDeliveryStore} from '../../runtime/teacher-staging-delivery.mjs';
 import {dispatchStagingInvite} from '../../apps/telegram-bot/src/staging-invite-dispatch.mjs';
 import {startAttempt} from '../../supabase/functions/univeracademy-api/attempts.ts';
 import {decodePublished} from '../../supabase/functions/univeracademy-api/storage/attempt-rows.ts';
 import {createCluster,createServiceLogin} from './cluster.mjs';
-import {issuer,provisionStaff,provisionStudent,testClerk} from './credentials.mjs';
-import {apiOrigin,studentOrigin} from './requests.mjs';
+import {issuer,party,provisionStaff,provisionStudent,testClerk} from './credentials.mjs';
+import {apiOrigin,good,routes,studentOrigin} from './requests.mjs';
 
-// Review-only coverage authored against main 953777b6687eed6871c722234992b151202f0ac3.
+// Review-only coverage authored against main 7161afb0f75f90710e5e6e34f12780fc98083c97.
 // This exercises observable behavior of the current paths, not production routing or readiness.
 const migration=new URL('../../supabase/migrations/teacher-staging/up.sql',import.meta.url);
 const candidate=new URL('../../docs/owner-group-transfer-fence.review.sql',import.meta.url);
@@ -31,9 +32,9 @@ function bounded(promise,label){
 
 test('exact registration expiry and post-claim invite delivery versus the review fence',{timeout:90000},async t=>{
   const cluster=await createCluster(),{admin}=cluster;
-  let holder,writer,deliveryPool;
+  let holder,writer,deliveryPool,cabinetPool;
   t.after(async()=>{
-    try{await Promise.allSettled([holder?.end(),writer?.end(),deliveryPool?.end()]);}
+    try{await Promise.allSettled([holder?.end(),writer?.end(),deliveryPool?.end(),cabinetPool?.end()]);}
     finally{await cluster.close();}
   });
   await cluster.installDeletion();
@@ -85,10 +86,10 @@ test('exact registration expiry and post-claim invite delivery versus the review
   };
   const revision=async gid=>(await one(admin,'SELECT revision::text AS revision FROM ua_private.groups WHERE id=$1',[gid])).revision;
   const currentOwner=async gid=>(await one(admin,'SELECT teacher_id FROM ua_cabinet.group_requests WHERE id=$1',[gid])).teacher_id;
-  const transfer=async(gid,rev)=>{
+  const transfer=async(gid,rev,from=source.id,to=dest.id)=>{
     const k=owner.id+'/staging/transferGroup/'+digest(randomUUID());
     return (await one(holder,'SELECT ua_cabinet.owner_transfer_group_fence($1,$2,$3,$4,$5,$6) AS result',
-      [owner.id,gid,source.id,dest.id,rev,k])).result;
+      [owner.id,gid,from,to,rev,k])).result;
   };
 
   let atExpiry, clients=0, authFactory=0, expiryWrites=0;
@@ -223,22 +224,58 @@ test('exact registration expiry and post-claim invite delivery versus the review
 
   const store=createStagingInviteDeliveryStore({pool:deliveryPool});
   const urls={cabinet:studentOrigin+'/',signIn:studentOrigin+'/sign-in'};
-  const outbox=token=>one(admin,'SELECT to_jsonb(d) AS delivery, i.created_by, i.expires_at<=clock_timestamp() AS expired FROM ua_cabinet.invite_delivery d JOIN ua_cabinet.invites i ON i.digest=d.invite_digest WHERE d.invite_digest=$1',[digest(token)]);
+  const outbox=token=>one(admin,'SELECT to_jsonb(d) AS delivery, i.created_by, i.expires_at::text AS expiry, i.expires_at<=clock_timestamp() AS expired FROM ua_cabinet.invite_delivery d JOIN ua_cabinet.invites i ON i.digest=d.invite_digest WHERE d.invite_digest=$1',[digest(token)]);
+  cabinetPool=new pg.Pool({connectionString:cabinetUrl,max:1,...limits});
+  const cabinet=createCabinetApi({enabled:true,pool:cabinetPool,teacherOrigin:party,studentOrigin,apiOrigin,
+    verifier:clerk.verifier,liveness:clerk.liveness,allowLegacyTelegram:false},never);
+  const redeem=(f,key)=>routes(cabinet,'student',f.person.token).command('acceptInvite',{token:f.invite.token},key);
+  const enrollment=f=>one(admin,"SELECT to_jsonb(m) AS membership,p.profile->>'active_group_id' AS profile_group FROM ua_private.memberships m JOIN ua_private.people p ON p.id=m.person_id WHERE m.person_id=$1",[f.person.id]);
+  const redemptions=async f=>(await admin.query('SELECT invite_digest,student_id,command_key FROM ua_cabinet.redemptions WHERE invite_digest=$1 OR student_id=$2 ORDER BY invite_digest,student_id',
+    [digest(f.invite.token),f.person.id])).rows;
+  const audits=async f=>(await admin.query("SELECT a.actor_id,a.target_id,a.revision::text AS revision,r.response FROM ua_private.staff_audit a LEFT JOIN ua_private.staff_receipts r ON r.actor_id=a.actor_id AND r.key=a.command_key WHERE a.target_id=$1 AND a.action='transferGroup' ORDER BY a.revision",
+    [f.gid])).rows;
+  const nextRev=revision=>String(BigInt(revision)+1n);
+  const audit=(f,from,to,old)=>({actor_id:owner.id,target_id:f.gid,revision:nextRev(old),
+    response:{groupId:f.gid,sourceTeacherId:from,destinationTeacherId:to,previousRevision:old,revision:nextRev(old)}});
   async function queue(name,number,telegramId){
     const person=await provisionStudent(admin,name,number,telegramId,{clerk});
     const gid=await group(name+' guruhi');
     await store.recordPrivateStart({telegramUserId:telegramId});
     const invite=await teacher('sendInvite',{groupId:gid,univeracademy_id:number});
     assert.equal(invite.delivery,'queued');
-    return {person,gid,invite,rev:await revision(gid)};
+    const f={person,gid,invite,rev:await revision(gid)};
+    f.initialEnrollment=await enrollment(f);
+    assert.equal(f.initialEnrollment.membership.active,false);
+    assert.equal(f.initialEnrollment.membership.affinity_group_id,null);
+    assert.equal(f.initialEnrollment.profile_group,null);
+    assert.deepEqual(await redemptions(f),[]);
+    return f;
   }
   const move=f=>inTx(holder,owner.id,false,()=>transfer(f.gid,f.rev));
+  async function deny(f,status,code,snapshot){
+    const response=await redeem(f,randomUUID());
+    const body=await response.json();
+    assert.equal(response.status,status,JSON.stringify(body));
+    assert.equal(body.error?.code,code);
+    assert.ok(!Object.hasOwn(body,'data'));
+    assert.deepEqual(await redemptions(f),[]);
+    assert.deepEqual(await enrollment(f),f.initialEnrollment);
+    assert.deepEqual(await outbox(f.invite.token),snapshot);
+  }
   async function unredeemable(f){
-    await assert.rejects(cmd(f.person.id,'student','acceptInvite',{token:f.invite.token}),
-      e=>e?.code==='INVITE_EXPIRED');
-    assert.equal((await one(admin,'SELECT count(*)::int n FROM ua_cabinet.redemptions WHERE invite_digest=$1',[digest(f.invite.token)])).n,0);
-    assert.equal((await one(admin,'SELECT active FROM ua_private.memberships WHERE person_id=$1',[f.person.id])).active,false);
-    assert.equal((await one(admin,"SELECT count(*)::int n FROM ua_private.staff_audit WHERE target_id=$1 AND action='transferGroup'",[f.gid])).n,1);
+    const postMove=await outbox(f.invite.token);
+    assert.equal(postMove.expired,true);
+    assert.equal(await currentOwner(f.gid),dest.id);
+    // The normal route checks the former teacher's group before checking time.
+    await deny(f,404,'NOT_FOUND',postMove);
+    const forward=audit(f,source.id,dest.id,f.rev);
+    assert.deepEqual(await audits(f),[forward]);
+    const movedBack=await inTx(holder,owner.id,false,()=>transfer(f.gid,forward.revision,dest.id,source.id));
+    assert.equal(movedBack.groupId,f.gid);
+    assert.equal(await currentOwner(f.gid),source.id);
+    // Fixture-only transfer-back isolates the expiry check under matching authorship.
+    await deny(f,410,'INVITE_EXPIRED',postMove);
+    assert.deepEqual(await audits(f),[forward,audit(f,dest.id,source.id,forward.revision)]);
   }
 
   await t.test('transfer before outbox claim leaves the queue history and suppresses transport',async()=>{
@@ -283,7 +320,9 @@ test('exact registration expiry and post-claim invite delivery versus the review
       await move(f);
       assert.equal(await currentOwner(f.gid),dest.id);
       assert.deepEqual(observed,[]);
-      assert.deepEqual(await outbox(f.invite.token),{...claimed,expired:true});
+      const afterTransfer=await outbox(f.invite.token);
+      assert.notEqual(afterTransfer.expiry,claimed.expiry);
+      assert.deepEqual(afterTransfer,{...claimed,expiry:afterTransfer.expiry,expired:true});
     }finally{release.resolve();await sending;}
     assert.equal(await sending,'sent');
     assert.deepEqual(observed,[{method:'sendMessage',chat:f.person.telegramId,invite:f.invite.token}]);
@@ -295,5 +334,24 @@ test('exact registration expiry and post-claim invite delivery versus the review
     assert.equal(delivered.delivery.claim_id,claimed.delivery.claim_id);
     assert.equal(delivered.delivery.claimed_at,claimed.delivery.claimed_at);
     await unredeemable(f);
+  });
+
+  await t.test('valid targeted invite uses the same student route, with one durable redemption across replay',async()=>{
+    // Run last so this independent control never supplies a claim to either race.
+    const f=await queue('Haqiqiy taklif','0100000155',711000155);
+    const before=await outbox(f.invite.token);
+    assert.equal(before.expired,false);
+    const key=randomUUID();
+    const first=await good(redeem(f,key));
+    assert.equal(first.id,f.gid);
+    const enrolled=await enrollment(f);
+    assert.deepEqual(enrolled,{membership:{...f.initialEnrollment.membership,active:true,affinity_group_id:f.gid,
+      revision:f.initialEnrollment.membership.revision+1,epoch:f.initialEnrollment.membership.epoch+1},profile_group:f.gid});
+    assert.deepEqual(await good(redeem(f,key)),first);
+    assert.deepEqual(await enrollment(f),enrolled);
+    assert.deepEqual(await redemptions(f),[{invite_digest:digest(f.invite.token),student_id:f.person.id,command_key:key}]);
+    assert.equal(await revision(f.gid),nextRev(f.rev));
+    assert.deepEqual(await outbox(f.invite.token),before);
+    assert.deepEqual(await audits(f),[]);
   });
 });
