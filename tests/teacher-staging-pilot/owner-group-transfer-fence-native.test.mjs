@@ -6,6 +6,8 @@ import test from 'node:test';
 import pg from 'pg';
 import {assignmentSchedule} from '../../runtime/teacher-assignment-schedule.mjs';
 import {createCabinetApi} from '../../runtime/teacher-cabinet-api.mjs';
+import {startAttempt, submitAttempt} from '../../supabase/functions/univeracademy-api/attempts.ts';
+import {decodePublished, encodePublished, encodeOrdinary} from '../../supabase/functions/univeracademy-api/storage/attempt-rows.ts';
 import {runStagingPilot} from '../../runtime/teacher-staging-store.mjs';
 import {addProfile, createCluster, createServiceLogin} from './cluster.mjs';
 import {party, ownerParty, provisionStaff, testClerk} from './credentials.mjs';
@@ -74,8 +76,8 @@ test('row-fence candidate with native restricted cabinet writers', {timeout:9000
   }
   const writerIn=(actor,fn)=>inTx(writer,actor,true,fn);
   const ownerIn=fn=>inTx(holder,owner.id,false,fn);
-  const cmd=(who,role,action,input,commandKey=randomUUID())=>runStagingPilot(
-    {client:writer,personIds:[who],now:Date.now()},{personId:who,role},action,input,commandKey);
+  const cmd=(who,role,action,input,commandKey=randomUUID(),now=Date.now())=>runStagingPilot(
+    {client:writer,personIds:[who],now},{personId:who,role},action,input,commandKey);
   const teacher=(actor,action,input)=>writerIn(actor,()=>cmd(actor,'teacher',action,input));
   const group=(actor,name)=>teacher(actor,'createGroup',{name,subjectId:'physics'});
   const revision=async gid=>(await one(admin,'SELECT revision::text n FROM ua_private.groups WHERE id=$1',[gid])).n;
@@ -122,7 +124,7 @@ test('row-fence candidate with native restricted cabinet writers', {timeout:9000
     await assert.rejects(ownerIn(()=>transfer(examGroup,source.id,dest.id,examRev,'scheduled')),fault('OPEN_OR_SCHEDULED_TEST'));
   });
 
-  await t.test('restricted genuine attempt writer holds same fence and transfer preserves completed history',async sub=>{
+  await t.test('restricted genuine attempt writer holds same fence and submits normally',async sub=>{
     const testId=await draft(source.id,'Fizika: darhol');
     const now=Date.now();
     if(Date.parse(assignmentSchedule(now).closes_at)-now<30_000){sub.skip('Under 30 seconds to Tashkent admission close');return;}
@@ -138,20 +140,62 @@ test('row-fence candidate with native restricted cabinet writers', {timeout:9000
     await assert.rejects(ownerIn(()=>transfer(examGroup,source.id,dest.id,examRev,'active')),fault('ACTIVE_TEST_ATTEMPT'));
     const result=await writerIn(student,()=>cmd(student,'student','submitAttempt',{attemptId:attempt.id}));
     assert.match(result.percentage,/^[0-9]+\.[0-9]{2}$/);
-    // Fixture setup only: do not change the runtime cancellation behavior or
-    // pretend this verifies arbitrary out-of-band scheduling changes are fenced.
-    await admin.query("UPDATE ua_private.assignments SET record=jsonb_set(record,'{cancelled}','true'::jsonb) WHERE group_id=$1",[examGroup]);
+    const terminal=await one(admin,"SELECT a.body->>'status' AS status, r.exact_result FROM ua_private.attempts a JOIN ua_private.ordinary_results r ON r.attempt_id=a.id WHERE a.id=$1",[attempt.id]);
+    assert.equal(terminal?.status,'submitted');
+    assert.ok(terminal.exact_result);
+    await assert.rejects(ownerIn(()=>transfer(examGroup,source.id,dest.id,examRev,'still-open')),fault('OPEN_OR_SCHEDULED_TEST'));
+  });
+
+  await t.test('transfer preserves completed native history of a legitimately expired assignment',async()=>{
+    const oldStudent=await addProfile(admin,{name:'Tarixiy oquvchi',role:'student',cabinetId:'0100000111'});
+    const historyGroup=(await group(source.id,'Tarixiy guruh')).id;
+    await teacher(source.id,'addMember',{groupId:historyGroup,univeracademy_id:'0100000111'});
+    const testId=await draft(source.id,'Fizika: yakunlangan');
+    const rev=await revision(historyGroup);
+    // The teacher command already accepts a transaction time. Use its genuine
+    // calendar logic to create an assignment on a past Tashkent admission day.
+    const past=Date.now()-48*60*60*1000;
+    const assignment=await writerIn(source.id,()=>cmd(source.id,'teacher','assignTest',
+      {groupId:historyGroup,testId},randomUUID(),past));
+    const historical=await one(admin,"SELECT record, demo_id, (record#>>'{admission,closesAt}')::numeric < extract(epoch FROM clock_timestamp())*1000 AS closed FROM ua_private.assignments WHERE id=$1",[assignment.id]);
+    assert.equal(historical.closed,true);
+    assert.equal(historical.record.cancelled,false);
+    const epochs=await one(admin,'SELECT m.epoch, g.grant_epoch FROM ua_private.memberships m JOIN ua_private.grants g ON g.person_id=m.person_id WHERE m.person_id=$1 AND g.assignment_id=$2',[oldStudent,assignment.id]);
+    assert.equal(epochs.epoch,epochs.grant_epoch);
+    // Fixture only: build historical data with the real attempt engine and
+    // native storage encoders. No assignment update, guard bypass, or clock override.
+    const access={proofKind:'student_session',personId:oldStudent,enabled:true,assignmentIds:[assignment.id]};
+    const started=startAttempt({access,admission:{...historical.record.admission,activeGroupId:historyGroup,
+      rostered:true,profileComplete:true,membershipEpoch:Number(epochs.epoch),grantEpoch:Number(epochs.grant_epoch)},
+      published:decodePublished(historical.record.published),existing:null,id:randomUUID(),confirmed:true,now:assignment.opensAt});
+    const complete=submitAttempt(access,started,{id:started.id,generation:started.generation},started.startedAt+1).record;
+    assert.equal(complete.status,'submitted');
+    const {published,questionOrder,answers,ordinary,...body}=complete;
+    assert.deepEqual(answers,[]);
+    assert.ok(ordinary);
+    try{
+      await admin.query('BEGIN');
+      await admin.query('INSERT INTO ua_private.attempts(id,person_id,assignment_id,demo_id,generation,state_revision,body,frozen_test,question_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        [complete.id,oldStudent,assignment.id,historical.demo_id,complete.generation,complete.stateRevision,
+          JSON.stringify(body),JSON.stringify(encodePublished(published)),JSON.stringify(questionOrder)]);
+      await admin.query("INSERT INTO ua_private.exam_series(person_id,demo_id,id,current_attempt_id,generation,state_revision,normal_attempt_used,official_attempt_id,recovery_state,recovery_window) VALUES($1,$2,$3,$4,$5,$6,true,$4,'none',NULL)",
+        [oldStudent,historical.demo_id,randomUUID(),complete.id,complete.generation,complete.seriesStateRevision]);
+      await admin.query('INSERT INTO ua_private.ordinary_results(attempt_id,exact_result) VALUES($1,$2)',[complete.id,JSON.stringify(encodeOrdinary(ordinary))]);
+      await admin.query('COMMIT');
+    }finally{await admin.query('ROLLBACK');}
     const history=()=>one(admin,`SELECT
       (SELECT jsonb_agg(to_jsonb(m) ORDER BY m.person_id) FROM ua_private.memberships m WHERE m.affinity_group_id=$1) AS members,
-      (SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM ua_private.assignments a WHERE a.group_id=$1) AS assignments,
+      (SELECT to_jsonb(a) FROM ua_private.assignments a WHERE a.id=$4 AND a.group_id=$1) AS assignment,
       (SELECT to_jsonb(a) FROM ua_private.attempts a WHERE a.id=$2) AS attempt,
+      (SELECT to_jsonb(s) FROM ua_private.exam_series s WHERE s.current_attempt_id=$2) AS series,
       (SELECT to_jsonb(r) FROM ua_private.ordinary_results r WHERE r.attempt_id=$2) AS result,
-      (SELECT to_jsonb(o) FROM ua_cabinet.test_owners o WHERE o.version_id=$3) AS authorship`,[examGroup,attempt.id,testId]);
+      (SELECT to_jsonb(o) FROM ua_cabinet.test_owners o WHERE o.version_id=$3) AS authorship`,[historyGroup,complete.id,testId,assignment.id]);
     const before=await history();
-    assert.ok(before.members?.length===1&&before.assignments?.length===2&&before.attempt&&before.result);
+    assert.ok(before.members?.length===1&&before.assignment&&before.attempt&&before.series&&before.result);
     assert.equal(before.attempt.body.status,'submitted');
     assert.equal(before.authorship.teacher_id,source.id);
-    assert.equal((await ownerIn(()=>transfer(examGroup,source.id,dest.id,examRev,'history'))).groupId,examGroup);
+    assert.equal((await ownerIn(()=>transfer(historyGroup,source.id,dest.id,rev,'history'))).groupId,historyGroup);
+    assert.equal(await currentOwner(historyGroup),dest.id);
     assert.deepEqual(await history(),before);
   });
 
