@@ -13,12 +13,12 @@ export const telegramSignInAppearance = Object.freeze({
 export const TELEGRAM_SIGN_IN_HINT = 'Telegram ichida Google bilan kirish ishlamaydi. Email manzilingizni kiriting: unga kod yuboramiz.';
 
 type SignInProps = Record<string, unknown>;
-export function SignInCard({ inTelegram, callbackUrl, Component = SignIn as ComponentType<SignInProps> }: {
-  inTelegram: boolean; callbackUrl: string; Component?: ComponentType<SignInProps>;
+export function SignInCard({ inTelegram, callbackUrl, existingOnly = false, Component = SignIn as ComponentType<SignInProps> }: {
+  inTelegram: boolean; callbackUrl: string; existingOnly?: boolean; Component?: ComponentType<SignInProps>;
 }) {
   return <>
     {inTelegram && <p className="notice" role="note">{TELEGRAM_SIGN_IN_HINT}</p>}
-    <Component routing="hash" withSignUp oauthFlow="redirect" forceRedirectUrl={callbackUrl} signUpForceRedirectUrl={callbackUrl}
+    <Component routing="hash" withSignUp={!existingOnly} oauthFlow="redirect" forceRedirectUrl={callbackUrl} signUpForceRedirectUrl={callbackUrl}
       fallback={<p role="status">Kirish oynasi tayyorlanmoqda…</p>}
       {...(inTelegram ? { appearance: telegramSignInAppearance } : {})} />
   </>;

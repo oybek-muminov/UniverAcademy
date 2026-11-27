@@ -8,6 +8,7 @@ import {createQuickRegisterRuntime} from './telegram-quick-register-runtime.ts';
 import {createTelegramRegisterClient,readTelegramNamePrefill} from './telegram-register-client.ts';
 import {StudentApp} from './student-app.tsx';
 import {ChannelRequiredCard} from './channel-required.tsx';
+import {openTelegramRecovery, telegramRecoveryUrl} from './telegram-link-flow.ts';
 
 type Clerk=ReturnType<typeof useClerk>;
 /** One-time ticket sign-in, invisible to the student. Any previous Clerk
@@ -75,8 +76,13 @@ export function QuickTelegramEntry({config,scope}:{config:CommonEntryConfig;scop
       {!busy&&<ErrorCode code={state.errorCode}/>}
     </form></main>;
   }
+  const recovery = state.phase === 'blocked' && state.errorCode === 'CLERK_SESSION_REVOKED' && config.telegramBrowserLink
+    ? telegramRecoveryUrl(config.telegramBrowserLink) : null;
   return <main className="shell"><section className="card"><p className="eyebrow">UniverAcademy</p><h1>O‘quvchi kabineti</h1>
-    <p role={state.phase==='blocked'?'alert':'status'}>{state.phase==='blocked'?state.notice:'Kabinet ochilmoqda…'}</p>
+    <p role={state.phase==='blocked'?'alert':'status'}>{recovery ? 'Eski kabinetingizga kirish uchun avvalgi hisobingizni qayta tasdiqlang.' : state.phase==='blocked'?state.notice:'Kabinet ochilmoqda…'}</p>
+    {recovery && <a className="primary" href={recovery} target="_blank" rel="noopener noreferrer" onClick={event => {
+      if (openTelegramRecovery(scope,recovery)) event.preventDefault();
+    }}>Mavjud hisobimga kirish</a>}
     {state.phase==='blocked'&&<ErrorCode code={state.errorCode}/>}
   </section></main>;
 }

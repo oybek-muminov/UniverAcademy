@@ -1,0 +1,84 @@
+{
+  "format_version": 1,
+  "base_commit": "5ac68aaf91032fc9c4c1872608f17c618277097e",
+  "files": [
+    {
+      "path": "apps/mini-app/src/sign-in-card.tsx",
+      "previous_sha256": null,
+      "bytes": 1375,
+      "sha256": "4a878387458ad231cb9ad9c8f3e6702aab2f2f74b8908dd10b77ce3d7a476ada"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-browser-link-client.ts",
+      "previous_sha256": null,
+      "bytes": 3953,
+      "sha256": "50ffec3822a81c96f387b5f0cd148aab1a8693d4ef998bf7af0f9c1dca72ca6f"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-link-flow.ts",
+      "previous_sha256": null,
+      "bytes": 6004,
+      "sha256": "bee6f5c67e683eef3051493222fdcd05274144562c128a3406b69dbff2cb0b77"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-link-page.tsx",
+      "previous_sha256": null,
+      "bytes": 7418,
+      "sha256": "90960da058cc6e471a6ce96b7544587ed468ca65b10538e74bb91e2ba6eb5cde"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-link-view.tsx",
+      "previous_sha256": null,
+      "bytes": 2555,
+      "sha256": "6fe1ce7f8f3a93c63df3d969a657cc68f046dd82a78cdf95f6aa2cc1189f788e"
+    },
+    {
+      "path": "apps/mini-app/src/telegram-quick-register-entry.tsx",
+      "previous_sha256": null,
+      "bytes": 6724,
+      "sha256": "779d4628145eb1293cb0fd86c2f7a672e2d19374244222598c170cc00676ffd3"
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-browser-link-client.test.mjs",
+      "previous_sha256": null,
+      "bytes": 5464,
+      "sha256": "1e6c0e2c7334d14f457980cc88c13b73d922e18d285288a520ba8c1238ccb1b8"
+    },
+    {
+      "path": "apps/mini-app/tests/telegram-quick-register.test.mjs",
+      "previous_sha256": null,
+      "bytes": 11426,
+      "sha256": "6f37051175bc0d5bc40703600f4d3139c78a1e690712c2ec9aaf090586d95cc0"
+    },
+    {
+      "path": "contracts/telegram-browser-link.review.openapi.json",
+      "previous_sha256": null,
+      "bytes": 2987,
+      "sha256": "6b4268348f1b579eaf2f40efaab1e0829b0b8d0e6c2813cc9a1c1dc5053e3a7e"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/clerk-http.ts",
+      "previous_sha256": "73cea752f9682317e655da374385380a1f3c1c4fdc43d7c65a5cf3cfdf610dd9",
+      "bytes": 18679,
+      "sha256": "f1aaec60760669fa853b7e534a5adaf86cd48c5a7b85bc113ab385703ea3ef76"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/storage/telegram-return-rows.ts",
+      "previous_sha256": "0f75691aa83a01252bdb59202feb65057de9789dfbe5dbb1e2457a9094bea609",
+      "bytes": 17760,
+      "sha256": "fcbb338cfe2ff2d74400b2e722a397fb62805d05af533a620655ee0c1cae5e7c"
+    },
+    {
+      "path": "supabase/functions/univeracademy-api/telegram-return.ts",
+      "previous_sha256": "a0b382e0c7a9876fa24e5e94ad0d9ab729330b35e9388063d4fa4e7324ea4320",
+      "bytes": 9051,
+      "sha256": "31a41f3f1153dd2a6adc5c8b1fb904fcc5f55465afa19f57c2d51ba2571ff241"
+    },
+    {
+      "path": "tests/backend/student-prepared/telegram-rows.test.mjs",
+      "previous_sha256": "128022cda9d08fcc96399f73b9d98643e31449e470b6e36d510f504e10d185d2",
+      "bytes": 51350,
+      "sha256": "f943d3bf775f7dc33f711586c6c1eb8c47550e1e26f7ccfba0caa960f7292872"
+    }
+  ]
+}

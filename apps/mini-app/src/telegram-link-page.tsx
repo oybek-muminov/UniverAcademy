@@ -7,7 +7,7 @@ import type { CommonEntryConfig } from './common-production-runtime.ts';
 import { createProductionOwnerConnection } from './production-connection.ts';
 import { createProductionApiTransport } from './production-runtime.ts';
 import { createTelegramBrowserLinkClient, TELEGRAM_BROWSER_LINK_CONTRACT_SHA256 } from './telegram-browser-link-client.ts';
-import { beginTelegramConfirmation, forgetInvite, readTelegramCallback, rememberInvite, telegramReturnUrl } from './telegram-link-flow.ts';
+import { beginTelegramConfirmation, forgetInvite, forgetTelegramRecovery, readTelegramCallback, rememberInvite, rememberTelegramRecovery, telegramReturnUrl } from './telegram-link-flow.ts';
 import type { TabStore } from './telegram-link-flow.ts';
 import { StudentFailure } from './transport.ts';
 import { StudentApiError } from './owner-client/student-client.ts';
@@ -25,6 +25,7 @@ export function browserLinkPending(store: Pick<Storage, 'getItem'> = sessionStor
 export function linkFailureMessage(error: unknown): string {
   const code = error instanceof StudentApiError || error instanceof StudentFailure ? error.code : '';
   const status = error instanceof StudentApiError ? error.status : 0;
+  if (code === 'CLERK_IDENTITY_REVOKED') return 'Bu hisob avvalgi kabinetga bog‘lanmagan. Avval ishlatgan hisobingiz bilan kiring.';
   if (code === 'IDENTITY_LINK_CONFLICT') return 'Bu Telegram hisobi boshqa kabinetga bog‘langan yoki bu kabinet boshqa Telegram hisobiga bog‘langan. Administratorga murojaat qiling.';
   if (code === 'INIT_DATA_REPLAY') return 'Bu tasdiq allaqachon ishlatilgan. Telegram bilan qaytadan tasdiqlang.';
   if (code === 'INIT_DATA_INVALID' || code === 'INIT_DATA_EXPIRED') return 'Telegram tasdig‘i qabul qilinmadi yoki eskirdi. Qaytadan tasdiqlang.';
@@ -36,6 +37,7 @@ export function linkFailureMessage(error: unknown): string {
 export function TelegramLinkEntry({ config }: { config: CommonEntryConfig }) {
   const clerk = useClerk(), { session } = useSession();
   const [store] = useState(tabStore), [callback] = useState(() => readTelegramCallback(location.search, store));
+  const [recovery] = useState(() => rememberTelegramRecovery(location.search, store));
   const [invite] = useState(() => rememberInvite(location.search, store));
   const [phase, setPhase] = useState<LinkPhase>(config.telegramBrowserLink ? 'signin' : 'disabled'), [message, setMessage] = useState('');
   const started = useRef(false), active = session?.status === 'active' && !session.currentTask;
@@ -53,13 +55,15 @@ export function TelegramLinkEntry({ config }: { config: CommonEntryConfig }) {
     const connection = createProductionOwnerConnection({ mode: 'production', baseUrl: config.apiBaseUrl, contractSha256: config.contractSha256 }, fetch, { loginMethod: 'clerk' });
     try {
       // The person row exists only after the normal Clerk exchange; the link then needs its own fresh proof.
-      const exchange = await current.getToken({ skipCache: true });
-      if (!exchange) throw new StudentFailure('auth', 'CLERK_TOKEN_INVALID');
-      await connection.auth.login(exchange);
+      if (!recovery) {
+        const exchange = await current.getToken({ skipCache: true });
+        if (!exchange) throw new StudentFailure('auth', 'CLERK_TOKEN_INVALID');
+        await connection.auth.login(exchange);
+      }
       const proof = await current.getToken({ skipCache: true });
       if (!proof || clerk.session?.id !== current.id) throw new StudentFailure('auth', 'ACCESS_SUPERSEDED');
       await createTelegramBrowserLinkClient({ baseUrl: config.apiBaseUrl, contractSha256: TELEGRAM_BROWSER_LINK_CONTRACT_SHA256,
-        transport: createProductionApiTransport(config, fetch) }).link(proof, { code, code_verifier: verifier });
+        transport: createProductionApiTransport(config, fetch) }).link(proof, { code, code_verifier: verifier, ...(recovery ? { existing_only: true as const } : {}) });
       finish('done');
     } catch (error) { finish('failed', linkFailureMessage(error)); }
     // The app session stays valid on the server so the Mini App can resume it; only this tab's copy is dropped.
@@ -78,17 +82,18 @@ export function TelegramLinkEntry({ config }: { config: CommonEntryConfig }) {
   useEffect(() => {
     if (phase !== 'done') return;
     forgetInvite(store);
+    if (recovery) forgetTelegramRecovery(store);
     const timer = setTimeout(() => location.assign(returnUrl), 1500);
     return () => clearTimeout(timer);
-  }, [phase, returnUrl, store]);
+  }, [phase, returnUrl, store, recovery]);
   async function confirm() {
     if (!login) return;
     setPhase('working');
     try { location.assign(await beginTelegramConfirmation({ config: login, store })); }
     catch { finish('failed', 'Telegram oynasini ochib bo‘lmadi. Qaytadan urinib ko‘ring.'); }
   }
-  return <TelegramLinkView phase={phase} message={message} returnUrl={returnUrl}
-    signIn={<SignInCard inTelegram={false} callbackUrl={config.appOrigin + '/telegram-link'} />}
+  return <TelegramLinkView phase={phase} message={message} returnUrl={returnUrl} recovery={recovery}
+    signIn={<SignInCard inTelegram={false} callbackUrl={config.appOrigin + '/telegram-link'} existingOnly={recovery} />}
     onConfirm={() => void confirm()} onRetry={() => { started.current = true; setPhase(active ? 'ready' : 'signin'); }}
     onSwitchAccount={() => { started.current = false; void clerk.signOut().then(() => setPhase('signin')); }} />;
 }

@@ -797,6 +797,7 @@ applySourceTransition('ega-cabinet-overlay.json', EGA_CABINET_SHA256, 'fe30adccd
 applySourceTransition('ega-acceptance-overlay.json', EGA_ACCEPTANCE_SHA256, '1a5107b57b3342d69a202fb903193751974ec97f', 'EGA_ACCEPTANCE');
 applySourceTransition('telegram-quick-register-overlay.json', QUICK_REGISTER_SHA256, 'dde90c3e4521e6c6b1be420547609cc82904d007', 'QUICK_REGISTER');
 applySourceTransition('telegram-entry-errors-overlay.json', ENTRY_ERRORS_SHA256, '31c4950862225c4b4698922677a02b303e08e85d', 'ENTRY_ERRORS');
+applySourceTransition('telegram-session-recovery-overlay.json', '6ab0d9baa8afaac720135d8ef5cec6d85d3e32e3cbe45e879455d60959fcef9d', '5ac68aaf91032fc9c4c1872608f17c618277097e', 'SESSION_RECOVERY');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

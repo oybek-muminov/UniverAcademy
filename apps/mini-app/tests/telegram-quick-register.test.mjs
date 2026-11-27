@@ -130,3 +130,14 @@ test('describeFailure separates real network loss from everything else',()=>{
   assert.deepEqual(describeFailure(Error('Something odd')),{code:'SOMETHING_ODD',network:false});
   assert.deepEqual(describeFailure(42),{code:'UNKNOWN',network:false});
 });
+
+test('recovery mode survives browser redirects without falling into registration', async () => {
+  const {rememberTelegramRecovery,forgetTelegramRecovery,telegramRecoveryUrl}=await import('../src/telegram-link-flow.ts');
+  const m=new Map(), store={getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)};
+  assert.equal(telegramRecoveryUrl({redirectUri:'https://mini.example.org/telegram-link'}),'https://mini.example.org/telegram-link?recover=1');
+  assert.equal(rememberTelegramRecovery('',store,100),false);
+  assert.equal(rememberTelegramRecovery('?recover=1',store,100),true);
+  assert.equal(rememberTelegramRecovery('?code=telegram-return',store,2_000_000),true);
+  forgetTelegramRecovery(store);
+  assert.equal(rememberTelegramRecovery('',store,2_000_000),false);
+});
