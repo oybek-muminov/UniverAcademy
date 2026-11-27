@@ -740,6 +740,7 @@ const TEACHER_CABINET_PROFILE_SHA256 = '8faa75909fb1ff86a42f5050b631d1a7b1085aa5
 const ENTRY_ERRORS_SHA256 = 'd3a743516efa0a7aa7da882d3c628fa42bcbebf0262e614f10da8303f284e919';
 const QUICK_REGISTER_SHA256 = '1dcc1ee389a2ea9aadb1cf0248e93ebe9e31376245688ee9349093d916d616ec';
 const EGA_ACCEPTANCE_SHA256 = 'da2030c6e027cc59a2feed40bd0f78fe544cb7560134f577ee9692e940091520';
+const OWNER_ASSIGN_SHA256 = '5e69199405d3ce4329819e07dc9fe3dbef6204502161cde6b5d04e3cd37a295d';
 const EGA_CABINET_SHA256 = '33e595aff2853b5c65eee4c97440a0c0e4b82f8965d5d578c9fc16f78711ddaf';
 const TEACHER_BROWSER_LINK_SHA256 = '9d316d88db40610a3faaad30449a3e7b51a0a6a67721c13ad3c43ad8bb389733';
 const TEACHER_TELEGRAM_SIGN_IN_SHA256 = '3195b733cc0b94f5ed733ab9e1a8384870b6dcdfc1b81d83ab0da27967a6966c';
@@ -795,6 +796,7 @@ applySourceTransition('telegram-sign-in-overlay.json', TEACHER_TELEGRAM_SIGN_IN_
 applySourceTransition('telegram-browser-link-overlay.json', TEACHER_BROWSER_LINK_SHA256, '0e06fbd3c2138240b430204cc146ab20c7a2ab58', 'TEACHER_BROWSER_LINK');
 applySourceTransition('ega-cabinet-overlay.json', EGA_CABINET_SHA256, 'fe30adccdf2e775ebee46e63e28c71f634f4fc87', 'EGA_CABINET');
 applySourceTransition('ega-acceptance-overlay.json', EGA_ACCEPTANCE_SHA256, '1a5107b57b3342d69a202fb903193751974ec97f', 'EGA_ACCEPTANCE');
+applySourceTransition('owner-assign-overlay.json', OWNER_ASSIGN_SHA256, 'dde90c3e4521e6c6b1be420547609cc82904d007', 'OWNER_ASSIGN');
 applySourceTransition('telegram-quick-register-overlay.json', QUICK_REGISTER_SHA256, 'dde90c3e4521e6c6b1be420547609cc82904d007', 'QUICK_REGISTER');
 applySourceTransition('telegram-entry-errors-overlay.json', ENTRY_ERRORS_SHA256, '31c4950862225c4b4698922677a02b303e08e85d', 'ENTRY_ERRORS');
 applySourceTransition('telegram-session-recovery-overlay.json', '6ab0d9baa8afaac720135d8ef5cec6d85d3e32e3cbe45e879455d60959fcef9d', '5ac68aaf91032fc9c4c1872608f17c618277097e', 'SESSION_RECOVERY');

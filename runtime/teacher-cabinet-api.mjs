@@ -20,6 +20,7 @@ const actions={
   teacher:new Set(['createGroup','addMember','removeMember','deleteGroup','deleteTest','requestAccountDeletion','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest']),
   student:new Set(['acceptInvite','startAttempt','resumeAttempt','saveAnswer','submitAttempt']),
   admin:new Set(['approveGroup']),
+  owner:new Set(['findStudent','assignTeacher']),
 };
 async function bodyBytes(request,max) {
   if (Number(request.headers.get('content-length'))>max) fail('FILE_TOO_LARGE',413);

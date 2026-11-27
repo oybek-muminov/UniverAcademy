@@ -25,7 +25,53 @@ export async function expireVisible(tx,person,groupIds,teacher){
 }
 export async function dashboard(tx,actor){
   const base={role:actor.role,person_id:actor.personId,name:displayName(actor.profile)};
-  if(actor.role==='owner')return base;
+  if(actor.role==='owner'){
+    // The Teachers the Owner has made: name, ID and approved subjects. Nothing about their groups or students.
+    const teachers=await query(tx,`SELECT p.id,${profileNameSql} AS name,p.univeracademy_id,
+      ARRAY(SELECT subject_id FROM ua_private.teacher_subject_approvals WHERE person_id=p.id AND approved AND revoked_at_ms IS NULL ORDER BY subject_id) AS subjects,
+      (SELECT count(DISTINCT g.id)::int FROM ua_cabinet.group_requests r
+        JOIN ua_private.groups g ON g.id=r.active_group_id AND g.status='active'
+        JOIN ua_private.staff_group_scope s ON s.group_id=g.id AND s.person_id=p.id AND s.revoked_at_ms IS NULL
+        JOIN ua_private.teacher_subject_approvals ta ON ta.person_id=p.id AND ta.subject_id=r.subject_id AND ta.approved AND ta.revoked_at_ms IS NULL
+        WHERE r.teacher_id=p.id) AS "activeGroupCount"
+      FROM ua_private.people_registration p JOIN ua_private.staff_access a ON a.person_id=p.id AND a.approved
+      WHERE p.enabled AND p.roles=ARRAY['teacher']::text[] ORDER BY lower(${profileNameSql}),p.id LIMIT 200`);
+    const [overview]=await query(tx,`WITH visible_assignments AS (
+      SELECT a.group_id,
+        CASE WHEN jsonb_typeof(a.record#>'{admission,opensAt}')='number' THEN (a.record#>>'{admission,opensAt}')::numeric END AS opens_at,
+        CASE WHEN jsonb_typeof(a.record#>'{admission,closesAt}')='number' THEN (a.record#>>'{admission,closesAt}')::numeric END AS closes_at
+      FROM ua_private.assignments a
+      WHERE (a.record->'cancelled' IS NULL OR a.record->'cancelled' IN ('null'::jsonb,'false'::jsonb))
+    ) SELECT
+      (SELECT count(*)::int FROM ua_private.people_registration p JOIN ua_private.staff_access a ON a.person_id=p.id AND a.approved WHERE p.enabled AND p.roles=ARRAY['teacher']::text[]) AS "activeTeachers",
+      (SELECT count(*)::int FROM ua_private.people_registration p WHERE enabled AND roles=ARRAY['student']::text[] AND profile->'registration_complete'='true'::jsonb) AS "activeStudents",
+      (SELECT count(*)::int FROM ua_private.groups WHERE status='active') AS "activeGroups",
+      (SELECT count(*)::int FROM visible_assignments a WHERE a.opens_at<=$1 AND a.closes_at>$1
+        AND (a.group_id IS NULL OR EXISTS(SELECT 1 FROM ua_private.groups g WHERE g.id=a.group_id AND g.status='active'))) AS "openAssignments",
+      (SELECT count(*)::int FROM ua_private.attempts t WHERE t.body->>'status'='submitted'
+        AND CASE WHEN jsonb_typeof(t.body->'completedAt')='number' THEN (t.body->>'completedAt')::numeric BETWEEN $1::numeric-604800000 AND $1::numeric ELSE false END) AS "submittedLast7Days",
+      (SELECT count(*)::int FROM ua_cabinet.group_requests WHERE active_group_id IS NULL) AS "pendingGroups",
+      (SELECT count(*)::int FROM ua_private.groups g WHERE g.status='active' AND NOT EXISTS(
+        SELECT 1 FROM visible_assignments a WHERE a.group_id=g.id AND a.closes_at>$1 AND a.opens_at<a.closes_at)) AS "groupsWithoutUpcomingAssignment",
+      COALESCE(has_function_privilege(current_user,to_regprocedure('ua_cabinet.owner_assign_teacher(uuid,uuid,text)'),'EXECUTE'),false) AS "canAssignTeacher"`,[tx.now]);
+    const {canAssignTeacher,...counts}=overview;
+    const appointmentHistory=await query(tx,`SELECT CAST(e.at_ms AS double precision) AS "atMs",
+      left(concat_ws(' ',actor.profile->>'first_name',actor.profile->>'last_name'),100) AS "actorName",
+      left(concat_ws(' ',target.profile->>'first_name',target.profile->>'last_name'),100) AS "targetName"
+      FROM ua_private.staff_audit e
+      LEFT JOIN ua_private.people_registration actor ON actor.id=e.actor_id
+      LEFT JOIN ua_private.people_registration target ON target.id=e.target_id
+      WHERE e.action='assignTeacher'
+      ORDER BY e.at_ms DESC,e.command_key DESC LIMIT 12`);
+    const accountRequestHistory=await query(tx,`SELECT CAST(e.at_ms AS double precision) AS "atMs",
+      left(concat_ws(' ',teacher.profile->>'first_name',teacher.profile->>'last_name'),100) AS "teacherName"
+      FROM (SELECT DISTINCT ON (actor_id) actor_id,at_ms,command_key FROM ua_private.staff_audit
+        WHERE action='requestAccountDeletion' AND target_id=actor_id
+        ORDER BY actor_id,at_ms DESC,command_key DESC) e
+      JOIN ua_private.people_registration teacher ON teacher.id=e.actor_id AND teacher.roles=ARRAY['teacher']::text[]
+      ORDER BY e.at_ms DESC,e.command_key DESC LIMIT 12`);
+    return {...base,overview:counts,canAssignTeacher,appointmentHistory,accountRequestHistory,teachers:teachers.map(t=>({id:t.id,name:t.name,univeracademy_id:t.univeracademy_id,subjects:t.subjects,activeGroupCount:t.activeGroupCount}))};
+  }
   if(actor.role==='admin'){
     const gs=await query(tx,`SELECT r.id,r.name,r.subject_id,COALESCE(g.status,'pending') status,${profileNameSql} AS teacher_name FROM ua_cabinet.group_requests r
       LEFT JOIN ua_private.groups g ON g.id=r.active_group_id JOIN ua_private.people p ON p.id=r.teacher_id

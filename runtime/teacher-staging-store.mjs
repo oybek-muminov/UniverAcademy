@@ -4,10 +4,10 @@ import {fail} from '../supabase/functions/univeracademy-api/fault.ts';
 import {parseTeacherTestText} from './teacher-pilot-text-import.mjs';
 import {cleanText,editableDraft,requireEditable} from './teacher-pilot-import.mjs';
 import {query,need,needId,groupView,createDraft,saveDraft,publish,assign,preview,ownedTest,requireOwnedTest,archivedFilter} from './teacher-staging-content.mjs';
-import {dashboard,expireVisible} from './teacher-staging-dashboard.mjs';
+import {dashboard,expireVisible,displayName} from './teacher-staging-dashboard.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const actions={teacher:new Set(['dashboard','previewText','availableStudents','createGroup','addMember','removeMember','createInvite','sendInvite','importTest','readDraft','updateDraft','previewTest','publishTest','assignTest','deleteGroup','deleteTest','readMedia','putMedia','requestAccountDeletion']),
- student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup']),owner:new Set(['dashboard'])};
+ student:new Set(['dashboard','acceptInvite','startAttempt','saveAnswer','submitAttempt','resumeAttempt','readMedia']),admin:new Set(['dashboard','approveGroup']),owner:new Set(['dashboard','findStudent','assignTeacher'])};
 const attemptActions=new Set(['startAttempt','saveAnswer','submitAttempt','resumeAttempt']);
 function canonical(v){return JSON.stringify(v,(_,x)=>x && typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);}
 async function actorFor(tx,{personId,role}){
@@ -305,6 +305,42 @@ async function effect(tx,actor,action,input,subjectId,g){
     default:fail('FORBIDDEN',403);
   }
 }
+// The Owner's two commands. Looking up a student only reads. Making a Teacher is decided by one guarded database
+// function that re-checks the Owner, the student and the subject; the server role has no other write path to roles.
+const assignFaults={ASSIGN_FORBIDDEN:['FORBIDDEN',403],ASSIGN_SUBJECT_INVALID:['VALIDATION_ERROR',422],ASSIGN_TARGET_NOT_FOUND:['NOT_FOUND',404],
+  ASSIGN_TARGET_NOT_STUDENT:['TARGET_NOT_STUDENT',409],ASSIGN_TARGET_INCOMPLETE:['TARGET_INCOMPLETE',409],ASSIGN_TARGET_IN_GROUP:['TARGET_IN_GROUP',409]};
+const ownerSubject=input=>{const s=input.subjectId??'physics';if(s!=='physics')fail('VALIDATION_ERROR',422);return s;};
+const cabinetNumber=input=>{if(typeof input.univeracademy_id!=='string'||!/^\d{10}$/.test(input.univeracademy_id))fail('VALIDATION_ERROR',422);return input.univeracademy_id;};
+async function targetByCabinet(tx,id){
+  return (await query(tx,`SELECT p.id,p.enabled,p.roles,p.profile,EXISTS(SELECT 1 FROM ua_private.memberships m WHERE m.person_id=p.id AND m.active) AS grouped
+    FROM ua_private.people_registration p WHERE p.univeracademy_id=$1`,[id]))[0];
+}
+async function findStudent(tx,input){
+  const id=cabinetNumber(input),t=await targetByCabinet(tx,id);
+  if(!t||!t.enabled)return {found:false};
+  const student=t.roles.length===1&&t.roles[0]==='student';
+  const reason=!student?'not_student':!t.profile.registration_complete?'incomplete':t.grouped?'in_group':null;
+  return {found:true,univeracademy_id:id,name:displayName(t.profile),role:t.roles[0]??null,eligible:reason===null,reason};
+}
+async function assignTeacher(tx,actor,input,receiptKey,payload){
+  const id=cabinetNumber(input),subjectId=ownerSubject(input);
+  const prior=(await query(tx,'SELECT payload,response FROM ua_private.staff_receipts WHERE actor_id=$1 AND key=$2',[actor.personId,receiptKey]))[0];
+  if(prior){if(prior.payload!==payload)fail('IDEMPOTENCY_CONFLICT',409);return prior.response;}
+  const target=await targetByCabinet(tx,id);
+  if(!target||!target.enabled)fail('NOT_FOUND',404);
+  try{await query(tx,'SELECT ua_cabinet.owner_assign_teacher($1,$2,$3)',[actor.personId,target.id,subjectId]);}
+  catch(error){
+    const fault=assignFaults[String(error?.message??'').trim()];
+    if(fault)fail(fault[0],fault[1]);
+    if(error?.code==='42883')fail('TEACHER_APPOINTMENT_UNAVAILABLE',503);
+    throw error;
+  }
+  const response={id:target.id,univeracademy_id:id,name:displayName(target.profile),subjectId};
+  await query(tx,'INSERT INTO ua_private.staff_receipts(actor_id,key,payload,response) VALUES($1,$2,$3,$4)',[actor.personId,receiptKey,payload,response]);
+  await query(tx,'INSERT INTO ua_private.staff_audit(command_key,actor_id,action,target_id,revision,at_ms) VALUES($1,$2,$3,$4,$5,$6)',
+    [receiptKey,actor.personId,'assignTeacher',target.id,0,tx.now]);
+  return response;
+}
 export async function runStagingPilot(tx,identity,action,input={},key){
   if(!tx?.personIds?.includes(identity?.personId))fail('FORBIDDEN',403);
   if(!input||typeof input!=='object'||Array.isArray(input))fail('VALIDATION_ERROR',422);
@@ -315,6 +351,7 @@ export async function runStagingPilot(tx,identity,action,input={},key){
     return dashboard(tx,actor);
   }
   if(action==='previewText')return parseTeacherTestText(input.text);
+  if(action==='findStudent')return findStudent(tx,input);
   if(action==='availableStudents')return availableStudents(tx,actor,input);
   if(action==='readMedia'||action==='putMedia')return media(tx,actor,action,input);
   if(action==='readDraft'){
@@ -330,6 +367,7 @@ export async function runStagingPilot(tx,identity,action,input={},key){
   if(action==='acceptInvite')return accept(tx,actor,input,key);
   const importSubject=action==='importTest'?subjectFor(actor,input.subjectId):null;
   const receiptKey=actor.personId+'/staging/'+action+'/'+hash(key),payload=hash(canonical(input));
+  if(action==='assignTeacher')return assignTeacher(tx,actor,input,receiptKey,payload);
   if(action==='deleteGroup'||action==='deleteTest'){
     // A repeated request must still answer after the group or test is already gone.
     const done=(await query(tx,'SELECT payload,response FROM ua_private.staff_receipts WHERE actor_id=$1 AND key=$2',[actor.personId,receiptKey]))[0];

@@ -127,7 +127,15 @@ test('classroom workflow with restricted logins and the captured PostgreSQL cata
     const reply=await owner.dashboard();
     assert.equal(reply.headers.get('cache-control'),'no-store');
     assert.equal(reply.headers.get('access-control-allow-origin'),ownerParty);
-    assert.deepEqual(await good(reply),{role:'owner',person_id:row.id,name:'Loyiha egasi Sinov'});
+    const opened=await good(reply);
+    const {teachers,overview,canAssignTeacher,appointmentHistory,accountRequestHistory,...identity}=opened;
+    assert.deepEqual(accountRequestHistory,[]);
+    assert.deepEqual(appointmentHistory,[]);
+    assert.deepEqual(identity,{role:'owner',person_id:row.id,name:'Loyiha egasi Sinov'});
+    assert.equal(canAssignTeacher,false,'the appointment migration is absent');
+    assert.deepEqual(Object.keys(overview).sort(),['activeGroups','activeStudents','activeTeachers','groupsWithoutUpcomingAssignment','openAssignments','pendingGroups','submittedLast7Days']);
+    assert.ok(Object.values(overview).every(n=>Number.isSafeInteger(n)&&n>=0));
+    assert.ok(Array.isArray(opened.teachers));
     // Not a staff or student identity, nothing from a claim, wrong audience or another surface.
     await rejected(routes(ownerRouter,'owner',await sign(teacherRow.subject)).dashboard(),403);
     await rejected(routes(ownerRouter,'owner',await sign(adminRow.subject,{role:'owner'})).dashboard(),403);

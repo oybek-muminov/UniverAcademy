@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "base_commit": "dde90c3e4521e6c6b1be420547609cc82904d007",
+  "files": [
+    {
+      "path": "runtime/teacher-staging-dashboard.mjs",
+      "previous_sha256": "95c52eb583762a2cd64a63c02c98bdbab1c1d9232eb181fda65e921fbca3490c",
+      "bytes": 11862,
+      "sha256": "00f77c05e353b210ee373971b1276307647e5b3fb3158be9ad039b0f644042c0"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/native.test.mjs",
+      "previous_sha256": "023b4cf6cce7056aeea738571cde470ffb10f75f298f8a00b79701fd32c96d4f",
+      "bytes": 43298,
+      "sha256": "ea648455645372194ae0f40cf70dc51c6cf333ef594a7d49a73278b5101ca42a"
+    },
+    {
+      "path": "runtime/teacher-cabinet-api.mjs",
+      "previous_sha256": "0f3f206e94140a4f2e97df9de0b78e76ea1661b88cd3bee7c390538ec89793bf",
+      "bytes": 11631,
+      "sha256": "95a3e9c6653b97e9d9ca8ad782bb9719b3897514e89543cce76210ee2335f7f9"
+    },
+    {
+      "path": "tests/teacher-staging-pilot/workerd-acceptance.mjs",
+      "previous_sha256": "7dfc563051b45c8f3804b1f2e5a62d6fa48483a023f421627ff07e6de22ec275",
+      "bytes": 15629,
+      "sha256": "b39b51215d7c3ca984bab216480db82d8d01bccca11eaaaf99511fe871124977"
+    },
+    {
+      "path": "runtime/teacher-staging-store.mjs",
+      "previous_sha256": "f1a31d20781b3345ab4e4c4534671e04c54710c14806b1300f36b23f49855114",
+      "bytes": 28494,
+      "sha256": "69f6f89422ac172dfc5c396c4dc21d16feed95a0bf73706c27f3af6027164f6a"
+    },
+    {
+      "path": "runtime/cabinet-role.mjs",
+      "previous_sha256": "8d54338a397a56e06711c2680d10a20b88b12ae24786b87e6079f455ba1db4de",
+      "bytes": 473,
+      "sha256": "ac11bd60f8472263dcd47570b8cc5a445025c9ce446ef4a5da05df20cb24cc47"
+    }
+  ]
+}

@@ -98,7 +98,13 @@ try {
   const teacherUI=routes(browser,'teacher',teacherJwt),adminUI=routes(browser,'admin',adminJwt),student=routes(browser,'student',account.token);
   const ownerUI=routes(browser,'owner',ownerJwt),ownerDashboard=await ownerUI.dashboard();
   assert.equal(ownerDashboard.headers.get('cache-control'),'no-store');
-  assert.deepEqual(await good(ownerDashboard),{role:'owner',person_id:owner.id,name:'Loyiha egasi Sinov'});
+  const {overview,canAssignTeacher,appointmentHistory,accountRequestHistory,...ownerView}=await good(ownerDashboard);
+  assert.deepEqual(ownerView,{role:'owner',person_id:owner.id,name:'Loyiha egasi Sinov',
+    teachers:[{id:teacher.id,name:'Muallim Sinov',univeracademy_id:null,subjects:['physics'],activeGroupCount:0}]});
+  assert.equal(canAssignTeacher,false);
+  assert.equal(overview.activeTeachers,1);
+  assert.deepEqual(appointmentHistory,[]);
+  assert.deepEqual(accountRequestHistory,[]);
   // Tokens minted for the Ustoz site are not valid on the Owner site (wrong audience).
   for(const token of [teacherJwt,adminJwt]) await rejected(routes(browser,'owner',token).dashboard(),401);
   for(const token of [teacherJwt,adminJwt]) await rejected(routes(browser,'owner',await clerk.sign(token===teacherJwt?teacher.subject:admin.subject,{azp:ownerParty})).dashboard(),403);
