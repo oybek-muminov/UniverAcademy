@@ -1,0 +1,48 @@
+{
+  "format_version": 1,
+  "base_commit": "dde90c3e4521e6c6b1be420547609cc82904d007",
+  "files": [
+    {
+      "path": "apps/mini-app/src/clerk-prebuilt-entry.tsx",
+      "previous_sha256": "3b46711ec8d6ddd02d1f0c7b0708ac9009b91efa519da69e15f1ed6f2ce9ba67",
+      "bytes": 5898,
+      "sha256": "c64cb768f2f7ca549155b01d6c3fd3101fcb1d0b9401ed0b802a2460d496128d"
+    },
+    {
+      "path": "apps/mini-app/src/common-production-runtime.ts",
+      "previous_sha256": "004db1a9152d44764a5abe579dc72d4e8ddf271e3b139e14ed3b46ec1bc9b7b4",
+      "bytes": 5532,
+      "sha256": "166979816fd64a1e89b009aa23e94b2725dcbd920fc5d0f97196ef78c446b03a"
+    },
+    {
+      "path": "apps/telegram-bot/src/login-message-lifecycle.mjs",
+      "previous_sha256": "dc76a531e8ee1756f239d4d70265c02e7bebb283515c100f1ddca4f26fb1e55d",
+      "bytes": 10738,
+      "sha256": "4ccd0f02098346d916195e77d7511f77f7bac7a2be9588ae4c036ec04c2b7f7a"
+    },
+    {
+      "path": "apps/telegram-bot/src/returning-worker.mjs",
+      "previous_sha256": "6dedba7eacfb80f00659130558fbbc0996e34ec49e079a14e2a218125cd926b9",
+      "bytes": 9746,
+      "sha256": "d32c0e81df74fa834025b3d18a8ee753e0c0050ca8f7c7d12c916564e9ee0eba"
+    },
+    {
+      "path": "runtime/cloudflare-entry.mjs",
+      "previous_sha256": "896ac17bfb3a1a3c0cfcea9d4b8c48b4eff97098746d81ba6833ea9dc8136bc0",
+      "bytes": 13999,
+      "sha256": "8ea044a714319a616be3caf72e82376fe92f0a89ed8f947bb6645dc87785e5ef"
+    },
+    {
+      "path": "runtime/telegram-clerk-entry-api.mjs",
+      "previous_sha256": "5e0d94e0f7555ae84a66ee0891e31f48ed5185add3b800690df31cb6360280d9",
+      "bytes": 6920,
+      "sha256": "f9c814c7db6300dcf8e87007da7f9aeecb446e112e43e46a147a5c6455b22139"
+    },
+    {
+      "path": "tools/generate-account-deletion-pins.mjs",
+      "previous_sha256": "93a262ce9e8c546e7254d5faa8d40e79d0b0a11f76bd5d0d4dc121d2f2680a3e",
+      "bytes": 6555,
+      "sha256": "beb274333eadb8c21185f9b590caaebc253b9e06964fe59e9b0a9a29141b4dbf"
+    }
+  ]
+}

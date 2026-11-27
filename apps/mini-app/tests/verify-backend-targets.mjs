@@ -737,6 +737,7 @@ const TEACHER_CABINET_MENU_SHA256 = '4d02fe0367298d11b88a112c59192c287910e697762
 const TEACHER_CABINET_COMFORT_SHA256 = 'ead074b678b6d2c796902ebe647c05a373e060659bc843afba502a8179ec0ec4';
 const TEACHER_CABINET_MEMBERS_SHA256 = '86630bf8820412054a2b2e9f4d25b3a79400a9a67518073c637e49c0071bc4ea';
 const TEACHER_CABINET_PROFILE_SHA256 = '8faa75909fb1ff86a42f5050b631d1a7b1085aa5e4e4fb3135907bf28c8c6f25';
+const QUICK_REGISTER_SHA256 = '1dcc1ee389a2ea9aadb1cf0248e93ebe9e31376245688ee9349093d916d616ec';
 const EGA_ACCEPTANCE_SHA256 = 'da2030c6e027cc59a2feed40bd0f78fe544cb7560134f577ee9692e940091520';
 const EGA_CABINET_SHA256 = '33e595aff2853b5c65eee4c97440a0c0e4b82f8965d5d578c9fc16f78711ddaf';
 const TEACHER_BROWSER_LINK_SHA256 = '9d316d88db40610a3faaad30449a3e7b51a0a6a67721c13ad3c43ad8bb389733';
@@ -793,6 +794,7 @@ applySourceTransition('telegram-sign-in-overlay.json', TEACHER_TELEGRAM_SIGN_IN_
 applySourceTransition('telegram-browser-link-overlay.json', TEACHER_BROWSER_LINK_SHA256, '0e06fbd3c2138240b430204cc146ab20c7a2ab58', 'TEACHER_BROWSER_LINK');
 applySourceTransition('ega-cabinet-overlay.json', EGA_CABINET_SHA256, 'fe30adccdf2e775ebee46e63e28c71f634f4fc87', 'EGA_CABINET');
 applySourceTransition('ega-acceptance-overlay.json', EGA_ACCEPTANCE_SHA256, '1a5107b57b3342d69a202fb903193751974ec97f', 'EGA_ACCEPTANCE');
+applySourceTransition('telegram-quick-register-overlay.json', QUICK_REGISTER_SHA256, 'dde90c3e4521e6c6b1be420547609cc82904d007', 'QUICK_REGISTER');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {

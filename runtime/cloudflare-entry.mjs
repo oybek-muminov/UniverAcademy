@@ -2,6 +2,7 @@ import {fetchNativeCabinet} from './cloudflare-cabinet-route.mjs';
 import {forwardTeacherStaging} from './teacher-staging-proxy.mjs';
 import {telegramMenuEnvironmentKeys} from './telegram-menu-completion.mjs';
 import {createTelegramClerkEntryApi,atomicEntryEnabled,atomicAuthorizedParties,atomicEntryEnvironmentKeys} from "./telegram-clerk-entry-api.mjs";
+import {createTelegramRegisterApi,telegramRegisterEnvironmentKeys,REGISTER_PATH} from "./telegram-register-api.mjs";
 import {createDeletionApi,isDeletionRequestPath,deletionRequestEnvironmentKeys} from "./account-deletion-api.mjs";
 import {isContractPath} from "./contract-paths.mjs";
 import {isHyperdriveConnectionString} from "./hyperdrive-connection-string.mjs";
@@ -32,7 +33,7 @@ const envKeys=["UA_API_ORIGIN","UA_ALLOWED_ORIGINS","UA_SESSION_POLICY",
   "UA_CLERK_PROVIDER_SETTINGS","UA_CLERK_SECRET_KEY","HYPERDRIVE","UA_TELEGRAM_BOT_TOKEN","UA_TELEGRAM_LOOKUP_TIMEOUT_MS","UA_TELEGRAM_START_MODE",
   "UA_CHANNEL_GATE_ENABLED","UA_REQUIRED_CHANNEL","UA_REQUIRED_CHANNEL_URL",
   "UA_TELEGRAM_LOGIN_ENABLED","UA_TELEGRAM_LOGIN_CLIENT_ID","UA_TELEGRAM_LOGIN_CLIENT_SECRET","UA_TELEGRAM_LOGIN_REDIRECT_URI",
-  ...pilotEnvironmentKeys,...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys];
+  ...pilotEnvironmentKeys,...deletionRequestEnvironmentKeys,...atomicEntryEnvironmentKeys,...telegramMenuEnvironmentKeys,...telegramRegisterEnvironmentKeys];
 const policyKeys=["initDataMaxAgeSeconds","futureSkewSeconds","accessTtlMs",
   "familyTtlMs","logoutTombstoneMs","identityCollisionAttempts","newLogin"];
 
@@ -131,6 +132,8 @@ export function createCloudflareEntrypoint({loadClient=async()=>(await import("p
       if(new URL(request.url).origin!==publics.apiOrigin)return response("MALFORMED_REQUEST",400);
       if(isDeletionRequestPath(new URL(request.url).pathname))
         return await createDeletionApi({allowedOrigins:publics.allowedOrigins,loadClient,makeClerk,transport,now}).fetch(request,env);
+      if(new URL(request.url).pathname.replace(/\/$/,"")===REGISTER_PATH)
+        return await createTelegramRegisterApi({allowedOrigins:publics.allowedOrigins,getBindings:env=>privateBindings(env,true),loadClient,transport,now}).fetch(request,env);
       if(new URL(request.url).pathname==="/api/v1/auth/telegram/entry")
         return await createTelegramClerkEntryApi({allowedOrigins:publics.allowedOrigins,getBindings:env=>privateBindings(env,true),loadClient,makeClerk,transport,now,numericPresentation:unavailableNumbers}).fetch(request,env);
       return await withPublicCors(async scopedRequest=>{

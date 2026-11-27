@@ -20,3 +20,11 @@ export function browserLoginUrl(env, invite = null) {
   return url.href;
 }
 export const browserLoginKeyboard = url => ({ inline_keyboard: [[{ text: BROWSER_LOGIN_BUTTON, url }]] });
+
+// Quick registration (owner decision 2026-11-27): a new student gets ONE button that opens the Mini App
+// cabinet inside Telegram; the Mini App asks only for first and last name. Bot flag, default off, so the
+// previous button returns instantly by removing TELEGRAM_QUICK_REGISTER. /telegram-link stays in code.
+export const QUICK_REGISTER_TEXT = 'Assalomu alaykum! UniverAcademy’ga xush kelibsiz. Kabinetingizni ochish uchun tugmani bosing.';
+export const QUICK_REGISTER_BUTTON = 'Kabinetni ochish';
+export const quickRegisterEnabled = env => !!env && Object.hasOwn(env, 'TELEGRAM_QUICK_REGISTER') && env.TELEGRAM_QUICK_REGISTER === 'true';
+export const quickRegisterKeyboard = cabinetUrl => ({ inline_keyboard: [[{ text: QUICK_REGISTER_BUTTON, web_app: { url: cabinetUrl } }]] });

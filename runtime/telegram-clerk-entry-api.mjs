@@ -3,6 +3,7 @@ import {TelegramClerkEntryRows} from '../supabase/functions/univeracademy-api/st
 import {createCloudflarePostgres} from './cloudflare-postgres.mjs';
 import {createTelegramClerkEntryHttp} from './telegram-clerk-entry-http.mjs';
 import {publicHttpsOrigin} from './local-cors.mjs';
+import {telegramRegisterEnabled} from './telegram-register-api.mjs';
 const unavailable=()=>new ApiFault('SERVICE_UNAVAILABLE',503);
 export const atomicEntryEnvironmentKeys=Object.freeze(['UA_TELEGRAM_ATOMIC_ENTRY_ENABLED','UA_TELEGRAM_ATOMIC_AUTHORIZED_PARTIES']);
 export function atomicEntryEnabled(env){
@@ -29,7 +30,9 @@ export function createTelegramClerkEntryApi({allowedOrigins,getBindings,loadClie
   const origin=request.headers.get('origin');const reply=(status,code)=>new Response(JSON.stringify({error:{code,message:code}}),{status,headers:{'content-type':'application/json','cache-control':'no-store','cdn-cache-control':'no-store','cloudflare-cdn-cache-control':'no-store','vary':'Origin',...(allowedOrigins.includes(origin)?{'access-control-allow-origin':origin}:{})}});
   // All public gates precede private binding/provider/DB access.
   if(!origin||!allowedOrigins.includes(origin))return reply(403,'FORBIDDEN');
-  try{if(!atomicEntryEnabled(env))return reply(404,'NOT_FOUND');}catch{return reply(503,'SERVICE_UNAVAILABLE');}
+  // Quick registration needs only this endpoint. It deliberately does NOT
+  // imply atomic mode's narrowing of /auth/clerk or retirement of /auth/telegram/link.
+  try{if(!atomicEntryEnabled(env)&&!telegramRegisterEnabled(env))return reply(404,'NOT_FOUND');}catch{return reply(503,'SERVICE_UNAVAILABLE');}
   const url=new URL(request.url);
   if(url.pathname!=='/api/v1/auth/telegram/entry'||url.search)return reply(404,'NOT_FOUND');
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type','cache-control':'no-store','vary':'Origin'}});

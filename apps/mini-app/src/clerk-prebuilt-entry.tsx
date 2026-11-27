@@ -1,6 +1,7 @@
 import {StaffBrowserChoices} from './staff-browser-entry.tsx';
 import {AccountDeletionHost} from './account-deletion-candidate/host.tsx';
 import { AtomicTelegramEntry } from './telegram-atomic-entry.tsx';
+import { QuickTelegramEntry } from './telegram-quick-register-entry.tsx';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useClerk, useSession } from '@clerk/react';
 import { SignInCard } from './sign-in-card.tsx';
@@ -17,6 +18,8 @@ import { ChannelRequiredCard } from './channel-required.tsx';
 // fields, synthetic provider or roles are installed. Telegram links use only
 // reviewed server operations; a widget/cookie/lookup never grants a cabinet.
 export function PrebuiltReadyEntry(props: {config:CommonEntryConfig;scope:unknown;signIn:SignInFutureResource;signUp:SignUpFutureResource}) {
+  // New students register inside Telegram with just their name (default off).
+  if(props.config.telegramQuickRegister && props.config.telegramEnabled && hasTelegramLaunchContext(props.scope))return <QuickTelegramEntry config={props.config} scope={props.scope}/>;
   if(props.config.telegramAtomicEnabled && hasTelegramLaunchContext(props.scope))return <AtomicTelegramEntry config={props.config} scope={props.scope}/>;
   return <LegacyPrebuiltReadyEntry {...props}/>;
 }

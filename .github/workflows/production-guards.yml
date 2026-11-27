@@ -48,6 +48,8 @@ jobs:
       - run: node --test tests/teacher-cabinet/*.test.mjs
       - run: node tests/account-deletion/run-native.mjs
       - run: node tests/telegram-entry/run-native.mjs
+      - run: node --test tests/telegram-register/*.test.mjs apps/mini-app/tests/telegram-quick-register.test.mjs
+      - run: node tests/telegram-register/run-native.mjs
       - run: node --test apps/mini-app/tests/dashboard-*.test.mjs
       - run: npm --prefix apps/mini-app run build
         env:

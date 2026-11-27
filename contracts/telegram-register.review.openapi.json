@@ -1,0 +1,51 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UniverAcademy quick Telegram registration (review fragment)",
+    "version": "0.1.0-quick-register.1",
+    "description": "Additive and default-off (UA_TELEGRAM_REGISTER_ENABLED). For a new student inside the Telegram Mini App the server creates the Clerk account itself (external_id tg:<telegram id>, no email, no password) and returns only a short-lived one-time Clerk sign-in token. The Mini App signs in with it (ticket strategy) and then calls the existing atomic entry POST /api/v1/auth/telegram/entry with the same init_data. This operation never records a Telegram replay, never creates a cabinet and never issues an app session. It changes no existing operation in telegram-return.openapi.json."
+  },
+  "paths": {
+    "/api/v1/auth/telegram/register": {
+      "post": {
+        "operationId": "registerTelegramStudent",
+        "summary": "Prepare a new student's Clerk account from a signed Telegram launch",
+        "description": "No bearer token: the signed init_data is the only proof and is verified (HMAC and freshness) without being consumed. Names are trimmed; each is 1-64 characters of letters, spaces, hyphens and apostrophes (' ‘ ’ ʻ ʼ); control characters are rejected. If the Telegram account already has a cabinet, nothing is created and already_registered is returned. At most one Clerk account exists per Telegram account; repeated or concurrent calls reuse it. Limited to 5 calls per 10 minutes per Telegram account (per server instance).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["init_data", "first_name", "last_name"],
+                "properties": {
+                  "init_data": { "type": "string", "minLength": 1, "maxLength": 16384 },
+                  "first_name": { "type": "string", "minLength": 1, "maxLength": 64 },
+                  "last_name": { "type": "string", "minLength": 1, "maxLength": 64 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Either the student already has a cabinet (use /auth/telegram/resume) or a one-time sign-in ticket (valid 180 seconds).",
+            "content": { "application/json": { "schema": { "oneOf": [
+              { "type": "object", "additionalProperties": false, "required": ["status"], "properties": { "status": { "const": "already_registered" } } },
+              { "type": "object", "additionalProperties": false, "required": ["status", "ticket"], "properties": { "status": { "const": "ticket" }, "ticket": { "type": "string", "minLength": 1, "maxLength": 4096 } } }
+            ] } } }
+          },
+          "400": { "description": "MALFORMED_JSON." },
+          "401": { "description": "INIT_DATA_INVALID or INIT_DATA_EXPIRED." },
+          "403": { "description": "FORBIDDEN: origin not allowed." },
+          "404": { "description": "Route disabled." },
+          "409": { "description": "IDENTITY_LINK_CONFLICT: the Clerk account for this Telegram account already belongs to another cabinet, or more than one exists." },
+          "422": { "description": "VALIDATION_ERROR: body shape or names." },
+          "429": { "description": "RATE_LIMITED." },
+          "503": { "description": "SERVICE_UNAVAILABLE: Clerk or the database is unavailable." }
+        }
+      }
+    }
+  }
+}

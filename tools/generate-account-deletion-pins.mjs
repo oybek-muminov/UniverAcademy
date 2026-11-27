@@ -53,6 +53,7 @@ const transitions = [
   readPinned(manifests+'telegram-browser-link-overlay.json', /const TEACHER_BROWSER_LINK_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'ega-cabinet-overlay.json', /const EGA_CABINET_SHA256 = '([a-f0-9]{64})';/),
   readPinned(manifests+'ega-acceptance-overlay.json', /const EGA_ACCEPTANCE_SHA256 = '([a-f0-9]{64})';/),
+  readPinned(manifests+'telegram-quick-register-overlay.json', /const QUICK_REGISTER_SHA256 = '([a-f0-9]{64})';/),
 ].map(release => new Map(release.files.map(file => [file.path,file])));
 const previousFiles = new Map(previous.files.map(file => [file.path, file]));
 const rows = [];

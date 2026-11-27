@@ -25,7 +25,7 @@ export function readCommonEntryConfig(env: Readonly<Record<string, unknown>>, pa
   return Object.freeze({ ...config, publishableKey: key, clerkFrontendOrigin: url.origin,
     callbackUrl: config.appOrigin + '/auth/callback', signInUrl: config.appOrigin + '/sign-in',
     stagingPilotEnabled: env.VITE_TEACHER_PILOT_ENABLED === 'true',
-    telegramEnabled: env.VITE_TELEGRAM_SDK_ENABLED === 'true', telegramAtomicEnabled: env.VITE_TELEGRAM_ATOMIC_ENTRY === 'true', deletionEnabled: env.VITE_ACCOUNT_DELETION_ENABLED === 'true',
+    telegramEnabled: env.VITE_TELEGRAM_SDK_ENABLED === 'true', telegramAtomicEnabled: env.VITE_TELEGRAM_ATOMIC_ENTRY === 'true', telegramQuickRegister: env.VITE_TELEGRAM_QUICK_REGISTER === 'true', deletionEnabled: env.VITE_ACCOUNT_DELETION_ENABLED === 'true',
     telegramBrowserLink: readTelegramLoginConfig(env, config.appOrigin) });
 }
 export type CommonEntryConfig = ReturnType<typeof readCommonEntryConfig>;

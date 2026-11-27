@@ -3,7 +3,7 @@ import { teacherPilotStartToken } from './teacher-pilot-invite.mjs';
 import { lookupValidatedStart } from './private-start-lookup.mjs';
 import { staffCabinetNavigation } from './staff-cabinet-navigation.mjs';
 import { channelBlock, CHANNEL_PROMPT_TEXT, channelPromptMarkup } from './channel-gate.mjs';
-import { browserLoginUrl, browserLoginKeyboard, BROWSER_INVITE_TEXT } from './browser-login.mjs';
+import { browserLoginUrl, browserLoginKeyboard, BROWSER_INVITE_TEXT , quickRegisterEnabled, quickRegisterKeyboard, QUICK_REGISTER_TEXT } from './browser-login.mjs';
 import { createTelegramDelivery } from './telegram-delivery.mjs';
 import { readChannelGate } from '../../../runtime/channel-membership.mjs';
 
@@ -69,6 +69,8 @@ async function handleChannelCheck(env, check) {
   const nav = await lookupValidatedStart(context, env.TELEGRAM_START_LOOKUP);
   if (nav.status === 'disabled') return json({ method: 'answerCallbackQuery', callback_query_id: check.callback_query_id });
   const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
+  if (nav.status === 'needs_clerk' && quickRegisterEnabled(env)) return json({ method: 'sendMessage', chat_id: check.telegram_user_id,
+    text: QUICK_REGISTER_TEXT, reply_markup: quickRegisterKeyboard(urls.cabinet) });
   if (nav.status === 'needs_clerk') return json({ method: 'sendMessage', chat_id: check.telegram_user_id,
     text: GREETINGS.needs_clerk, reply_markup: { inline_keyboard: [[{ text: 'Kirish / Ro‘yxatdan o‘tish', web_app: { url: urls.signIn } }]] } });
   const staff = await staffCabinetNavigation(env, check.telegram_user_id);
@@ -102,7 +104,8 @@ export function createReturningBotWorker() {
           if (nav.status === 'disabled') return ack();
           const urls = readMiniDestinations(env.MINI_CABINET_URL, env.MINI_SIGN_IN_URL);
           // A new student cannot confirm an invitation before signing in, and Google needs a normal browser.
-          const browser = nav.status === 'needs_clerk' ? browserLoginUrl(env, invite) : null;
+          // Quick registration: the cabinet itself registers the new student, then shows the invitation.
+          const browser = nav.status === 'needs_clerk' && !quickRegisterEnabled(env) ? browserLoginUrl(env, invite) : null;
           if (browser) return json({ method: 'sendMessage', chat_id: context.telegram_user_id, text: BROWSER_INVITE_TEXT, reply_markup: browserLoginKeyboard(browser) });
           const url = new URL(urls.cabinet);
           url.searchParams.set('invite', invite);
@@ -129,6 +132,8 @@ export function createReturningBotWorker() {
       const gate = linked && !staff ? await channelBlock(env, context.telegram_user_id) : null;
       if (gate) return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
         text: CHANNEL_PROMPT_TEXT, reply_markup: channelPromptMarkup(gate) });
+      if (navigation.status === 'needs_clerk' && quickRegisterEnabled(env)) return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
+        text: QUICK_REGISTER_TEXT, reply_markup: quickRegisterKeyboard(urls.cabinet) });
       const browser = navigation.status === 'needs_clerk' ? browserLoginUrl(env) : null;
       if (browser) return json({ method: 'sendMessage', chat_id: context.telegram_user_id,
         text: GREETINGS.needs_clerk, reply_markup: browserLoginKeyboard(browser) });
