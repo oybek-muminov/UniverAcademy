@@ -96,6 +96,7 @@ export class TelegramReturnRows implements TelegramReturnPort{
   async linkLogin(proof:ClerkProof,login:TelegramLoginInput):Promise<{ok:true}>{return this.run("link",login,proof) as Promise<{ok:true}>;}
   private async run(kind:"link"|"resume",raw:string|TelegramLoginInput,proof?:ClerkProof):Promise<{ok:true}|TelegramSession>{
     const o=this.o,policy=checkSessionPolicy(o.sessionPolicy);if(!o.verifier||typeof o.liveness!=="function")unavailable();
+    const existingOnly=typeof raw!=="string"&&raw.existing_only===true;
     const timestamps=telegramRequestClock(o.now);
     let launch:TelegramLaunch;
     if(typeof raw==="string"){if(!o.botToken)unavailable();launch=await verifyTelegramLaunch(raw,o.botToken,policy,timestamps.worker());}
@@ -154,6 +155,7 @@ export class TelegramReturnRows implements TelegramReturnPort{
       if(!auth.identities[clerkIdentityKey(identity)]?.enabled||auth.identities[clerkIdentityKey(identity)].personId!==personId)fail("CLERK_IDENTITY_REVOKED",401);
       let result:{ok:true}|TelegramSession;
       if(kind==="link"){
+        if(existingOnly&&person.telegramId!==launch.telegramUserId)fail("IDENTITY_LINK_CONFLICT",409);
         if(person.telegramId!==null&&person.telegramId!==launch.telegramUserId)fail("IDENTITY_LINK_CONFLICT",409);
         await live(proof!);
         if(person.telegramId===launch.telegramUserId){

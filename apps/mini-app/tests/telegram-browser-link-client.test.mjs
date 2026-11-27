@@ -55,3 +55,13 @@ test('only the HTTPS production API base is accepted', () => {
   for (const baseUrl of ['http://api.example.org/api/v1', 'https://api.example.org/other', 'https://u:p@api.example.org/api/v1', 'https://api.example.org/api/v1?x=1', 'nope'])
     assert.throws(() => createTelegramBrowserLinkClient({ baseUrl, transport: async () => json({}), contractSha256: TELEGRAM_BROWSER_LINK_CONTRACT_SHA256 }), isProtocol);
 });
+
+test('recovery sends the existing-only instruction; false and extra fields are refused', async () => {
+  const { calls, api } = client(json({ data: { ok: true } }));
+  const input = { ...BODY, existing_only: true };
+  assert.deepEqual(await api.link(JWT, input), { ok: true });
+  assert.deepEqual(JSON.parse(calls[0].body), input);
+  await assert.rejects(api.link(JWT, { ...BODY, existing_only: false }), isProtocol);
+  await assert.rejects(api.link(JWT, { ...input, extra: true }), isProtocol);
+  assert.equal(calls.length, 1);
+});

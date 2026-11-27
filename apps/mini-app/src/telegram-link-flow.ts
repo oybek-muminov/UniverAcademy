@@ -4,6 +4,28 @@
 // client secret and verifies Telegram's signed answer. The secret never reaches this bundle.
 export const TELEGRAM_AUTH_URL = 'https://oauth.telegram.org/auth';
 export const TELEGRAM_BOT_URL = 'https://t.me/univeracademybot';
+import { readTelegramBridge } from './telegram-bridge.ts';
+
+const RECOVERY_KEY = 'ua.telegram-link.recovery';
+export function telegramRecoveryUrl(config: TelegramLoginConfig): string {
+  return config.redirectUri + '?recover=1';
+}
+export function openTelegramRecovery(scope: unknown, url: string): boolean {
+  const bridge = readTelegramBridge(scope);
+  if (typeof bridge?.openLink !== 'function') return false;
+  try { bridge.openLink(url); return true; } catch { return false; }
+}
+export function rememberTelegramRecovery(search: string, store: TabStore, now = Date.now()): boolean {
+  const recovery = new URLSearchParams(search).get('recover') === '1';
+  try {
+    if (recovery) store.setItem(RECOVERY_KEY, String(now));
+    const at = Number(store.getItem(RECOVERY_KEY));
+    return recovery || (at > 0 && now >= at);
+  } catch { return recovery; }
+}
+export function forgetTelegramRecovery(store: TabStore): void {
+  try { store.removeItem(RECOVERY_KEY); } catch { /* storage unavailable */ }
+}
 const PENDING_KEY = 'ua.telegram-link.pending', INVITE_KEY = 'ua.telegram-link.invite';
 export const PENDING_MAX_AGE_MS = 10 * 60 * 1000;
 const INVITE = /^grp_[A-Za-z0-9_-]{1,60}$/;

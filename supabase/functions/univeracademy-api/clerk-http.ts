@@ -100,11 +100,12 @@ async function verifyCurrentClerk(tx:ClerkTransaction,proof:ClerkProof,deps:Cler
 }
 // Internal post-verification transaction operation, not an HTTP/auth bypass.
 // The public handler still obtains proof only from createClerkVerifier.
-export async function exchangeClerkSession(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies){
+export async function exchangeClerkSession(tx:ClerkTransaction,proof:ClerkProof,deps:ClerkCandidateDependencies,existingOnly=false){
   const {state}=tx,policy=checkSessionPolicy(deps.sessionPolicy),id=identity(proof);
   // identities is the locked, authoritative platform projection. Disabled
   // mappings remain existing mappings and can never enter provisioning.
   const creating=!Object.hasOwn(state.identities,clerkIdentityKey(id));
+  if(existingOnly&&creating)fail("CLERK_IDENTITY_REVOKED",401);
   const checked=await verifyCurrentClerk(tx,proof,deps,creating),{providerExpires}=checked;
   const digest=await proofHash(clerkReplayIdentity(proof));
   // All provider/clock/digest awaits precede account creation and supersession.
@@ -203,6 +204,11 @@ export function createClerkCandidateHandler(configuration:ClerkCandidateDependen
         const login=await telegramLoginBody(request),proof=await createClerkVerifier(deps.verifier)(bearer(request));
         const operation=deps.transactions.telegramReturn;if(!operation?.linkLogin)fail("SERVICE_UNAVAILABLE",503);
         const result=await operation.linkLogin(proof,login);
+        if(login.existing_only){
+          // Both providers confirmed the existing pair, and exchange cannot provision.
+          // Keep the session server-side; the next signed Telegram launch resumes it.
+          await deps.transactions.transaction(tx=>exchangeClerkSession(tx,proof,deps,true),{kind:"exchange",proof});
+        }
         return studentResponse(request,result);
       }
       if(path==="/api/v1/auth/telegram/resume"&&request.method==="POST"){

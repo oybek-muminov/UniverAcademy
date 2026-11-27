@@ -473,3 +473,26 @@ test('HTTP route: Telegram refusing the code leaves the link and the replay tabl
  const response=await f.post(f.handlerWithLogin(f.loginConfig));assert.equal(response.status,401);assert.equal((await response.json()).error.code,'INIT_DATA_INVALID');
  assert.equal(f.pool.data.people[ids.person].telegramId,null);assert.equal(Object.keys(f.pool.data.initReplays).length,0);
 });
+
+test('existing-only browser recovery never creates a missing link or changes a different link', {skip:!jose}, async () => {
+  for (const existing of [null, secondTg]) {
+    const f=await loginFixture();
+    f.pool.data.people[ids.person].telegramId=existing;
+    const before=structuredClone(f.pool.data);
+    const response=await f.post(f.handlerWithLogin(f.loginConfig), {...f.body,existing_only:true});
+    assert.equal(response.status,409);
+    assert.equal((await response.json()).error.code,'IDENTITY_LINK_CONFLICT');
+    assert.deepEqual(f.pool.data,before);
+  }
+});
+test('existing-only browser recovery renews the same cabinet and returns only acknowledgement', {skip:!jose}, async () => {
+  const f=await loginFixture();
+  f.pool.data.people[ids.person].telegramId=tg;
+  for(const family of Object.values(f.pool.data.families))family.expiresAt=clock-1;
+  const original=structuredClone(f.pool.data.people);
+  const response=await f.post(f.handlerWithLogin(f.loginConfig), {...f.body,existing_only:true});
+  assert.equal(response.status,200,await response.clone().text());
+  assert.deepEqual((await response.json()).data,{ok:true});
+  assert.deepEqual(f.pool.data.people,original);
+  assert.equal((await f.resume(await launch())).status,200);
+});

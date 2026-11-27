@@ -9,7 +9,7 @@ import type {JWTVerifyGetKey} from "jose";
 export type TelegramStartState="linked"|"needs_clerk"|"disabled";
 export type TelegramStartInput=Readonly<{update_id:number;telegram_user_id:number}>;
 export type TelegramSession={access_token:string;refresh_token:string;expires_at:string;refresh_expires_at:string;token_type:"Bearer";profile:ReturnType<typeof profileWire>};
-export type TelegramLoginInput=Readonly<{code:string;code_verifier:string}>;
+export type TelegramLoginInput=Readonly<{code:string;code_verifier:string;existing_only?:true}>;
 export type TelegramReturnPort={link(proof:ClerkProof,raw:string):Promise<{ok:true}>;resume(raw:string):Promise<TelegramSession>;linkLogin?(proof:ClerkProof,login:TelegramLoginInput):Promise<{ok:true}>};
 export type TelegramLaunch=Readonly<{telegramUserId:number;authDate:number;replayDigest:string}>;
 const verifiedLaunches=new WeakSet<object>();
@@ -68,10 +68,12 @@ export const TELEGRAM_LOGIN_TOKEN_URL="https://oauth.telegram.org/token";
 const MAX_TOKEN_RESPONSE=65_536;
 export async function telegramLoginBody(request:Request):Promise<TelegramLoginInput>{
   let value:unknown;try{value=JSON.parse(await request.text());}catch{fail("MALFORMED_JSON",400);}
-  if(!plain(value)||Reflect.ownKeys(value).length!==2||!Object.hasOwn(value,"code")||!Object.hasOwn(value,"code_verifier"))fail("VALIDATION_ERROR",422);
+  if(!plain(value)||Reflect.ownKeys(value).length!==(Object.hasOwn(value,"existing_only")?3:2)||!Object.hasOwn(value,"code")||!Object.hasOwn(value,"code_verifier"))fail("VALIDATION_ERROR",422);
   const code=ownValue(value,"code"),verifier=ownValue(value,"code_verifier");
   if(typeof code!=="string"||!/^[\x21-\x7e]{8,2048}$/.test(code)||typeof verifier!=="string"||!/^[A-Za-z0-9\-._~]{43,128}$/.test(verifier))fail("VALIDATION_ERROR",422);
-  return Object.freeze({code,code_verifier:verifier});
+  const existingOnly=Object.hasOwn(value,"existing_only");
+  if(existingOnly&&ownValue(value,"existing_only")!==true)fail("VALIDATION_ERROR",422);
+  return Object.freeze({code,code_verifier:verifier,...(existingOnly?{existing_only:true as const}:{})});
 }
 export async function verifyTelegramLoginLaunch(input:TelegramLoginInput,config:TelegramLoginConfig,policy:SessionPolicy,now:number):Promise<TelegramLaunch>{
   checkSessionPolicy(policy);if(!Number.isSafeInteger(now)||now<0)unavailable();
