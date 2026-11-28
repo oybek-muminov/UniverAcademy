@@ -196,6 +196,11 @@ textarea { resize: vertical; min-height: 55px; width: 100%; padding: 8px; border
   top: 0; z-index: 1; background: white; padding: 14px 18px; border-bottom: 1px solid #dbe4dc; }
 .preview-header h2 { margin: 0; overflow-wrap: anywhere; }
 #preview-content { padding: 4px 18px 14px; }
+#student-dialog #preview-content :is(.pilot-formula, .pilot-formula-block) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: .15em;
+}
 body:has(#student-dialog[open]) { overflow: hidden; }
 @media (max-width: 580px) {
   .editor-meta { grid-template-columns: minmax(0,1fr); }

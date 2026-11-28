@@ -1,0 +1,12 @@
+{
+  "format_version": 1,
+  "base_commit": "65391aaf5c9797f784a44f5a507d597c3296345a",
+  "files": [
+    {
+      "path": "apps/teacher-web/local-pilot/styles.css",
+      "previous_sha256": "ab7a2661dc2e9fe4394eb3470ccd8e9cbdd59727ff653756190b0d355e430ab0",
+      "bytes": 15672,
+      "sha256": "350dbf89efd55fae78604e36d1845299ffe89e8c8631682aa805784502a65e6f"
+    }
+  ]
+}

@@ -800,6 +800,8 @@ applySourceTransition('owner-assign-overlay.json', OWNER_ASSIGN_SHA256, 'dde90c3
 applySourceTransition('telegram-quick-register-overlay.json', QUICK_REGISTER_SHA256, 'dde90c3e4521e6c6b1be420547609cc82904d007', 'QUICK_REGISTER');
 applySourceTransition('telegram-entry-errors-overlay.json', ENTRY_ERRORS_SHA256, '31c4950862225c4b4698922677a02b303e08e85d', 'ENTRY_ERRORS');
 applySourceTransition('telegram-session-recovery-overlay.json', '6ab0d9baa8afaac720135d8ef5cec6d85d3e32e3cbe45e879455d60959fcef9d', '5ac68aaf91032fc9c4c1872608f17c618277097e', 'SESSION_RECOVERY');
+const USTOZ_FORMULA_SCROLL_SHA256 = 'db62680de5520a4766c27a0a07e1be39e6537fe9468c748d2af57f577e779757';
+applySourceTransition('ustoz-formula-scroll-overlay.json', USTOZ_FORMULA_SCROLL_SHA256, '65391aaf5c9797f784a44f5a507d597c3296345a', 'USTOZ_FORMULA_SCROLL');
 for (const file of selected.values()) {
   const bytes = readTarget(file.path);
   if (currentRuntimePaths.includes(file.path)) {
